@@ -1,2 +1,0 @@
-com.solace.test.integration.junit.jupiter.extension.LogTestInfoExtension
-org.assertj.core.api.junit.jupiter.SoftAssertionsExtension
