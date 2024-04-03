@@ -1,6 +1,8 @@
 package com.solace.spring.cloud.stream.binder.properties;
 
 import com.solace.spring.cloud.stream.binder.util.DestinationType;
+import com.solace.spring.cloud.stream.binder.util.PersistenceMode;
+import com.solacesystems.jcsmp.DeliveryMode;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.ArrayList;
@@ -48,6 +50,10 @@ public class SolaceProducerProperties extends SolaceCommonProperties {
 	 * When set to true, irreversibly convert non-serializable headers to strings. An exception is thrown otherwise.
 	 */
 	private boolean nonserializableHeaderConvertToString = false;
+    /**
+     * Indicated if messages should be sending fire and forget or producer has to wait for broker persistence ack.
+     */
+    private DeliveryMode deliveryMode = DeliveryMode.PERSISTENT;
 
 	public DestinationType getDestinationType() {
 		return destinationType;
@@ -96,4 +102,12 @@ public class SolaceProducerProperties extends SolaceCommonProperties {
 	public void setNonserializableHeaderConvertToString(boolean nonserializableHeaderConvertToString) {
 		this.nonserializableHeaderConvertToString = nonserializableHeaderConvertToString;
 	}
+
+    public DeliveryMode getDeliveryMode() {
+        return deliveryMode;
+    }
+
+    public void setDeliveryMode(DeliveryMode deliveryMode) {
+        this.deliveryMode = deliveryMode;
+    }
 }

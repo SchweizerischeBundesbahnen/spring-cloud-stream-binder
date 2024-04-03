@@ -8,15 +8,15 @@ import java.util.Objects;
 import java.util.StringJoiner;
 
 public class RetryableAckRebindTask implements RetryableTaskService.RetryableTask {
-	private final FlowReceiverContainer flowReceiverContainer;
+	private final Receiver receiver;
 	private final MessageContainer messageContainer;
 	private final RetryableTaskService taskService;
 
 	private static final Log logger = LogFactory.getLog(RetryableAckRebindTask.class);
 
-	public RetryableAckRebindTask(FlowReceiverContainer flowReceiverContainer, MessageContainer messageContainer,
+	public RetryableAckRebindTask(Receiver receiver, MessageContainer messageContainer,
 								  RetryableTaskService taskService) {
-		this.flowReceiverContainer = flowReceiverContainer;
+		this.receiver = receiver;
 		this.messageContainer = messageContainer;
 		this.taskService = taskService;
 	}
@@ -24,25 +24,25 @@ public class RetryableAckRebindTask implements RetryableTaskService.RetryableTas
 	@Override
 	public boolean run(int attempt) throws InterruptedException {
 		try {
-			if (flowReceiverContainer.acknowledgeRebind(messageContainer, true) != null) {
+			if (receiver.acknowledgeRebind(messageContainer, true) != null) {
 				return true;
 			} else if (messageContainer.isAcknowledged()) {
-				taskService.submit(new RetryableRebindTask(flowReceiverContainer,
+				taskService.submit(new RetryableRebindTask(receiver,
 						messageContainer.getFlowReceiverReferenceId(), taskService));
 				return true;
 			} else {
 				return false;
 			}
 		} catch (JCSMPException | UnboundFlowReceiverContainerException e) {
-			if (messageContainer.isStale() && !flowReceiverContainer.isBound()) {
+			if (messageContainer.isStale() && !receiver.isBound()) {
 				logger.warn(String.format(
 						"failed to rebind queue %s and flow container %s is now unbound. Attempting to bind.",
-						flowReceiverContainer.getQueueName(), flowReceiverContainer.getId()), e);
-				taskService.submit(new RetryableBindTask(flowReceiverContainer));
+                        receiver.getEndpointName(), receiver.getId()), e);
+				taskService.submit(new RetryableBindTask(receiver));
 				return true;
 			} else {
 				logger.warn(String.format("failed to rebind flow container %s queue %s. Will retry",
-						flowReceiverContainer.getId(), flowReceiverContainer.getQueueName()), e);
+                        receiver.getId(), receiver.getEndpointName()), e);
 				return false;
 			}
 		} catch (SolaceStaleMessageException e) {
@@ -55,7 +55,7 @@ public class RetryableAckRebindTask implements RetryableTaskService.RetryableTas
 	@Override
 	public String toString() {
 		return new StringJoiner(", ", RetryableAckRebindTask.class.getSimpleName() + "[", "]")
-				.add("flowReceiverContainer=" + flowReceiverContainer.getId())
+				.add("flowReceiverContainer=" + receiver.getId())
 				.add("messageContainer=" + messageContainer.getId())
 				.toString();
 	}
@@ -65,13 +65,13 @@ public class RetryableAckRebindTask implements RetryableTaskService.RetryableTas
 		if (this == o) return true;
 		if (o == null || getClass() != o.getClass()) return false;
 		RetryableAckRebindTask that = (RetryableAckRebindTask) o;
-		return Objects.equals(flowReceiverContainer, that.flowReceiverContainer) &&
+		return Objects.equals(receiver, that.receiver) &&
 				Objects.equals(messageContainer, that.messageContainer) &&
 				Objects.equals(taskService, that.taskService);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(flowReceiverContainer, messageContainer, taskService);
+		return Objects.hash(receiver, messageContainer, taskService);
 	}
 }

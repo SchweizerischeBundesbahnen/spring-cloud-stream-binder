@@ -48,9 +48,9 @@ public class ErrorQueueInfrastructure {
 	}
 
 	public ErrorQueueRepublishCorrelationKey createCorrelationKey(MessageContainer messageContainer,
-																  FlowReceiverContainer flowReceiverContainer,
+																  Receiver receiver,
 																  boolean hasTemporaryQueue) {
-		return new ErrorQueueRepublishCorrelationKey(this, messageContainer, flowReceiverContainer,
+		return new ErrorQueueRepublishCorrelationKey(this, messageContainer, receiver,
 				hasTemporaryQueue, retryableTaskService);
 	}
 

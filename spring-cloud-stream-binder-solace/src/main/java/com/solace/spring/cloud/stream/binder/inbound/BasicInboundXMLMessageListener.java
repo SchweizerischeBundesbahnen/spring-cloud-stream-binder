@@ -4,6 +4,7 @@ import com.solace.spring.cloud.stream.binder.inbound.acknowledge.JCSMPAcknowledg
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
+import com.solace.spring.cloud.stream.binder.util.Receiver;
 import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -25,18 +26,18 @@ public class BasicInboundXMLMessageListener extends InboundXMLMessageListener {
 
 	private static final Log logger = LogFactory.getLog(BasicInboundXMLMessageListener.class);
 
-	BasicInboundXMLMessageListener(FlowReceiverContainer flowReceiverContainer,
-								   ConsumerDestination consumerDestination,
-								   ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
-								   @Nullable BatchCollector batchCollector,
-								   Consumer<Message<?>> messageConsumer,
-								   JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
-								   BiFunction<Message<?>, RuntimeException, Boolean> errorHandlerFunction,
-								   @Nullable SolaceMeterAccessor solaceMeterAccessor,
-								   @Nullable AtomicBoolean remoteStopFlag,
-								   ThreadLocal<AttributeAccessor> attributesHolder,
-								   boolean needHolderAndAttributes) {
-		super(flowReceiverContainer,
+	BasicInboundXMLMessageListener(Receiver receiver,
+                                   ConsumerDestination consumerDestination,
+                                   ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
+                                   @Nullable BatchCollector batchCollector,
+                                   Consumer<Message<?>> messageConsumer,
+                                   JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
+                                   BiFunction<Message<?>, RuntimeException, Boolean> errorHandlerFunction,
+                                   @Nullable SolaceMeterAccessor solaceMeterAccessor,
+                                   @Nullable AtomicBoolean remoteStopFlag,
+                                   ThreadLocal<AttributeAccessor> attributesHolder,
+                                   boolean needHolderAndAttributes) {
+		super(receiver,
 				consumerDestination,
 				consumerProperties,
 				batchCollector,

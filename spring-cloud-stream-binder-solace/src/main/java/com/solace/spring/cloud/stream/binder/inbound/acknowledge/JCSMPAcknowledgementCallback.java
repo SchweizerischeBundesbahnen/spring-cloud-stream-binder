@@ -1,13 +1,6 @@
 package com.solace.spring.cloud.stream.binder.inbound.acknowledge;
 
-import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
-import com.solace.spring.cloud.stream.binder.util.MessageContainer;
-import com.solace.spring.cloud.stream.binder.util.RetryableAckRebindTask;
-import com.solace.spring.cloud.stream.binder.util.RetryableRebindTask;
-import com.solace.spring.cloud.stream.binder.util.RetryableTaskService;
-import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
-import com.solace.spring.cloud.stream.binder.util.SolaceStaleMessageException;
+import com.solace.spring.cloud.stream.binder.util.*;
 import com.solacesystems.jcsmp.XMLMessage;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -22,7 +15,7 @@ import java.util.concurrent.TimeoutException;
 
 class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
 	private final MessageContainer messageContainer;
-	private final FlowReceiverContainer flowReceiverContainer;
+	private final Receiver receiver;
 	private final boolean hasTemporaryQueue;
 	private final ErrorQueueInfrastructure errorQueueInfrastructure;
 	private final RetryableTaskService taskService;
@@ -33,12 +26,12 @@ class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
 
 	private static final Log logger = LogFactory.getLog(JCSMPAcknowledgementCallback.class);
 
-	JCSMPAcknowledgementCallback(MessageContainer messageContainer, FlowReceiverContainer flowReceiverContainer,
+	JCSMPAcknowledgementCallback(MessageContainer messageContainer, Receiver receiver,
 								 boolean hasTemporaryQueue,
 								 RetryableTaskService taskService,
 								 @Nullable ErrorQueueInfrastructure errorQueueInfrastructure) {
 		this.messageContainer = messageContainer;
-		this.flowReceiverContainer = flowReceiverContainer;
+		this.receiver = receiver;
 		this.hasTemporaryQueue = hasTemporaryQueue;
 		this.taskService = taskService;
 		this.errorQueueInfrastructure = errorQueueInfrastructure;
@@ -58,7 +51,7 @@ class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
 		try {
 			switch (status) {
 				case ACCEPT:
-					flowReceiverContainer.acknowledge(messageContainer);
+                    receiver.acknowledge(messageContainer);
 					break;
 				case REJECT:
 					if (republishToErrorQueue()) {
@@ -73,7 +66,7 @@ class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
 									Status.REQUEUE, XMLMessage.class.getSimpleName(),
 									messageContainer.getMessage().getMessageId()));
 						}
-						flowReceiverContainer.acknowledge(messageContainer);
+                        receiver.acknowledge(messageContainer);
 					}
 					break;
 				case REQUEUE:
@@ -89,16 +82,16 @@ class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
 						if (logger.isDebugEnabled()) {
 							logger.debug(String.format("%s %s: Will be re-queued onto queue %s",
 									XMLMessage.class.getSimpleName(), messageContainer.getMessage().getMessageId(),
-									flowReceiverContainer.getQueueName()));
+                                    receiver.getEndpointName()));
 						}
 						if (!asyncRebind) {
-							RetryableAckRebindTask rebindTask = new RetryableAckRebindTask(flowReceiverContainer,
+							RetryableAckRebindTask rebindTask = new RetryableAckRebindTask(receiver,
 									messageContainer, taskService);
 							if (!rebindTask.run(0)) {
 								taskService.submit(rebindTask);
 							}
 						} else {
-							rebindFuture = flowReceiverContainer.futureAcknowledgeRebind(messageContainer);
+							rebindFuture = receiver.futureAcknowledgeRebind(messageContainer);
 						}
 					}
 			}
@@ -135,7 +128,7 @@ class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
 					errorQueueInfrastructure.getErrorQueueName()));
 		}
 
-		errorQueueInfrastructure.createCorrelationKey(messageContainer, flowReceiverContainer, hasTemporaryQueue)
+		errorQueueInfrastructure.createCorrelationKey(messageContainer, receiver, hasTemporaryQueue)
 				.handleError(false);
 		return true;
 	}

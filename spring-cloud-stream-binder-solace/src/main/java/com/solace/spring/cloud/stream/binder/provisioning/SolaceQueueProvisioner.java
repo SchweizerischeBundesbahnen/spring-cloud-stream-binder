@@ -2,6 +2,7 @@ package com.solace.spring.cloud.stream.binder.provisioning;
 
 import com.solace.spring.cloud.stream.binder.properties.SolaceCommonProperties;
 import com.solace.spring.cloud.stream.binder.util.DestinationType;
+import com.solace.spring.cloud.stream.binder.util.PersistenceMode;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.InvalidOperationException;
@@ -101,6 +102,14 @@ public class SolaceQueueProvisioner
 
 		boolean isAnonQueue = SolaceProvisioningUtil.isAnonQueue(group);
 		boolean isDurableQueue = SolaceProvisioningUtil.isDurableQueue(group);
+		boolean isPersistent = properties.getExtension().getPersistent() == PersistenceMode.PERSISTENT;
+
+        if (isDurableQueue && !isPersistent) {
+            String msg = "Non persistent message consuming is not supported when group name is defined.";
+            logger.warn(msg);
+            throw new ProvisioningException(msg);
+        }
+
 		SolaceProvisioningUtil.QueueNames queueNames = SolaceProvisioningUtil.getQueueNames(name, group, properties, isAnonQueue);
 		String groupQueueName = queueNames.getConsumerGroupQueueName();
 
@@ -113,7 +122,7 @@ public class SolaceQueueProvisioner
 						"either configure a concurrency of 1 or use a non-exclusive queue";
 				logger.warn(msg);
 				throw new ProvisioningException(msg);
-			} else if (!StringUtils.hasText(group)) {
+			} else if (!StringUtils.hasText(group) && isPersistent) {
 				String msg = "Concurrency > 1 is not supported when using anonymous consumer groups, " +
 						"either configure a concurrency of 1 or define a consumer group";
 				logger.warn(msg);
@@ -121,13 +130,19 @@ public class SolaceQueueProvisioner
 			}
 		}
 
+        Set<String> additionalSubscriptions = new HashSet<>(Arrays.asList(properties.getExtension().getQueueAdditionalSubscriptions()));
+
+        if (!isPersistent) {
+            return new SolaceConsumerDestination(null, name, queueNames.getPhysicalGroupName(), !isDurableQueue,
+                    null, additionalSubscriptions);
+        }
+
 		logger.info(isAnonQueue ?
 				String.format("Creating anonymous (temporary) queue %s", groupQueueName) :
 				String.format("Creating %s queue %s for consumer group %s", isDurableQueue ? "durable" : "temporary", groupQueueName, group));
 		Queue queue = provisionQueue(groupQueueName, isDurableQueue, endpointProperties, doDurableQueueProvisioning,
 				properties.isAutoStartup());
 
-		Set<String> additionalSubscriptions = new HashSet<>(Arrays.asList(properties.getExtension().getQueueAdditionalSubscriptions()));
 
 		String errorQueueName = null;
 		if (properties.getExtension().isAutoBindErrorQueue()) {

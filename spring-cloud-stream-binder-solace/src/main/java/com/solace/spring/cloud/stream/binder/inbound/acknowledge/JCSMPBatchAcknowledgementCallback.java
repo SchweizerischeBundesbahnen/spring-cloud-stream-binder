@@ -1,12 +1,6 @@
 package com.solace.spring.cloud.stream.binder.inbound.acknowledge;
 
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
-import com.solace.spring.cloud.stream.binder.util.MessageContainer;
-import com.solace.spring.cloud.stream.binder.util.RetryableRebindTask;
-import com.solace.spring.cloud.stream.binder.util.RetryableTaskService;
-import com.solace.spring.cloud.stream.binder.util.SolaceBatchAcknowledgementException;
-import com.solace.spring.cloud.stream.binder.util.SolaceStaleMessageException;
-import com.solace.spring.cloud.stream.binder.util.UnboundFlowReceiverContainerException;
+import com.solace.spring.cloud.stream.binder.util.*;
 import com.solacesystems.jcsmp.JCSMPException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
@@ -26,7 +20,7 @@ import java.util.concurrent.TimeoutException;
  */
 class JCSMPBatchAcknowledgementCallback implements AcknowledgmentCallback {
 	private final List<JCSMPAcknowledgementCallback> acknowledgementCallbacks;
-	private final FlowReceiverContainer flowReceiverContainer;
+	private final Receiver receiver;
 	private final RetryableTaskService taskService;
 	private boolean acknowledged = false;
 	private boolean autoAckEnabled = true;
@@ -34,10 +28,10 @@ class JCSMPBatchAcknowledgementCallback implements AcknowledgmentCallback {
 	private static final Log logger = LogFactory.getLog(JCSMPBatchAcknowledgementCallback.class);
 
 	JCSMPBatchAcknowledgementCallback(List<JCSMPAcknowledgementCallback> acknowledgementCallbacks,
-									  FlowReceiverContainer flowReceiverContainer,
+									  Receiver receiver,
 									  RetryableTaskService taskService) {
 		this.acknowledgementCallbacks = acknowledgementCallbacks;
-		this.flowReceiverContainer = flowReceiverContainer;
+		this.receiver = receiver;
 		this.taskService = taskService;
 	}
 
@@ -123,7 +117,7 @@ class JCSMPBatchAcknowledgementCallback implements AcknowledgmentCallback {
 
 		// in case there isn't an active rebind
 		for (UUID flowReceiverReferenceId : flowsReceiversToRebind) {
-			taskService.submit(new RetryableRebindTask(flowReceiverContainer, flowReceiverReferenceId, taskService));
+			taskService.submit(new RetryableRebindTask(receiver, flowReceiverReferenceId, taskService));
 		}
 
 		if (firstEncounteredException != null) {

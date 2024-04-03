@@ -9,13 +9,7 @@ import com.solace.spring.cloud.stream.binder.util.DestinationType;
 import com.solace.spring.cloud.stream.binder.util.ErrorChannelSendingCorrelationKey;
 import com.solace.spring.cloud.stream.binder.util.JCSMPSessionProducerManager;
 import com.solace.spring.cloud.stream.binder.util.XMLMessageMapper;
-import com.solacesystems.jcsmp.Destination;
-import com.solacesystems.jcsmp.JCSMPException;
-import com.solacesystems.jcsmp.JCSMPFactory;
-import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.Topic;
-import com.solacesystems.jcsmp.XMLMessage;
-import com.solacesystems.jcsmp.XMLMessageProducer;
+import com.solacesystems.jcsmp.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.cloud.stream.binder.BinderHeaders;
@@ -84,6 +78,11 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
 		try {
 			CorrelationData correlationData = message.getHeaders().get(SolaceBinderHeaders.CONFIRM_CORRELATION, CorrelationData.class);
 			if (correlationData != null) {
+                if (properties.getExtension().getDeliveryMode() != DeliveryMode.PERSISTENT) {
+                    String msg0 = String.format("Cannot send message using handler %s", id);
+                    String msg1 = "CONFIRM_CORRELATION is not supported, because the channel is configured as deliveryMode!=PERSISTENT.";
+                    throw handleMessagingException(correlationKey, msg0, new IllegalArgumentException(msg1));
+                }
 				correlationData.setMessage(message);
 				correlationKey.setConfirmCorrelation(correlationData);
 			}
@@ -92,8 +91,12 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
 					String.format("Unable to parse header %s", SolaceBinderHeaders.CONFIRM_CORRELATION), e);
 		}
 
-		XMLMessage xmlMessage = xmlMessageMapper.map(message, properties.getExtension().getHeaderExclusions(),
-				properties.getExtension().isNonserializableHeaderConvertToString());
+		XMLMessage xmlMessage = xmlMessageMapper.map(
+                message,
+                properties.getExtension().getHeaderExclusions(),
+				properties.getExtension().isNonserializableHeaderConvertToString(),
+                properties.getExtension().getDeliveryMode()
+        );
 		correlationKey.setRawMessage(xmlMessage);
 		xmlMessage.setCorrelationKey(correlationKey);
 

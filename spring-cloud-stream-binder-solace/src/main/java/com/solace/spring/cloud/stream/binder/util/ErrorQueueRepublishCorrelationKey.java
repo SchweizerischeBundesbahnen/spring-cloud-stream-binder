@@ -6,7 +6,7 @@ import org.apache.commons.logging.LogFactory;
 public class ErrorQueueRepublishCorrelationKey {
 	private final ErrorQueueInfrastructure errorQueueInfrastructure;
 	private final MessageContainer messageContainer;
-	private final FlowReceiverContainer flowReceiverContainer;
+	private final Receiver receiver;
 	private final boolean hasTemporaryQueue;
 	private final RetryableTaskService retryableTaskService;
 	private long errorQueueDeliveryAttempt = 0;
@@ -15,18 +15,18 @@ public class ErrorQueueRepublishCorrelationKey {
 
 	public ErrorQueueRepublishCorrelationKey(ErrorQueueInfrastructure errorQueueInfrastructure,
 											 MessageContainer messageContainer,
-											 FlowReceiverContainer flowReceiverContainer,
+                                             Receiver receiver,
 											 boolean hasTemporaryQueue,
 											 RetryableTaskService retryableTaskService) {
 		this.errorQueueInfrastructure = errorQueueInfrastructure;
 		this.messageContainer = messageContainer;
-		this.flowReceiverContainer = flowReceiverContainer;
+		this.receiver = receiver;
 		this.hasTemporaryQueue = hasTemporaryQueue;
 		this.retryableTaskService = retryableTaskService;
 	}
 
 	public void handleSuccess() throws SolaceStaleMessageException {
-		flowReceiverContainer.acknowledge(messageContainer);
+        receiver.acknowledge(messageContainer);
 	}
 
 	public void handleError(boolean skipSyncFallbackAttempt) throws SolaceStaleMessageException {
@@ -59,14 +59,14 @@ public class ErrorQueueRepublishCorrelationKey {
 			logger.info(String.format(
 					"Exceeded max error queue delivery attempts and cannot requeue XMLMessage %s since queue %s is " +
 							"temporary. Failed message will be discarded.",
-					messageContainer.getMessage().getMessageId(), flowReceiverContainer.getQueueName()));
-			flowReceiverContainer.acknowledge(messageContainer);
+					messageContainer.getMessage().getMessageId(), receiver.getEndpointName()));
+			receiver.acknowledge(messageContainer);
 		} else {
 			logger.info(String.format(
 					"Exceeded max error queue delivery attempts. XMLMessage %s will be re-queued onto queue %s",
-					messageContainer.getMessage().getMessageId(), flowReceiverContainer.getQueueName()));
+					messageContainer.getMessage().getMessageId(), receiver.getEndpointName()));
 
-			RetryableAckRebindTask rebindTask = new RetryableAckRebindTask(flowReceiverContainer, messageContainer,
+			RetryableAckRebindTask rebindTask = new RetryableAckRebindTask(receiver, messageContainer,
 					retryableTaskService);
 			try {
 				if (skipSyncAttempt || !rebindTask.run(0)) {
@@ -74,7 +74,7 @@ public class ErrorQueueRepublishCorrelationKey {
 				}
 			} catch (InterruptedException interruptedException) {
 				logger.info(String.format("Interrupt received while rebinding to queue %s with message %s",
-						flowReceiverContainer.getQueueName(), messageContainer.getMessage().getMessageId()));
+                        receiver.getEndpointName(), messageContainer.getMessage().getMessageId()));
 			}
 		}
 	}

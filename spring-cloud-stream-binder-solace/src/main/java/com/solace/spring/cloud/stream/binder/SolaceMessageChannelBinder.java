@@ -3,6 +3,7 @@ package com.solace.spring.cloud.stream.binder;
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
 import com.solace.spring.cloud.stream.binder.inbound.BatchCollector;
 import com.solace.spring.cloud.stream.binder.inbound.JCSMPInboundChannelAdapter;
+import com.solace.spring.cloud.stream.binder.inbound.JCSMPInboundTopicConsumer;
 import com.solace.spring.cloud.stream.binder.inbound.JCSMPMessageSource;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.outbound.JCSMPOutboundMessageHandler;
@@ -12,11 +13,7 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestination;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceQueueProvisioner;
-import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
-import com.solace.spring.cloud.stream.binder.util.JCSMPSessionProducerManager;
-import com.solace.spring.cloud.stream.binder.util.RetryableTaskService;
-import com.solace.spring.cloud.stream.binder.util.SolaceErrorMessageHandler;
-import com.solace.spring.cloud.stream.binder.util.SolaceMessageHeaderErrorMessageStrategy;
+import com.solace.spring.cloud.stream.binder.util.*;
 import com.solacesystems.jcsmp.Context;
 import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
@@ -111,6 +108,15 @@ public class SolaceMessageChannelBinder
 	@Override
 	protected MessageProducer createConsumerEndpoint(ConsumerDestination destination, String group,
 													 ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
+        if (properties.getExtension().getPersistent() == PersistenceMode.NON_PERSISTENT) {
+            return createConsumerEndpointNonPersistent(destination, properties);
+        }
+
+        return createConsumerEndpointPersistent(destination, group, properties);
+    }
+
+    protected MessageProducer createConsumerEndpointPersistent(ConsumerDestination destination, String group,
+                                                     ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
 		SolaceConsumerDestination solaceDestination = (SolaceConsumerDestination) destination;
 
 		JCSMPInboundChannelAdapter adapter = new JCSMPInboundChannelAdapter(
@@ -149,7 +155,34 @@ public class SolaceMessageChannelBinder
 		return adapter;
 	}
 
-	@Override
+    protected MessageProducer createConsumerEndpointNonPersistent(ConsumerDestination destination,
+                                                               ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
+        SolaceConsumerDestination solaceDestination = (SolaceConsumerDestination) destination;
+
+        JCSMPInboundTopicConsumer adapter = new JCSMPInboundTopicConsumer(
+                solaceDestination,
+                jcsmpSession,
+                taskService,
+                properties,
+                solaceMeterAccessor);
+
+        adapter.setRemoteStopFlag(consumersRemoteStopFlag);
+
+
+        ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, null, properties);
+        if (properties.getMaxAttempts() > 1) {
+            adapter.setRetryTemplate(buildRetryTemplate(properties));
+            adapter.setRecoveryCallback(errorInfra.getRecoverer());
+        } else {
+            adapter.setErrorChannel(errorInfra.getErrorChannel());
+        }
+
+        adapter.setErrorMessageStrategy(errorMessageStrategy);
+        return adapter;
+    }
+
+
+    @Override
 	protected PolledConsumerResources createPolledConsumerResources(String name, String group,
 																	ConsumerDestination destination,
 																	ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties) {

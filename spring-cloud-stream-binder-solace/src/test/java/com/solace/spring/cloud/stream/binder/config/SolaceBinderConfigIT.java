@@ -70,7 +70,7 @@ public class SolaceBinderConfigIT {
 		Pattern datePattern = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}");
 
 		softly.assertThat(client.getSoftwareVersion())
-				.matches(String.format("%s(?:-SNAPSHOT)? \\(%s\\)", versionPattern, versionPattern));
+				.matches(String.format("%s(?:(-SBB)?-SNAPSHOT)? \\(%s\\)", versionPattern, versionPattern));
 		softly.assertThat(client.getSoftwareDate()).matches(String.format("%s \\(%s\\)", datePattern, datePattern));
 		softly.assertThat(client.getPlatform()).endsWith("Solace Spring Cloud Stream Binder (JCSMP SDK)");
 	}

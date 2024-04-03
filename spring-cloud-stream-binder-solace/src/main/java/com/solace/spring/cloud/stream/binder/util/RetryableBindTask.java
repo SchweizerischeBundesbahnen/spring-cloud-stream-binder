@@ -8,21 +8,21 @@ import java.util.Objects;
 import java.util.StringJoiner;
 
 public class RetryableBindTask implements RetryableTaskService.RetryableTask {
-	private final FlowReceiverContainer flowReceiverContainer;
+	private final Receiver receiver;
 
 	private static final Log logger = LogFactory.getLog(RetryableBindTask.class);
 
-	public RetryableBindTask(FlowReceiverContainer flowReceiverContainer) {
-		this.flowReceiverContainer = flowReceiverContainer;
+	public RetryableBindTask(Receiver receiver) {
+		this.receiver = receiver;
 	}
 
 	@Override
 	public boolean run(int attempt) {
 		try {
-			flowReceiverContainer.bind();
+            receiver.bind();
 			return true;
 		} catch (JCSMPException e) {
-			logger.warn(String.format("failed to bind queue %s. Will retry", flowReceiverContainer.getQueueName()), e);
+			logger.warn(String.format("failed to bind queue %s. Will retry", receiver.getEndpointName()), e);
 			return false;
 		}
 	}
@@ -30,7 +30,7 @@ public class RetryableBindTask implements RetryableTaskService.RetryableTask {
 	@Override
 	public String toString() {
 		return new StringJoiner(", ", RetryableBindTask.class.getSimpleName() + "[", "]")
-				.add("flowReceiverContainer=" + flowReceiverContainer.getId())
+				.add("flowReceiverContainer=" + receiver.getId())
 				.toString();
 	}
 
@@ -39,11 +39,11 @@ public class RetryableBindTask implements RetryableTaskService.RetryableTask {
 		if (this == o) return true;
 		if (o == null || getClass() != o.getClass()) return false;
 		RetryableBindTask that = (RetryableBindTask) o;
-		return Objects.equals(flowReceiverContainer.getId(), that.flowReceiverContainer.getId());
+		return Objects.equals(receiver.getId(), that.receiver.getId());
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(flowReceiverContainer);
+		return Objects.hash(receiver);
 	}
 }

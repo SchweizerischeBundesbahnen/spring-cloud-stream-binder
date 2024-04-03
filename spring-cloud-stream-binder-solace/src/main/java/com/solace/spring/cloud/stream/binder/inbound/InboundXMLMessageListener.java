@@ -3,14 +3,7 @@ package com.solace.spring.cloud.stream.binder.inbound;
 import com.solace.spring.cloud.stream.binder.inbound.acknowledge.JCSMPAcknowledgementCallbackFactory;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
-import com.solace.spring.cloud.stream.binder.util.MessageContainer;
-import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
-import com.solace.spring.cloud.stream.binder.util.SolaceBatchAcknowledgementException;
-import com.solace.spring.cloud.stream.binder.util.SolaceMessageHeaderErrorMessageStrategy;
-import com.solace.spring.cloud.stream.binder.util.SolaceStaleMessageException;
-import com.solace.spring.cloud.stream.binder.util.UnboundFlowReceiverContainerException;
-import com.solace.spring.cloud.stream.binder.util.XMLMessageMapper;
+import com.solace.spring.cloud.stream.binder.util.*;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ClosedFacilityException;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -40,7 +33,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 abstract class InboundXMLMessageListener implements Runnable {
-	final FlowReceiverContainer flowReceiverContainer;
+	final Receiver receiver;
 	final ConsumerDestination consumerDestination;
 	private final ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties;
 	final ThreadLocal<AttributeAccessor> attributesHolder;
@@ -56,18 +49,18 @@ abstract class InboundXMLMessageListener implements Runnable {
 
 	private static final Log logger = LogFactory.getLog(InboundXMLMessageListener.class);
 
-	InboundXMLMessageListener(FlowReceiverContainer flowReceiverContainer,
-							  ConsumerDestination consumerDestination,
-							  ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
-							  @Nullable BatchCollector batchCollector,
-							  Consumer<Message<?>> messageConsumer,
-							  JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
-							  @Nullable SolaceMeterAccessor solaceMeterAccessor,
-							  @Nullable AtomicBoolean remoteStopFlag,
-							  ThreadLocal<AttributeAccessor> attributesHolder,
-							  boolean needHolder,
-							  boolean needAttributes) {
-		this.flowReceiverContainer = flowReceiverContainer;
+	InboundXMLMessageListener(Receiver receiver,
+                              ConsumerDestination consumerDestination,
+                              ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
+                              @Nullable BatchCollector batchCollector,
+                              Consumer<Message<?>> messageConsumer,
+                              JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
+                              @Nullable SolaceMeterAccessor solaceMeterAccessor,
+                              @Nullable AtomicBoolean remoteStopFlag,
+                              ThreadLocal<AttributeAccessor> attributesHolder,
+                              boolean needHolder,
+                              boolean needAttributes) {
+		this.receiver = receiver;
 		this.consumerDestination = consumerDestination;
 		this.consumerProperties = consumerProperties;
 		this.batchCollector = batchCollector;
@@ -78,7 +71,7 @@ abstract class InboundXMLMessageListener implements Runnable {
 		this.attributesHolder = attributesHolder;
 		this.needHolder = needHolder;
 		this.needAttributes = needAttributes;
-		this.xmlMessageMapper = flowReceiverContainer.getXMLMessageMapper();
+		this.xmlMessageMapper = receiver.getXMLMessageMapper();
 	}
 
 	abstract void handleMessage(Supplier<Message<?>> messageSupplier, Consumer<Message<?>> sendToConsumerHandler,
@@ -108,7 +101,7 @@ abstract class InboundXMLMessageListener implements Runnable {
 			throw t;
 		} finally {
 			logger.info(String.format("Closing flow receiver to destination %s", consumerDestination.getName()));
-			flowReceiverContainer.unbind();
+            receiver.unbind();
 		}
 	}
 
@@ -121,15 +114,15 @@ abstract class InboundXMLMessageListener implements Runnable {
 
 		try {
 			if (batchCollector != null && consumerProperties.getExtension().getBatchTimeout() > 0) {
-				messageContainer = flowReceiverContainer.receive(consumerProperties.getExtension().getBatchTimeout());
+				messageContainer = receiver.receive(consumerProperties.getExtension().getBatchTimeout());
 			} else {
-				messageContainer = flowReceiverContainer.receive();
+				messageContainer = receiver.receive();
 			}
 		} catch (StaleSessionException e) {
 			throw e;
 		} catch (JCSMPException e) {
 			String msg = String.format("Received error while trying to read message from endpoint %s",
-					flowReceiverContainer.getQueueName());
+                    receiver.getEndpointName());
 			if ((e instanceof JCSMPTransportException || e instanceof ClosedFacilityException) && !keepPolling()) {
 				logger.debug(msg, e);
 			} else {

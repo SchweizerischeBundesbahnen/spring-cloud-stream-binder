@@ -35,7 +35,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * <p>Messaging operations concurrently invoked through this object during a rebind operation are not affected
  * by the rebind.</p>
  */
-public class FlowReceiverContainer {
+public class FlowReceiverContainer implements Receiver {
 	private final UUID id = UUID.randomUUID();
 	private final JCSMPSession session;
 	private final String queueName;
@@ -682,7 +682,7 @@ public class FlowReceiverContainer {
 		return id;
 	}
 
-	public String getQueueName() {
+	public String getEndpointName() {
 		return queueName;
 	}
 

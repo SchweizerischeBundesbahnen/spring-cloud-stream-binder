@@ -1,5 +1,6 @@
 package com.solace.spring.cloud.stream.binder.properties;
 
+import com.solace.spring.cloud.stream.binder.util.PersistenceMode;
 import com.solacesystems.jcsmp.EndpointProperties;
 import java.util.ArrayList;
 import java.util.List;
@@ -133,6 +134,10 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
 	 * The number of milliseconds before republished messages are discarded or moved to a Dead Message Queue.
 	 */
 	private Long errorMsgTtl = null;
+    /**
+     * Indicated if messages should be consumed using a queue or directly via topic.
+     */
+    private PersistenceMode persistent = PersistenceMode.PERSISTENT;
 	// ------------------------
 
 	/**
@@ -331,4 +336,12 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
 	public void setHeaderExclusions(List<String> headerExclusions) {
 		this.headerExclusions = headerExclusions;
 	}
+
+    public PersistenceMode getPersistent() {
+        return persistent;
+    }
+
+    public void setPersistent(PersistenceMode persistent) {
+        this.persistent = persistent;
+    }
 }

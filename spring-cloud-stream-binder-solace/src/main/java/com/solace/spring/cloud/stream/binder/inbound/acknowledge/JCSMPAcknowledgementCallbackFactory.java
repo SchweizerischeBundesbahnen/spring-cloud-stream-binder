@@ -1,23 +1,20 @@
 package com.solace.spring.cloud.stream.binder.inbound.acknowledge;
 
-import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
-import com.solace.spring.cloud.stream.binder.util.MessageContainer;
-import com.solace.spring.cloud.stream.binder.util.RetryableTaskService;
+import com.solace.spring.cloud.stream.binder.util.*;
 import org.springframework.integration.acks.AcknowledgmentCallback;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class JCSMPAcknowledgementCallbackFactory {
-	private final FlowReceiverContainer flowReceiverContainer;
+	private final Receiver receiver;
 	private final boolean hasTemporaryQueue;
 	private final RetryableTaskService taskService;
 	private ErrorQueueInfrastructure errorQueueInfrastructure;
 
-	public JCSMPAcknowledgementCallbackFactory(FlowReceiverContainer flowReceiverContainer, boolean hasTemporaryQueue,
-											   RetryableTaskService taskService) {
-		this.flowReceiverContainer = flowReceiverContainer;
+	public JCSMPAcknowledgementCallbackFactory(Receiver receiver, boolean hasTemporaryQueue,
+                                               RetryableTaskService taskService) {
+		this.receiver = receiver;
 		this.hasTemporaryQueue = hasTemporaryQueue;
 		this.taskService = taskService;
 	}
@@ -33,11 +30,11 @@ public class JCSMPAcknowledgementCallbackFactory {
 	public AcknowledgmentCallback createBatchCallback(List<MessageContainer> messageContainers) {
 		return new JCSMPBatchAcknowledgementCallback(messageContainers.stream()
 				.map(this::createJCSMPCallback)
-				.collect(Collectors.toList()), flowReceiverContainer, taskService);
+				.collect(Collectors.toList()), receiver, taskService);
 	}
 
 	private JCSMPAcknowledgementCallback createJCSMPCallback(MessageContainer messageContainer) {
-		return new JCSMPAcknowledgementCallback(messageContainer, flowReceiverContainer, hasTemporaryQueue,
+		return new JCSMPAcknowledgementCallback(messageContainer, receiver, hasTemporaryQueue,
 				taskService, errorQueueInfrastructure);
 	}
 
