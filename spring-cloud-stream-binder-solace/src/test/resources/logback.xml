@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<configuration>
-    <include resource="org/springframework/boot/logging/logback/base.xml" />
-    <logger name="CONSOLE" level="INFO" />
-    <logger name="com.solace.spring.cloud.stream.binder" level="INFO"/>
-    <logger name="com.solace.spring.cloud.stream.binder.inbound.BatchCollector" level="INFO"/>
-    <logger name="com.solace.spring.cloud.stream.binder.inbound.acknowledge" level="INFO"/>
-    <logger name="com.solace.spring.cloud.stream.binder.test" level="INFO"/>
-</configuration>
