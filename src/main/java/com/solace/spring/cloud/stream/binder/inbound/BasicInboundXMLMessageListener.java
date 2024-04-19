@@ -1,10 +1,10 @@
 package com.solace.spring.cloud.stream.binder.inbound;
 
 import com.solace.spring.cloud.stream.binder.inbound.acknowledge.JCSMPAcknowledgementCallbackFactory;
+import com.solace.spring.cloud.stream.binder.inbound.acknowledge.SolaceAckUtil;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
-import com.solace.spring.cloud.stream.binder.util.Receiver;
 import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -26,18 +26,18 @@ public class BasicInboundXMLMessageListener extends InboundXMLMessageListener {
 
 	private static final Log logger = LogFactory.getLog(BasicInboundXMLMessageListener.class);
 
-	BasicInboundXMLMessageListener(Receiver receiver,
-                                   ConsumerDestination consumerDestination,
-                                   ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
-                                   @Nullable BatchCollector batchCollector,
-                                   Consumer<Message<?>> messageConsumer,
-                                   JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
-                                   BiFunction<Message<?>, RuntimeException, Boolean> errorHandlerFunction,
-                                   @Nullable SolaceMeterAccessor solaceMeterAccessor,
-                                   @Nullable AtomicBoolean remoteStopFlag,
-                                   ThreadLocal<AttributeAccessor> attributesHolder,
-                                   boolean needHolderAndAttributes) {
-		super(receiver,
+	BasicInboundXMLMessageListener(FlowReceiverContainer flowReceiverContainer,
+								   ConsumerDestination consumerDestination,
+								   ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
+								   @Nullable BatchCollector batchCollector,
+								   Consumer<Message<?>> messageConsumer,
+								   JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
+								   BiFunction<Message<?>, RuntimeException, Boolean> errorHandlerFunction,
+								   @Nullable SolaceMeterAccessor solaceMeterAccessor,
+								   @Nullable AtomicBoolean remoteStopFlag,
+								   ThreadLocal<AttributeAccessor> attributesHolder,
+								   boolean needHolderAndAttributes) {
+		super(flowReceiverContainer,
 				consumerDestination,
 				consumerProperties,
 				batchCollector,
@@ -53,7 +53,7 @@ public class BasicInboundXMLMessageListener extends InboundXMLMessageListener {
 
 	@Override
 	void handleMessage(Supplier<Message<?>> messageSupplier, Consumer<Message<?>> sendToConsumerHandler,
-							 AcknowledgmentCallback acknowledgmentCallback, boolean isBatched)
+					   AcknowledgmentCallback acknowledgmentCallback, boolean isBatched)
 			throws SolaceAcknowledgmentException {
 		Message<?> message;
 		try {
@@ -66,7 +66,9 @@ public class BasicInboundXMLMessageListener extends InboundXMLMessageListener {
 				logger.warn(String.format("Failed to map %s to a Spring Message and no error channel " +
 						"was configured. Message will be rejected.", isBatched ? "a batch of XMLMessages" :
 						"an XMLMessage"), e);
-				AckUtils.reject(acknowledgmentCallback);
+				if (!SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)) {
+					AckUtils.requeue(acknowledgmentCallback);
+				}
 			}
 			return;
 		}

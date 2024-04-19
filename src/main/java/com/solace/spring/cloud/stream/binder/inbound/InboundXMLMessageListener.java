@@ -1,15 +1,28 @@
 package com.solace.spring.cloud.stream.binder.inbound;
 
 import com.solace.spring.cloud.stream.binder.inbound.acknowledge.JCSMPAcknowledgementCallbackFactory;
+import com.solace.spring.cloud.stream.binder.inbound.acknowledge.SolaceAckUtil;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
-import com.solace.spring.cloud.stream.binder.util.*;
+import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
+import com.solace.spring.cloud.stream.binder.util.MessageContainer;
+import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
+import com.solace.spring.cloud.stream.binder.util.SolaceMessageHeaderErrorMessageStrategy;
+import com.solace.spring.cloud.stream.binder.util.UnboundFlowReceiverContainerException;
+import com.solace.spring.cloud.stream.binder.util.XMLMessageMapper;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ClosedFacilityException;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.StaleSessionException;
 import com.solacesystems.jcsmp.XMLMessage;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -24,16 +37,8 @@ import org.springframework.integration.support.ErrorMessageUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-
 abstract class InboundXMLMessageListener implements Runnable {
-	final Receiver receiver;
+	final FlowReceiverContainer flowReceiverContainer;
 	final ConsumerDestination consumerDestination;
 	private final ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties;
 	final ThreadLocal<AttributeAccessor> attributesHolder;
@@ -49,18 +54,18 @@ abstract class InboundXMLMessageListener implements Runnable {
 
 	private static final Log logger = LogFactory.getLog(InboundXMLMessageListener.class);
 
-	InboundXMLMessageListener(Receiver receiver,
-                              ConsumerDestination consumerDestination,
-                              ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
-                              @Nullable BatchCollector batchCollector,
-                              Consumer<Message<?>> messageConsumer,
-                              JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
-                              @Nullable SolaceMeterAccessor solaceMeterAccessor,
-                              @Nullable AtomicBoolean remoteStopFlag,
-                              ThreadLocal<AttributeAccessor> attributesHolder,
-                              boolean needHolder,
-                              boolean needAttributes) {
-		this.receiver = receiver;
+	InboundXMLMessageListener(FlowReceiverContainer flowReceiverContainer,
+							  ConsumerDestination consumerDestination,
+							  ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
+							  @Nullable BatchCollector batchCollector,
+							  Consumer<Message<?>> messageConsumer,
+							  JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
+							  @Nullable SolaceMeterAccessor solaceMeterAccessor,
+							  @Nullable AtomicBoolean remoteStopFlag,
+							  ThreadLocal<AttributeAccessor> attributesHolder,
+							  boolean needHolder,
+							  boolean needAttributes) {
+		this.flowReceiverContainer = flowReceiverContainer;
 		this.consumerDestination = consumerDestination;
 		this.consumerProperties = consumerProperties;
 		this.batchCollector = batchCollector;
@@ -71,7 +76,7 @@ abstract class InboundXMLMessageListener implements Runnable {
 		this.attributesHolder = attributesHolder;
 		this.needHolder = needHolder;
 		this.needAttributes = needAttributes;
-		this.xmlMessageMapper = receiver.getXMLMessageMapper();
+		this.xmlMessageMapper = flowReceiverContainer.getXMLMessageMapper();
 	}
 
 	abstract void handleMessage(Supplier<Message<?>> messageSupplier, Consumer<Message<?>> sendToConsumerHandler,
@@ -101,7 +106,7 @@ abstract class InboundXMLMessageListener implements Runnable {
 			throw t;
 		} finally {
 			logger.info(String.format("Closing flow receiver to destination %s", consumerDestination.getName()));
-            receiver.unbind();
+			flowReceiverContainer.unbind();
 		}
 	}
 
@@ -114,15 +119,15 @@ abstract class InboundXMLMessageListener implements Runnable {
 
 		try {
 			if (batchCollector != null && consumerProperties.getExtension().getBatchTimeout() > 0) {
-				messageContainer = receiver.receive(consumerProperties.getExtension().getBatchTimeout());
+				messageContainer = flowReceiverContainer.receive(consumerProperties.getExtension().getBatchTimeout());
 			} else {
-				messageContainer = receiver.receive();
+				messageContainer = flowReceiverContainer.receive();
 			}
 		} catch (StaleSessionException e) {
 			throw e;
 		} catch (JCSMPException e) {
 			String msg = String.format("Received error while trying to read message from endpoint %s",
-                    receiver.getEndpointName());
+					flowReceiverContainer.getQueueName());
 			if ((e instanceof JCSMPTransportException || e instanceof ClosedFacilityException) && !keepPolling()) {
 				logger.debug(msg, e);
 			} else {
@@ -161,7 +166,7 @@ abstract class InboundXMLMessageListener implements Runnable {
 					acknowledgmentCallback,
 					false);
 		} catch (SolaceAcknowledgmentException e) {
-			swallowStaleException(e, bytesXMLMessage);
+			throw e;
 		} catch (Exception e) {
 			try {
 				if (ExceptionUtils.indexOfType(e, RequeueCurrentMessageException.class) > -1) {
@@ -171,13 +176,17 @@ abstract class InboundXMLMessageListener implements Runnable {
 					AckUtils.requeue(acknowledgmentCallback);
 				} else {
 					logger.warn(String.format(
-							"Exception thrown while processing XMLMessage %s. Message will be rejected.",
+							"Exception thrown while processing XMLMessage %s. Message will be requeued.",
 							bytesXMLMessage.getMessageId()), e);
-					AckUtils.reject(acknowledgmentCallback);
+					if (!SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)) {
+						AckUtils.requeue(acknowledgmentCallback);
+					}
 				}
 			} catch (SolaceAcknowledgmentException e1) {
 				e1.addSuppressed(e);
-				swallowStaleException(e1, bytesXMLMessage);
+				logger.warn(String.format("Exception thrown while re-queuing XMLMessage %s.",
+						bytesXMLMessage.getMessageId()), e1);
+				throw e1;
 			}
 		}
 	}
@@ -199,33 +208,24 @@ abstract class InboundXMLMessageListener implements Runnable {
 					acknowledgmentCallback,
 					true);
 		} catch (Exception e) {
-			if (e instanceof SolaceBatchAcknowledgementException && ((SolaceBatchAcknowledgementException) e)
-					.isAllStaleExceptions()) {
-				logger.info("Cannot acknowledge batch, all messages are stale", e);
-			} else {
-				try {
-					if (ExceptionUtils.indexOfType(e, RequeueCurrentMessageException.class) > -1) {
-						if (logger.isWarnEnabled()) {
-							logger.warn("Exception thrown while processing batch. Batch's message will be requeued.",
-									e);
-						}
-						AckUtils.requeue(acknowledgmentCallback);
-					} else {
-						if (logger.isWarnEnabled()) {
-							logger.warn("Exception thrown while processing batch. Batch's messages will be rejected.",
-									e);
-						}
-						AckUtils.reject(acknowledgmentCallback);
+			try {
+				if (ExceptionUtils.indexOfType(e, RequeueCurrentMessageException.class) > -1) {
+					if (logger.isWarnEnabled()) {
+						logger.warn("Exception thrown while processing batch. Batch's message will be requeued.", e);
 					}
-				} catch (SolaceAcknowledgmentException e1) {
-					e1.addSuppressed(e);
-					if (e1 instanceof SolaceBatchAcknowledgementException && ((SolaceBatchAcknowledgementException) e1)
-							.isAllStaleExceptions()) {
-						logger.info("Cannot acknowledge batch, all messages are stale", e1);
-					} else {
-						throw e;
+					AckUtils.requeue(acknowledgmentCallback);
+				} else {
+					if (logger.isWarnEnabled()) {
+						logger.warn("Exception thrown while processing batch. Batch's messages will be requeued.", e);
+					}
+					if (!SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)) {
+						AckUtils.requeue(acknowledgmentCallback);
 					}
 				}
+			} catch (SolaceAcknowledgmentException e1) {
+				e1.addSuppressed(e);
+				logger.warn("Exception thrown while re-queuing batch.", e1);
+				throw e1;
 			}
 		} finally {
 			batchCollector.confirmDelivery();
@@ -294,17 +294,6 @@ abstract class InboundXMLMessageListener implements Runnable {
 				attributes.setAttribute(SolaceMessageHeaderErrorMessageStrategy.ATTR_SOLACE_ACKNOWLEDGMENT_CALLBACK,
 						acknowledgmentCallback);
 			}
-		}
-	}
-
-	private void swallowStaleException(SolaceAcknowledgmentException e, BytesXMLMessage bytesXMLMessage) {
-		if (ExceptionUtils.indexOfType(e, SolaceStaleMessageException.class) > -1) {
-			if (logger.isDebugEnabled()) {
-				logger.debug(String.format("Cannot acknowledge stale XMLMessage %s", bytesXMLMessage.getMessageId()),
-						e);
-			}
-		} else {
-			throw e;
 		}
 	}
 

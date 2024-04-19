@@ -1,22 +1,17 @@
 package com.solace.spring.cloud.stream.binder.inbound.acknowledge;
 
-import com.solace.spring.cloud.stream.binder.util.*;
+import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
+import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
+import com.solace.spring.cloud.stream.binder.util.MessageContainer;
+import java.util.List;
 import org.springframework.integration.acks.AcknowledgmentCallback;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 public class JCSMPAcknowledgementCallbackFactory {
-	private final Receiver receiver;
-	private final boolean hasTemporaryQueue;
-	private final RetryableTaskService taskService;
+	private final FlowReceiverContainer flowReceiverContainer;
 	private ErrorQueueInfrastructure errorQueueInfrastructure;
 
-	public JCSMPAcknowledgementCallbackFactory(Receiver receiver, boolean hasTemporaryQueue,
-                                               RetryableTaskService taskService) {
-		this.receiver = receiver;
-		this.hasTemporaryQueue = hasTemporaryQueue;
-		this.taskService = taskService;
+	public JCSMPAcknowledgementCallbackFactory(FlowReceiverContainer flowReceiverContainer) {
+		this.flowReceiverContainer = flowReceiverContainer;
 	}
 
 	public void setErrorQueueInfrastructure(ErrorQueueInfrastructure errorQueueInfrastructure) {
@@ -29,13 +24,12 @@ public class JCSMPAcknowledgementCallbackFactory {
 
 	public AcknowledgmentCallback createBatchCallback(List<MessageContainer> messageContainers) {
 		return new JCSMPBatchAcknowledgementCallback(messageContainers.stream()
-				.map(this::createJCSMPCallback)
-				.collect(Collectors.toList()), receiver, taskService);
+				.map(this::createJCSMPCallback).toList());
 	}
 
 	private JCSMPAcknowledgementCallback createJCSMPCallback(MessageContainer messageContainer) {
-		return new JCSMPAcknowledgementCallback(messageContainer, receiver, hasTemporaryQueue,
-				taskService, errorQueueInfrastructure);
+		return new JCSMPAcknowledgementCallback(messageContainer, flowReceiverContainer,
+				errorQueueInfrastructure);
 	}
 
 }

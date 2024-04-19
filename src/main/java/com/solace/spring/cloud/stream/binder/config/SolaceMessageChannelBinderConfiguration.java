@@ -12,6 +12,7 @@ import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
+import com.solacesystems.jcsmp.impl.JCSMPBasicSession;
 import jakarta.annotation.PostConstruct;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -20,6 +21,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.lang.Nullable;
+
+import java.util.Set;
+
+import static com.solacesystems.jcsmp.XMLMessage.Outcome.*;
 
 @Configuration
 @Import(SolaceHealthIndicatorsConfiguration.class)
@@ -64,6 +69,10 @@ public class SolaceMessageChannelBinderConfiguration {
 				// as the call closing JCSMP session also delete the context
 				// and terminates the application
 				solaceSessionEventHandler.setSessionHealthUp();
+			}
+			if (jcsmpSession instanceof JCSMPBasicSession session &&
+					!session.isRequiredSettlementCapable(Set.of(ACCEPTED,FAILED,REJECTED))) {
+				logger.warn("The connected Solace PubSub+ Broker is not compatible. It doesn't support message NACK capability. Consumer bindings will fail to start.");
 			}
 		} catch (Exception e) {
 			if (context != null) {

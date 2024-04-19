@@ -41,7 +41,6 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
     private SolaceMeterAccessor solaceMeterAccessor;
     @Setter
     private SolaceExtendedBindingProperties extendedBindingProperties = new SolaceExtendedBindingProperties();
-    private final RetryableTaskService taskService = new RetryableTaskService();
     private static final SolaceMessageHeaderErrorMessageStrategy errorMessageStrategy = new SolaceMessageHeaderErrorMessageStrategy();
     @Nullable
     private SolaceBinderHealthAccessor solaceBinderHealthAccessor;
@@ -66,7 +65,6 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
     @Override
     public void destroy() {
         logger.info(String.format("Closing JCSMP session %s", jcsmpSession.getSessionName()));
-        taskService.close();
         sessionProducerManager.release(errorHandlerProducerKey);
         consumersRemoteStopFlag.set(true);
         jcsmpSession.closeSession();
@@ -97,7 +95,7 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
     protected MessageProducer createQueueMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         SolaceConsumerDestination solaceDestination = (SolaceConsumerDestination) destination;
 
-        JCSMPInboundQueueMessageProducer adapter = new JCSMPInboundQueueMessageProducer(solaceDestination, jcsmpSession, taskService, properties, getConsumerEndpointProperties(properties), solaceMeterAccessor);
+        JCSMPInboundQueueMessageProducer adapter = new JCSMPInboundQueueMessageProducer(solaceDestination, jcsmpSession, properties, getConsumerEndpointProperties(properties), solaceMeterAccessor);
 
         if (solaceBinderHealthAccessor != null) {
             adapter.setSolaceBinderHealthAccessor(solaceBinderHealthAccessor);
@@ -107,7 +105,7 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
         adapter.setPostStart(getConsumerPostStart(solaceDestination, properties));
 
         if (properties.getExtension().isAutoBindErrorQueue()) {
-            adapter.setErrorQueueInfrastructure(new ErrorQueueInfrastructure(sessionProducerManager, errorHandlerProducerKey, solaceDestination.getErrorQueueName(), properties.getExtension(), taskService));
+            adapter.setErrorQueueInfrastructure(new ErrorQueueInfrastructure(sessionProducerManager, errorHandlerProducerKey, solaceDestination.getErrorQueueName(), properties.getExtension()));
         }
 
         ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, group, properties);
@@ -126,7 +124,7 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
         JCSMPInboundTopicMessageProducer topicMessageProducer = this.jcsmpInboundTopicMessageMultiplexer.createTopicMessageProducer(destination, properties);
         AbstractMessageChannelBinder.ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, null, properties);
 
-            topicMessageProducer.setErrorChannel(errorInfra.getErrorChannel());
+        topicMessageProducer.setErrorChannel(errorInfra.getErrorChannel());
         topicMessageProducer.setErrorMessageStrategy(errorMessageStrategy);
         return topicMessageProducer;
     }
@@ -141,7 +139,7 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
         SolaceConsumerDestination solaceDestination = (SolaceConsumerDestination) destination;
 
         EndpointProperties endpointProperties = getConsumerEndpointProperties(consumerProperties);
-        JCSMPMessageSource messageSource = new JCSMPMessageSource(solaceDestination, jcsmpSession, consumerProperties.isBatchMode() ? new BatchCollector(consumerProperties.getExtension()) : null, taskService, consumerProperties, endpointProperties, solaceMeterAccessor);
+        JCSMPMessageSource messageSource = new JCSMPMessageSource(solaceDestination, jcsmpSession, consumerProperties.isBatchMode() ? new BatchCollector(consumerProperties.getExtension()) : null, consumerProperties, endpointProperties, solaceMeterAccessor);
 
         if (solaceBinderHealthAccessor != null) {
             messageSource.setSolaceBinderHealthAccessor(solaceBinderHealthAccessor);
@@ -151,7 +149,7 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
         messageSource.setPostStart(getConsumerPostStart(solaceDestination, consumerProperties));
 
         if (consumerProperties.getExtension().isAutoBindErrorQueue()) {
-            messageSource.setErrorQueueInfrastructure(new ErrorQueueInfrastructure(sessionProducerManager, errorHandlerProducerKey, solaceDestination.getErrorQueueName(), consumerProperties.getExtension(), taskService));
+            messageSource.setErrorQueueInfrastructure(new ErrorQueueInfrastructure(sessionProducerManager, errorHandlerProducerKey, solaceDestination.getErrorQueueName(), consumerProperties.getExtension()));
         }
 
         ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, group, consumerProperties, true);

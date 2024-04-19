@@ -1,0 +1,25 @@
+name: Test Sign
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+
+jobs:
+  deploy:
+    name: Sign
+    runs-on: ubuntu-latest
+    environment: deploy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: adopt
+          gpg-private-key: ${{ secrets.PGP_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Build and Deploy with Maven
+        run: mvn -B -P sign-artifacts package --no-transfer-progress
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}

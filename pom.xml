@@ -1,28 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.4</version>
-        <relativePath /> <!-- lookup parent from repository -->
+        <version>3.2.5</version>
+        <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>ch.sbb</groupId>
     <artifactId>spring-cloud-stream-binder-solace</artifactId>
-    <version>3.3.1-SNAPSHOT</version>
+    <version>4.0.0</version>
 
     <name>Spring Cloud Stream Binder Solace</name>
     <description>A Spring Cloud Stream Binder implementation using the Solace Java API (JCSMP)</description>
     <url>https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder</url>
 
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/issues</url>
+    </issueManagement>
+
     <properties>
+        <java.version>17</java.version>
+        <spring-cloud.version>2023.0.1</spring-cloud.version>
+        <solace.jcsmp.version>10.23.0</solace.jcsmp.version>
         <maven.test.skip>true</maven.test.skip>
         <build.timestamp>${maven.build.timestamp}</build.timestamp>
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm:ss</maven.build.timestamp.format>
-        <java.version>17</java.version>
-        <spring-cloud.version>2023.0.1</spring-cloud.version>
-        <solace.jcsmp.version>10.22.0</solace.jcsmp.version>
     </properties>
 
     <dependencyManagement>
@@ -88,6 +94,27 @@
     </dependencies>
 
     <profiles>
+        <profile>
+            <id>sign-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.4</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>it_tests</id>
             <properties>
@@ -202,23 +229,31 @@
                                 <configuration>
                                     <properties>
                                         <property>
-                                            <name>org.slf4j.simpleLogger.log.io.swagger.codegen.v3.generators.DefaultCodegenConfig</name>
+                                            <name>
+                                                org.slf4j.simpleLogger.log.io.swagger.codegen.v3.generators.DefaultCodegenConfig
+                                            </name>
                                             <value>OFF</value>
                                         </property>
                                         <property>
-                                            <name>org.slf4j.simpleLogger.log.io.swagger.codegen.v3.AbstractGenerator</name>
+                                            <name>org.slf4j.simpleLogger.log.io.swagger.codegen.v3.AbstractGenerator
+                                            </name>
                                             <value>OFF</value>
                                         </property>
                                         <property>
-                                            <name>org.slf4j.simpleLogger.log.org.apache.maven.plugin.compiler.CompilerMojo</name>
+                                            <name>
+                                                org.slf4j.simpleLogger.log.org.apache.maven.plugin.compiler.CompilerMojo
+                                            </name>
                                             <value>OFF</value>
                                         </property>
                                         <property>
-                                            <name>org.slf4j.simpleLogger.log.org.apache.maven.plugins.javadoc.JavadocJar</name>
+                                            <name>
+                                                org.slf4j.simpleLogger.log.org.apache.maven.plugins.javadoc.JavadocJar
+                                            </name>
                                             <value>OFF</value>
                                         </property>
                                         <property>
-                                            <name>org.slf4j.simpleLogger.log.c.s.test.integration.semp.v2.SempV2Api</name>
+                                            <name>org.slf4j.simpleLogger.log.c.s.test.integration.semp.v2.SempV2Api
+                                            </name>
                                             <value>OFF</value>
                                         </property>
                                     </properties>
@@ -249,7 +284,8 @@
                                     <goal>generate</goal>
                                 </goals>
                                 <configuration>
-                                    <inputSpec>${project.basedir}/src/test/resources/semp/semp-v2-swagger-action.json</inputSpec>
+                                    <inputSpec>${project.basedir}/src/test/resources/semp/semp-v2-swagger-action.json
+                                    </inputSpec>
                                     <apiPackage>com.solace.test.integration.semp.v2.action.api</apiPackage>
                                     <modelPackage>com.solace.test.integration.semp.v2.action.model</modelPackage>
                                     <modelNamePrefix>Action</modelNamePrefix>
@@ -278,7 +314,8 @@
                                     <goal>generate</goal>
                                 </goals>
                                 <configuration>
-                                    <inputSpec>${project.basedir}/src/test/resources/semp/semp-v2-swagger-config.json</inputSpec>
+                                    <inputSpec>${project.basedir}/src/test/resources/semp/semp-v2-swagger-config.json
+                                    </inputSpec>
                                     <apiPackage>com.solace.test.integration.semp.v2.config.api</apiPackage>
                                     <modelPackage>com.solace.test.integration.semp.v2.config.model</modelPackage>
                                     <modelNamePrefix>Config</modelNamePrefix>
@@ -307,7 +344,8 @@
                                     <goal>generate</goal>
                                 </goals>
                                 <configuration>
-                                    <inputSpec>${project.basedir}/src/test/resources/semp/semp-v2-swagger-monitor.json</inputSpec>
+                                    <inputSpec>${project.basedir}/src/test/resources/semp/semp-v2-swagger-monitor.json
+                                    </inputSpec>
                                     <apiPackage>com.solace.test.integration.semp.v2.monitor.api</apiPackage>
                                     <modelPackage>com.solace.test.integration.semp.v2.monitor.model</modelPackage>
                                     <modelNamePrefix>Monitor</modelNamePrefix>
@@ -383,8 +421,8 @@
 
     <scm>
         <connection>scm:git:git@github.com:SchweizerischeBundesbahnen/spring-cloud-stream-binder.git</connection>
-      <tag>HEAD</tag>
-  </scm>
+        <tag>HEAD</tag>
+    </scm>
 
     <build>
         <plugins>
@@ -423,26 +461,9 @@
             </plugin>
 
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-release-plugin</artifactId>
-                <version>3.0.1</version>
-                <configuration>
-                    <tagNameFormat>@{project.version}</tagNameFormat>
-                    <projectVersionPolicyId>ConventionalCommitsVersionPolicy</projectVersionPolicyId>
-                </configuration>
-                <dependencies>
-                    <dependency>
-                        <groupId>nl.basjes.maven.release</groupId>
-                        <artifactId>conventional-commits-version-policy</artifactId>
-                        <version>1.0.6</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-
-            <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>3.2.4</version>
+                <version>3.2.5</version>
                 <configuration>
                     <skip>true</skip>
                 </configuration>
@@ -460,7 +481,8 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <source>17</source>
+                    <doclint>all,-missing</doclint>
+                    <source>${java.version}</source>
                     <detectJavaApiLink>false</detectJavaApiLink>
                 </configuration>
             </plugin>
@@ -479,16 +501,15 @@
             </plugin>
         </plugins>
     </build>
+
     <distributionManagement>
-        <repository>
-            <id>central</id>
-            <name>f1c32b487257-releases</name>
-            <url>https://bin.sbb.ch/artifactory/tms.mvn</url>
-        </repository>
         <snapshotRepository>
-            <id>snapshots</id>
-            <name>f1c32b487257-snapshots</name>
-            <url>https://bin.sbb.ch/artifactory/tms.mvn</url>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
         </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
     </distributionManagement>
 </project>
