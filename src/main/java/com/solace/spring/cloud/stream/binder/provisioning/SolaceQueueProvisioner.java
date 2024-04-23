@@ -175,7 +175,7 @@ public class SolaceQueueProvisioner
 			throw new ProvisioningException(msg, e);
 		}
 
-		if (testFlowCxn) {
+		if (isDurable && testFlowCxn) {
 			try {
 				logger.info(String.format("Testing consumer flow connection to queue %s (will not start it)", name));
 				final ConsumerFlowProperties testFlowProperties = new ConsumerFlowProperties().setEndpoint(queue).setStartState(false);
@@ -184,14 +184,10 @@ public class SolaceQueueProvisioner
 			} catch (JCSMPException e) {
 				String msg = String.format("Failed to connect test consumer flow to queue %s", name);
 
-				if (isDurable && !doDurableProvisioning) {
+				if (!doDurableProvisioning) {
 					msg += ". Provisioning is disabled, queue was not provisioned nor was its configuration validated.";
 				}
-
-				if (e instanceof InvalidOperationException && !isDurable) {
-					msg += ". If the Solace client is not capable of creating temporary queues, consider assigning this consumer to a group?";
-				}
-				logger.warn(msg, e);
+                logger.warn(msg, e);
 				throw new ProvisioningException(msg, e);
 			}
 		} else {
