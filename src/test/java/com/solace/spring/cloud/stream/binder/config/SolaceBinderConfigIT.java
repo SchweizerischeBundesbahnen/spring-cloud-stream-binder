@@ -21,57 +21,50 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
  * Binder {@link Configuration @Configuration} testing.
- *
+ * <p>
  * These are <b>NOT</b> tests regarding {@link SolaceMessageChannelBinder}.
  */
 @Isolated
 @Execution(ExecutionMode.SAME_THREAD)
-@SpringJUnitConfig(classes = SolaceJavaAutoConfiguration.class,
-		initializers = ConfigDataApplicationContextInitializer.class)
+@SpringJUnitConfig(classes = SolaceJavaAutoConfiguration.class, initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)
 public class SolaceBinderConfigIT {
-	private SolaceMessageChannelBinderConfiguration binderConfiguration;
-	private String clientName;
+    private SolaceMessageChannelBinderConfiguration binderConfiguration;
+    private String clientName;
 
-	@BeforeEach
-	void setUp(JCSMPProperties jcsmpProperties, ApplicationContext applicationContext, TestInfo testInfo) {
-		clientName = UUID.randomUUID().toString();
-		jcsmpProperties.setProperty(JCSMPProperties.CLIENT_NAME, clientName);
+    @BeforeEach
+    void setUp(JCSMPProperties jcsmpProperties, ApplicationContext applicationContext, TestInfo testInfo) {
+        clientName = UUID.randomUUID().toString();
+        jcsmpProperties.setProperty(JCSMPProperties.CLIENT_NAME, clientName);
 
-		binderConfiguration = new SolaceMessageChannelBinderConfiguration(jcsmpProperties,
-				new SolaceExtendedBindingProperties(), null);
-		AutowireCapableBeanFactory beanFactory = applicationContext.getAutowireCapableBeanFactory();
-		beanFactory.autowireBean(binderConfiguration);
-		binderConfiguration = (SolaceMessageChannelBinderConfiguration) beanFactory.initializeBean(binderConfiguration,
-				testInfo.toString());
-	}
+        binderConfiguration = new SolaceMessageChannelBinderConfiguration(jcsmpProperties, new SolaceExtendedBindingProperties(), Optional.empty(), Optional.empty());
+        AutowireCapableBeanFactory beanFactory = applicationContext.getAutowireCapableBeanFactory();
+        beanFactory.autowireBean(binderConfiguration);
+        binderConfiguration = (SolaceMessageChannelBinderConfiguration) beanFactory.initializeBean(binderConfiguration, testInfo.toString());
+    }
 
-	@Test
-	public void testClientInfoProvider(JCSMPProperties jcsmpProperties, SempV2Api sempV2Api, SoftAssertions softly)
-			throws Exception {
-		MonitorMsgVpnClient client;
-		SolaceMessageChannelBinder solaceMessageChannelBinder = binderConfiguration.solaceMessageChannelBinder(
-				binderConfiguration.provisioningProvider(), null, null);
-		try {
-			String vpnName = jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME);
-			client = sempV2Api.monitor()
-					.getMsgVpnClient(vpnName, clientName, null)
-					.getData();
-		} finally {
-			solaceMessageChannelBinder.destroy();
-		}
+    @Test
+    public void testClientInfoProvider(JCSMPProperties jcsmpProperties, SempV2Api sempV2Api, SoftAssertions softly) throws Exception {
+        MonitorMsgVpnClient client;
+        SolaceMessageChannelBinder solaceMessageChannelBinder = binderConfiguration.solaceMessageChannelBinder(binderConfiguration.provisioningProvider(), null, null);
+        try {
+            String vpnName = jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME);
+            client = sempV2Api.monitor().getMsgVpnClient(vpnName, clientName, null).getData();
+        } finally {
+            solaceMessageChannelBinder.destroy();
+        }
 
-		Pattern versionPattern = Pattern.compile("[0-9]+\\.[0-9]+\\.[0-9]+");
-		Pattern datePattern = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}");
+        Pattern versionPattern = Pattern.compile("[0-9]+\\.[0-9]+\\.[0-9]+");
+        Pattern datePattern = Pattern.compile("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}");
 
-		softly.assertThat(client.getSoftwareVersion())
-				.matches(String.format("%s(?:(-SBB)?-SNAPSHOT)? \\(%s\\)", versionPattern, versionPattern));
-		softly.assertThat(client.getSoftwareDate()).matches(String.format("%s \\(%s\\)", datePattern, datePattern));
-		softly.assertThat(client.getPlatform()).endsWith("Spring Cloud Stream Binder Solace (JCSMP SDK)");
-	}
+        softly.assertThat(client.getSoftwareVersion()).matches(String.format("%s(?:(-SBB)?-SNAPSHOT)? \\(%s\\)", versionPattern, versionPattern));
+        softly.assertThat(client.getSoftwareDate()).matches(String.format("%s \\(%s\\)", datePattern, datePattern));
+        softly.assertThat(client.getPlatform()).endsWith("Spring Cloud Stream Binder Solace (JCSMP SDK)");
+    }
 }

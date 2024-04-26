@@ -3,12 +3,15 @@ package com.solace.spring.cloud.stream.binder.config;
 import com.solace.spring.cloud.stream.binder.SolaceMessageChannelBinder;
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
 import com.solace.spring.cloud.stream.binder.health.handlers.SolaceSessionEventHandler;
+import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceExtendedBindingProperties;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceQueueProvisioner;
+import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.impl.JCSMPBasicSession;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -17,30 +20,26 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.lang.Nullable;
 
+import java.util.Optional;
 import java.util.Set;
 
 import static com.solacesystems.jcsmp.XMLMessage.Outcome.*;
 
+@RequiredArgsConstructor
 @Configuration
 @Import(SolaceHealthIndicatorsConfiguration.class)
 @EnableConfigurationProperties({SolaceExtendedBindingProperties.class})
 public class SolaceMessageChannelBinderConfiguration {
+    private final JCSMPSessionEventHandler jcsmpSessionEventHandler = new JCSMPSessionEventHandler();
     private final JCSMPProperties jcsmpProperties;
     private final SolaceExtendedBindingProperties solaceExtendedBindingProperties;
-    private final SolaceSessionEventHandler solaceSessionEventHandler;
+    private final Optional<SessionHealthIndicator> sessionHealthIndicator;
+    private final Optional<SolaceSessionEventHandler> solaceSessionEventHandler;
 
     private JCSMPSession jcsmpSession;
     private Context context;
 
     private static final Log logger = LogFactory.getLog(SolaceMessageChannelBinderConfiguration.class);
-
-    public SolaceMessageChannelBinderConfiguration(JCSMPProperties jcsmpProperties,
-                                                   SolaceExtendedBindingProperties solaceExtendedBindingProperties,
-                                                   @Nullable SolaceSessionEventHandler eventHandler) {
-        this.jcsmpProperties = jcsmpProperties;
-        this.solaceExtendedBindingProperties = solaceExtendedBindingProperties;
-        this.solaceSessionEventHandler = eventHandler;
-    }
 
     @PostConstruct
     private void initSession() throws JCSMPException {
@@ -48,26 +47,17 @@ public class SolaceMessageChannelBinderConfiguration {
         jcsmpProperties.setProperty(JCSMPProperties.CLIENT_INFO_PROVIDER, new SolaceBinderClientInfoProvider());
         jcsmpProperties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);
         try {
-            if (solaceSessionEventHandler != null) {
-                if (logger.isDebugEnabled()) {
-                    logger.debug("Registering Solace Session Event handler on session");
-                }
-                context = JCSMPFactory.onlyInstance().createContext(new ContextProperties());
-                jcsmpSession = JCSMPFactory.onlyInstance().createSession(jcsmpProperties, context, solaceSessionEventHandler);
-            } else {
-                jcsmpSession = JCSMPFactory.onlyInstance().createSession(jcsmpProperties);
-            }
+            this.context = JCSMPFactory.onlyInstance().createContext(new ContextProperties());
+            this.jcsmpSession = JCSMPFactory.onlyInstance().createSession(jcsmpProperties, context, jcsmpSessionEventHandler);
             logger.info(String.format("Connecting JCSMP session %s", jcsmpSession.getSessionName()));
             jcsmpSession.connect();
-            if (solaceSessionEventHandler != null) {
-                // after setting the session health indicator status to UP,
-                // we should not be worried about setting its status to DOWN,
-                // as the call closing JCSMP session also delete the context
-                // and terminates the application
-                solaceSessionEventHandler.setSessionHealthUp();
-            }
-            if (jcsmpSession instanceof JCSMPBasicSession session &&
-                    !session.isRequiredSettlementCapable(Set.of(ACCEPTED, FAILED, REJECTED))) {
+            // after setting the session health indicator status to UP,
+            // we should not be worried about setting its status to DOWN,
+            // as the call closing JCSMP session also delete the context
+            // and terminates the application
+            sessionHealthIndicator.ifPresent(SessionHealthIndicator::up);
+            solaceSessionEventHandler.ifPresent(jcsmpSessionEventHandler::addSessionEventHandler);
+            if (jcsmpSession instanceof JCSMPBasicSession session && !session.isRequiredSettlementCapable(Set.of(ACCEPTED, FAILED, REJECTED))) {
                 logger.warn("The connected Solace PubSub+ Broker is not compatible. It doesn't support message NACK capability. Consumer bindings will fail to start.");
             }
         } catch (Exception e) {
@@ -79,9 +69,12 @@ public class SolaceMessageChannelBinderConfiguration {
     }
 
     @Bean
-    SolaceMessageChannelBinder solaceMessageChannelBinder(SolaceQueueProvisioner solaceQueueProvisioner,
-                                                          @Nullable SolaceBinderHealthAccessor solaceBinderHealthAccessor,
-                                                          @Nullable SolaceMeterAccessor solaceMeterAccessor) {
+    JCSMPSessionEventHandler jcsmpSessionEventHandler() {
+        return jcsmpSessionEventHandler;
+    }
+
+    @Bean
+    SolaceMessageChannelBinder solaceMessageChannelBinder(SolaceQueueProvisioner solaceQueueProvisioner, @Nullable SolaceBinderHealthAccessor solaceBinderHealthAccessor, @Nullable SolaceMeterAccessor solaceMeterAccessor) {
         SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, context, solaceQueueProvisioner);
         binder.setExtendedBindingProperties(solaceExtendedBindingProperties);
         binder.setSolaceMeterAccessor(solaceMeterAccessor);
@@ -93,7 +86,7 @@ public class SolaceMessageChannelBinderConfiguration {
 
     @Bean
     SolaceQueueProvisioner provisioningProvider() {
-        return new SolaceQueueProvisioner(jcsmpSession);
+        return new SolaceQueueProvisioner(jcsmpSession, jcsmpSessionEventHandler);
     }
 
 }

@@ -13,28 +13,26 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 public class SolaceSessionEventHandlerTest {
-	@Test
-	public void testConnected(@Mock SessionHealthIndicator healthIndicator) {
-		SolaceSessionEventHandler sessionEventHandler = new SolaceSessionEventHandler(healthIndicator);
-		sessionEventHandler.setSessionHealthUp();
-		Mockito.verify(healthIndicator, Mockito.times(1)).up();
-		Mockito.verifyNoMoreInteractions(healthIndicator);
-	}
+    @Test
+    public void testConnected(@Mock SessionHealthIndicator healthIndicator) {
+        SolaceSessionEventHandler sessionEventHandler = new SolaceSessionEventHandler(healthIndicator);
+        sessionEventHandler.setSessionHealthUp();
+        Mockito.verify(healthIndicator, Mockito.times(1)).up();
+        Mockito.verifyNoMoreInteractions(healthIndicator);
+    }
 
-	@ParameterizedTest
-	@EnumSource(SessionEvent.class)
-	public void testHandleEvent(SessionEvent event,
-	                            @Mock SessionEventArgs eventArgs,
-	                            @Mock SessionHealthIndicator healthIndicator) {
-		Mockito.when(eventArgs.getEvent()).thenReturn(event);
+    @ParameterizedTest
+    @EnumSource(SessionEvent.class)
+    public void testHandleEvent(SessionEvent event, @Mock SessionEventArgs eventArgs, @Mock SessionHealthIndicator healthIndicator) {
+        Mockito.when(eventArgs.getEvent()).thenReturn(event);
 
-		SolaceSessionEventHandler sessionEventHandler = new SolaceSessionEventHandler(healthIndicator);
-		sessionEventHandler.handleEvent(eventArgs);
+        SolaceSessionEventHandler sessionEventHandler = new SolaceSessionEventHandler(healthIndicator);
+        sessionEventHandler.handleEvent(eventArgs);
 
-		switch (event) {
-			case DOWN_ERROR -> Mockito.verify(healthIndicator, Mockito.times(1)).down(eventArgs);
-			case RECONNECTING -> Mockito.verify(healthIndicator, Mockito.times(1)).reconnecting(eventArgs);
-			case RECONNECTED -> Mockito.verify(healthIndicator, Mockito.times(1)).up();
-		}
-	}
+        switch (event) {
+            case DOWN_ERROR -> Mockito.verify(healthIndicator, Mockito.times(1)).down(eventArgs);
+            case RECONNECTING -> Mockito.verify(healthIndicator, Mockito.times(1)).reconnecting(eventArgs);
+            case RECONNECTED -> Mockito.verify(healthIndicator, Mockito.times(1)).up();
+        }
+    }
 }

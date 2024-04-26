@@ -135,6 +135,9 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
         if (consumerProperties.getConcurrency() > 1) {
             logger.warn("Polled consumers do not support concurrency > 1, it will be ignored...");
         }
+        if (consumerProperties.isBatchMode()) {
+            logger.error("BatchMode is deprecated and should not be used.");
+        }
 
         SolaceConsumerDestination solaceDestination = (SolaceConsumerDestination) destination;
 

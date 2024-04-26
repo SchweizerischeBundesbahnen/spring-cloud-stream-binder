@@ -6,6 +6,7 @@ import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHea
 import com.solace.spring.cloud.stream.binder.health.handlers.SolaceSessionEventHandler;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solace.spring.cloud.stream.binder.properties.SolaceSessionHealthProperties;
+import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.boot.actuate.autoconfigure.health.ConditionalOnEnabledHealthIndicator;
@@ -19,32 +20,26 @@ import org.springframework.context.annotation.Configuration;
 @ConditionalOnEnabledHealthIndicator("binders")
 @EnableConfigurationProperties({SolaceSessionHealthProperties.class})
 public class SolaceHealthIndicatorsConfiguration {
-	private static final Log logger = LogFactory.getLog(SolaceHealthIndicatorsConfiguration.class);
+    private static final Log logger = LogFactory.getLog(SolaceHealthIndicatorsConfiguration.class);
 
-	@Bean
-	public SolaceBinderHealthAccessor solaceBinderHealthAccessor(
-			SolaceBinderHealthContributor solaceBinderHealthContributor) {
-		return new SolaceBinderHealthAccessor(solaceBinderHealthContributor);
-	}
+    @Bean
+    public SolaceBinderHealthAccessor solaceBinderHealthAccessor(SolaceBinderHealthContributor solaceBinderHealthContributor) {
+        return new SolaceBinderHealthAccessor(solaceBinderHealthContributor);
+    }
 
-	@Bean
-	public SolaceBinderHealthContributor solaceBinderHealthContributor(
-			SolaceSessionHealthProperties solaceSessionHealthProperties) {
-		if (logger.isDebugEnabled()) {
-			logger.debug("Creating Solace Connection Health Indicators Hierarchy");
-		}
-		return new SolaceBinderHealthContributor(
-				new SessionHealthIndicator(solaceSessionHealthProperties),
-				new BindingsHealthContributor()
-		);
-	}
+    @Bean
+    public SolaceBinderHealthContributor solaceBinderHealthContributor(SolaceSessionHealthProperties solaceSessionHealthProperties) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Creating Solace Connection Health Indicators Hierarchy");
+        }
+        return new SolaceBinderHealthContributor(new SessionHealthIndicator(solaceSessionHealthProperties), new BindingsHealthContributor());
+    }
 
-	@Bean
-	public SolaceSessionEventHandler solaceSessionEventHandler(SolaceBinderHealthContributor healthContributor) {
-		if (logger.isDebugEnabled()) {
-			logger.debug("Creating Solace Session Event Handler for monitoring Health");
-		}
-		return new SolaceSessionEventHandler(healthContributor.getSolaceSessionHealthIndicator());
-	}
-
+    @Bean
+    public SolaceSessionEventHandler solaceSessionEventHandler(SolaceBinderHealthContributor healthContributor) {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Creating Solace Session Event Handler for monitoring Health");
+        }
+        return new SolaceSessionEventHandler(healthContributor.getSolaceSessionHealthIndicator());
+    }
 }

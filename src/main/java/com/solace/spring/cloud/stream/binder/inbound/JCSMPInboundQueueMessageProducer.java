@@ -247,6 +247,10 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
 				flowReceiverContainer);
 		ackCallbackFactory.setErrorQueueInfrastructure(errorQueueInfrastructure);
 
+		if (consumerProperties.isBatchMode()) {
+			logger.error("BatchMode is deprecated and should not be used.");
+		}
+
 		InboundXMLMessageListener listener;
 		if (retryTemplate != null) {
 			Assert.state(getErrorChannel() == null,
