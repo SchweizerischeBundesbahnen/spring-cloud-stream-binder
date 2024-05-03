@@ -79,8 +79,8 @@ public class SolaceQueueProvisioner implements ProvisioningProvider<ExtendedCons
             logger.warn("Partitioning is not supported with this version of Solace's cloud stream binder.\n" + "Provisioning will continue under the assumption that it is disabled...");
         }
 
-        boolean isAnonQueue = SolaceProvisioningUtil.isAnonQueue(group);
-        boolean isDurableQueue = SolaceProvisioningUtil.isDurableQueue(group);
+        boolean isAnonQueue = SolaceProvisioningUtil.isAnonQueue(group, properties.getExtension().getQualityOfService());
+        boolean isDurableQueue = SolaceProvisioningUtil.isDurableQueue(group, properties.getExtension().getQualityOfService());
         SolaceProvisioningUtil.QueueNames queueNames = SolaceProvisioningUtil.getQueueNames(name, group, properties, isAnonQueue);
         String groupQueueName = queueNames.getConsumerGroupQueueName();
 

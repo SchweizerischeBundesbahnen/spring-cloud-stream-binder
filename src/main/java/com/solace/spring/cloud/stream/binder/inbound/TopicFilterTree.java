@@ -47,6 +47,13 @@ public class TopicFilterTree<T> {
 
     public void addTopic(String topic, T value) {
         LinkedList<String> topicParts = split(topic);
+        if (topicParts.size() > 1 && "#noexport".equals(topicParts.getFirst())) {
+            topicParts.pop(); // ignore #noexport
+        }
+        if (topicParts.size() > 2 && "#share".equals(topicParts.getFirst())) {
+            topicParts.pop(); // ignore #shared
+            topicParts.pop(); // ignore group
+        }
         addTopic(rootNode, topicParts, value);
     }
 

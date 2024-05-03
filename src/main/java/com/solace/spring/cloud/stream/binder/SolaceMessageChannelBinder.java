@@ -87,7 +87,7 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
     @Override
     protected MessageProducer createConsumerEndpoint(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         if (properties.getExtension() != null && properties.getExtension().getQualityOfService() == QualityOfService.AT_MOST_ONCE) {
-            return createTopicMessageProducer(destination, properties);
+            return createTopicMessageProducer(destination, group, properties);
         }
         return createQueueMessageProducer(destination, group, properties);
     }
@@ -120,8 +120,8 @@ public class SolaceMessageChannelBinder extends AbstractMessageChannelBinder<Ext
         return adapter;
     }
 
-    protected MessageProducer createTopicMessageProducer(ConsumerDestination destination, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
-        JCSMPInboundTopicMessageProducer topicMessageProducer = this.jcsmpInboundTopicMessageMultiplexer.createTopicMessageProducer(destination, properties);
+    protected MessageProducer createTopicMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
+        JCSMPInboundTopicMessageProducer topicMessageProducer = this.jcsmpInboundTopicMessageMultiplexer.createTopicMessageProducer(destination,group, properties);
         AbstractMessageChannelBinder.ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, null, properties);
 
         topicMessageProducer.setErrorChannel(errorInfra.getErrorChannel());

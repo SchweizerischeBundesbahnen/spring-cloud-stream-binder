@@ -60,6 +60,26 @@ class TopicFilterTreeTest {
     }
 
     @Test
+    void shouldMatchSharedTopics() {
+        topicFilterTree.addTopic("#share/bluber/foo/bar", "value1");
+        topicFilterTree.addTopic("#share/bluber/foo/*", "value2");
+        topicFilterTree.addTopic("#share/bluber/foo/*/bar", "value3");
+        topicFilterTree.addTopic("#share/balabala/foo/>", "value4");
+        Set<String> matchingValues = topicFilterTree.getMatching("foo/bar/bar");
+        assertThat(matchingValues).containsExactlyInAnyOrder("value3", "value4");
+    }
+
+    @Test
+    void shouldMatchNoExportSharedTopics() {
+        topicFilterTree.addTopic("#noexport/#share/bluber/foo/bar", "value1");
+        topicFilterTree.addTopic("#noexport/#share/bluber/foo/*", "value2");
+        topicFilterTree.addTopic("#noexport/#share/bluber/foo/*/bar", "value3");
+        topicFilterTree.addTopic("#noexport/#share/balabala/foo/>", "value4");
+        Set<String> matchingValues = topicFilterTree.getMatching("foo/bar/bar");
+        assertThat(matchingValues).containsExactlyInAnyOrder("value3", "value4");
+    }
+
+    @Test
     void shouldNotMatchUnrelatedTopic() {
         topicFilterTree.addTopic("foo/bar", "value");
         Set<String> matchingValues = topicFilterTree.getMatching("foo/ba");

@@ -25,8 +25,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class SolaceTestBinder
-        extends AbstractPollableConsumerTestBinder<SolaceMessageChannelBinder, ExtendedConsumerProperties<SolaceConsumerProperties>, ExtendedProducerProperties<SolaceProducerProperties>> {
+public class SolaceTestBinder extends AbstractPollableConsumerTestBinder<SolaceMessageChannelBinder, ExtendedConsumerProperties<SolaceConsumerProperties>, ExtendedProducerProperties<SolaceProducerProperties>> {
 
     private final JCSMPSession jcsmpSession;
     private final SempV2Api sempV2Api;
@@ -50,8 +49,7 @@ public class SolaceTestBinder
     }
 
     @Override
-    public Binding<MessageChannel> bindConsumer(String name, String group, MessageChannel moduleInputChannel,
-                                                ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
+    public Binding<MessageChannel> bindConsumer(String name, String group, MessageChannel moduleInputChannel, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         preBindCaptureConsumerResources(name, group, properties);
         Binding<MessageChannel> binding = super.bindConsumer(name, group, moduleInputChannel, properties);
         captureConsumerResources(binding, group, properties.getExtension());
@@ -59,9 +57,7 @@ public class SolaceTestBinder
     }
 
     @Override
-    public Binding<PollableSource<MessageHandler>> bindPollableConsumer(String name, String group,
-                                                                        PollableSource<MessageHandler> inboundBindTarget,
-                                                                        ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
+    public Binding<PollableSource<MessageHandler>> bindPollableConsumer(String name, String group, PollableSource<MessageHandler> inboundBindTarget, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         preBindCaptureConsumerResources(name, group, properties);
         Binding<PollableSource<MessageHandler>> binding = super.bindPollableConsumer(name, group, inboundBindTarget, properties);
         captureConsumerResources(binding, group, properties.getExtension());
@@ -69,11 +65,9 @@ public class SolaceTestBinder
     }
 
     @Override
-    public Binding<MessageChannel> bindProducer(String name, MessageChannel moduleOutputChannel,
-                                                ExtendedProducerProperties<SolaceProducerProperties> properties) {
+    public Binding<MessageChannel> bindProducer(String name, MessageChannel moduleOutputChannel, ExtendedProducerProperties<SolaceProducerProperties> properties) {
         if (properties.getRequiredGroups() != null) {
-            Arrays.stream(properties.getRequiredGroups())
-                    .forEach(g -> preBindCaptureProducerResources(name, g, properties));
+            Arrays.stream(properties.getRequiredGroups()).forEach(g -> preBindCaptureProducerResources(name, g, properties));
         }
 
         return super.bindProducer(name, moduleOutputChannel, properties);
@@ -88,7 +82,8 @@ public class SolaceTestBinder
     }
 
     private void preBindCaptureConsumerResources(String name, String group, ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties) {
-        if (SolaceProvisioningUtil.isAnonQueue(group)) return; // we don't know any anon resource names before binding
+        if (SolaceProvisioningUtil.isAnonQueue(group, consumerProperties.getExtension().getQualityOfService()))
+            return; // we don't know any anon resource names before binding
 
         SolaceProvisioningUtil.QueueNames queueNames = SolaceProvisioningUtil.getQueueNames(name, group, consumerProperties, false);
 
@@ -102,7 +97,7 @@ public class SolaceTestBinder
     private void captureConsumerResources(Binding<?> binding, String group, SolaceConsumerProperties consumerProperties) {
         String queueName = extractBindingDestination(binding);
         bindingNameToQueueName.put(binding.getBindingName(), queueName);
-        if (!SolaceProvisioningUtil.isAnonQueue(group)) {
+        if (!SolaceProvisioningUtil.isAnonQueue(group, consumerProperties.getQualityOfService())) {
             queues.add(queueName);
         }
         if (consumerProperties.isAutoBindErrorQueue()) {
@@ -149,8 +144,7 @@ public class SolaceTestBinder
                 jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
             } catch (JCSMPException e) {
                 try {
-                    sempV2Api.config().deleteMsgVpnQueue(
-                            (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME), queueName);
+                    sempV2Api.config().deleteMsgVpnQueue((String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME), queueName);
                 } catch (ApiException e1) {
                     RuntimeException toThrow = new RuntimeException(e);
                     toThrow.addSuppressed(e1);

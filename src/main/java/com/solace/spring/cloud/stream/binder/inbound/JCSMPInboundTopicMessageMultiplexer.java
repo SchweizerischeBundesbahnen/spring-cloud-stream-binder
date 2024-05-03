@@ -132,9 +132,9 @@ public class JCSMPInboundTopicMessageMultiplexer {
         }
     }
 
-    public JCSMPInboundTopicMessageProducer createTopicMessageProducer(ConsumerDestination destination, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
+    public JCSMPInboundTopicMessageProducer createTopicMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         this.ensureXMLMessageConsumer();
-        return new JCSMPInboundTopicMessageProducer((SolaceConsumerDestination) destination, properties, this.solaceMeterAccessorSupplier.get(), livecycleHooks);
+        return new JCSMPInboundTopicMessageProducer((SolaceConsumerDestination) destination,group, properties, this.solaceMeterAccessorSupplier.get(), livecycleHooks);
     }
 
     public interface LivecycleHooks {

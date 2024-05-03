@@ -83,6 +83,44 @@ public class SolaceBinderNonpersistentMessagingIT {
     }
 
     @Test
+    public void testTopicWithGroupTest(SpringCloudStreamContext context, TestInfo testInfo) throws Exception {
+        SolaceTestBinder binder = context.getBinder();
+
+        DirectChannel output = context.createBindableChannel("output", new BindingProperties());
+        DirectChannel input = context.createBindableChannel("input", new BindingProperties());
+
+        String topic = "testTopicWithGroupTest/direct/messagingSimpleTopicTest";
+        ExtendedProducerProperties<SolaceProducerProperties> producerProperties = context.createProducerProperties(testInfo);
+        producerProperties.getExtension().setDeliveryMode(DeliveryMode.NON_PERSISTENT);
+        Binding<MessageChannel> producerBinding = binder.bindProducer(topic, output, producerProperties);
+
+        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
+        consumerProperties.getExtension().setQualityOfService(QualityOfService.AT_MOST_ONCE);
+        Binding<MessageChannel> consumerBinding = binder.bindConsumer(topic, "foo", input, consumerProperties);
+
+        Message<?> message = MessageBuilder.withPayload("foo".getBytes()).setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE).setHeader(BinderHeaders.TARGET_DESTINATION, topic).build();
+
+        context.binderBindUnbindLatency();
+
+        AtomicReference<Message<?>> result = new AtomicReference<>(null);
+        input.subscribe(result::set);
+
+
+        output.send(message);
+        int wait = 10;
+        while (wait > 0 && result.get() == null) {
+            wait--;
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(100));
+        }
+
+        assertThat(result.get()).isNotNull();
+        assertThat(result.get().getPayload()).isEqualTo("foo".getBytes());
+
+        producerBinding.unbind();
+        consumerBinding.unbind();
+    }
+
+    @Test
     public void testMultipleListenerTest(SpringCloudStreamContext context, TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = context.getBinder();
 

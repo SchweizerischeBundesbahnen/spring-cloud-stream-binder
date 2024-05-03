@@ -3,114 +3,121 @@ package com.solace.spring.cloud.stream.binder.provisioning;
 import com.solace.spring.cloud.stream.binder.properties.SolaceCommonProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties;
+import com.solace.spring.cloud.stream.binder.util.QualityOfService;
 import com.solacesystems.jcsmp.EndpointProperties;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.cloud.stream.binder.ExtendedProducerProperties;
 import org.springframework.cloud.stream.provisioning.ProvisioningException;
-import org.springframework.expression.*;
+import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionException;
+import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.util.StringUtils;
 
-import java.util.*;
+import java.util.UUID;
 
 public class SolaceProvisioningUtil {
 
-	private SolaceProvisioningUtil() {}
+    private SolaceProvisioningUtil() {
+    }
 
-	public static EndpointProperties getEndpointProperties(SolaceCommonProperties properties) {
-		EndpointProperties endpointProperties = new EndpointProperties();
-		endpointProperties.setAccessType(properties.getQueueAccessType());
-		endpointProperties.setDiscardBehavior(properties.getQueueDiscardBehaviour());
-		endpointProperties.setMaxMsgRedelivery(properties.getQueueMaxMsgRedelivery());
-		endpointProperties.setMaxMsgSize(properties.getQueueMaxMsgSize());
-		endpointProperties.setPermission(properties.getQueuePermission());
-		endpointProperties.setQuota(properties.getQueueQuota());
-		endpointProperties.setRespectsMsgTTL(properties.getQueueRespectsMsgTtl());
-		return endpointProperties;
-	}
+    public static EndpointProperties getEndpointProperties(SolaceCommonProperties properties) {
+        EndpointProperties endpointProperties = new EndpointProperties();
+        endpointProperties.setAccessType(properties.getQueueAccessType());
+        endpointProperties.setDiscardBehavior(properties.getQueueDiscardBehaviour());
+        endpointProperties.setMaxMsgRedelivery(properties.getQueueMaxMsgRedelivery());
+        endpointProperties.setMaxMsgSize(properties.getQueueMaxMsgSize());
+        endpointProperties.setPermission(properties.getQueuePermission());
+        endpointProperties.setQuota(properties.getQueueQuota());
+        endpointProperties.setRespectsMsgTTL(properties.getQueueRespectsMsgTtl());
+        return endpointProperties;
+    }
 
-	public static EndpointProperties getErrorQueueEndpointProperties(SolaceConsumerProperties properties) {
-		EndpointProperties endpointProperties = new EndpointProperties();
-		endpointProperties.setAccessType(properties.getErrorQueueAccessType());
-		endpointProperties.setDiscardBehavior(properties.getErrorQueueDiscardBehaviour());
-		endpointProperties.setMaxMsgRedelivery(properties.getErrorQueueMaxMsgRedelivery());
-		endpointProperties.setMaxMsgSize(properties.getErrorQueueMaxMsgSize());
-		endpointProperties.setPermission(properties.getErrorQueuePermission());
-		endpointProperties.setQuota(properties.getErrorQueueQuota());
-		endpointProperties.setRespectsMsgTTL(properties.getErrorQueueRespectsMsgTtl());
-		return endpointProperties;
-	}
+    public static EndpointProperties getErrorQueueEndpointProperties(SolaceConsumerProperties properties) {
+        EndpointProperties endpointProperties = new EndpointProperties();
+        endpointProperties.setAccessType(properties.getErrorQueueAccessType());
+        endpointProperties.setDiscardBehavior(properties.getErrorQueueDiscardBehaviour());
+        endpointProperties.setMaxMsgRedelivery(properties.getErrorQueueMaxMsgRedelivery());
+        endpointProperties.setMaxMsgSize(properties.getErrorQueueMaxMsgSize());
+        endpointProperties.setPermission(properties.getErrorQueuePermission());
+        endpointProperties.setQuota(properties.getErrorQueueQuota());
+        endpointProperties.setRespectsMsgTTL(properties.getErrorQueueRespectsMsgTtl());
+        return endpointProperties;
+    }
 
-	public static boolean isAnonQueue(String groupName) {
-		return !StringUtils.hasText(groupName);
-	}
+    public static boolean isTopicSubscription(QualityOfService qualityOfService) {
+        return qualityOfService == QualityOfService.AT_MOST_ONCE;
+    }
 
-	public static boolean isDurableQueue(String groupName) {
-		return !isAnonQueue(groupName);
-	}
+    public static boolean isAnonQueue(String groupName, QualityOfService qualityOfService) {
+        return !StringUtils.hasText(groupName) || isTopicSubscription(qualityOfService);
+    }
 
-	public static String getTopicName(String baseTopicName, SolaceCommonProperties properties) {
-		return baseTopicName;
-	}
+    public static boolean isDurableQueue(String groupName, QualityOfService qualityOfService) {
+        return !isAnonQueue(groupName, qualityOfService);
+    }
 
-	public static String getQueueName(String topicName, String groupName, ExtendedProducerProperties<SolaceProducerProperties> properties) {
-		String queueNameExpression = properties.getExtension().getQueueNameExpressionsForRequiredGroups().getOrDefault(groupName, properties.getExtension().getQueueNameExpression());
-		return resolveQueueNameExpression(queueNameExpression, new ExpressionContextRoot(groupName, topicName, properties));
-	}
+    public static String getTopicName(String baseTopicName, SolaceCommonProperties properties) {
+        return baseTopicName;
+    }
 
-	public static QueueNames getQueueNames(String topicName, String groupName,
-										   ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties, boolean isAnonymous) {
-		final String physicalGroupName = isAnonymous ? UUID.randomUUID().toString() : groupName;
-		ExpressionContextRoot root = new ExpressionContextRoot(physicalGroupName, topicName, isAnonymous, consumerProperties);
+    public static String getQueueName(String topicName, String groupName, ExtendedProducerProperties<SolaceProducerProperties> properties) {
+        String queueNameExpression = properties.getExtension().getQueueNameExpressionsForRequiredGroups().getOrDefault(groupName, properties.getExtension().getQueueNameExpression());
+        return resolveQueueNameExpression(queueNameExpression, new ExpressionContextRoot(groupName, topicName, properties));
+    }
 
-		String resolvedQueueName = resolveQueueNameExpression(consumerProperties.getExtension().getQueueNameExpression(), root);
-		String resolvedErrorQueueName = resolveQueueNameExpression(consumerProperties.getExtension().getErrorQueueNameExpression(), root);
+    public static QueueNames getQueueNames(String topicName, String groupName, ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties, boolean isAnonymous) {
+        final String physicalGroupName = isAnonymous ? UUID.randomUUID().toString() : groupName;
+        ExpressionContextRoot root = new ExpressionContextRoot(physicalGroupName, topicName, isAnonymous, consumerProperties);
 
-		return new QueueNames(resolvedQueueName, resolvedErrorQueueName, physicalGroupName);
-	}
+        String resolvedQueueName = resolveQueueNameExpression(consumerProperties.getExtension().getQueueNameExpression(), root);
+        String resolvedErrorQueueName = resolveQueueNameExpression(consumerProperties.getExtension().getErrorQueueNameExpression(), root);
 
-	private static String resolveQueueNameExpression(String expression, ExpressionContextRoot root) {
-		try {
-			EvaluationContext evaluationContext = new StandardEvaluationContext(root);
-			ExpressionParser parser = new SpelExpressionParser();
-			Expression queueNameExp = parser.parseExpression(expression);
-			String resolvedQueueName = (String) queueNameExp.getValue(evaluationContext);
-			validateQueueName(resolvedQueueName, expression);
-			return resolvedQueueName != null ? resolvedQueueName.trim() : null;
-		} catch (ExpressionException e) {
-			throw new ProvisioningException(String.format("Failed to evaluate Spring expression: %s", expression), e);
-		}
-	}
+        return new QueueNames(resolvedQueueName, resolvedErrorQueueName, physicalGroupName);
+    }
 
-	private static void validateQueueName(String name, String expression) {
-		if (!StringUtils.hasText(name)) {
-			throw new ProvisioningException(String.format("Invalid SpEL expression %s as it resolves to a String that does not contain actual text.",
-					expression));
-		}
-	}
+    private static String resolveQueueNameExpression(String expression, ExpressionContextRoot root) {
+        try {
+            EvaluationContext evaluationContext = new StandardEvaluationContext(root);
+            ExpressionParser parser = new SpelExpressionParser();
+            Expression queueNameExp = parser.parseExpression(expression);
+            String resolvedQueueName = (String) queueNameExp.getValue(evaluationContext);
+            validateQueueName(resolvedQueueName, expression);
+            return resolvedQueueName != null ? resolvedQueueName.trim() : null;
+        } catch (ExpressionException e) {
+            throw new ProvisioningException(String.format("Failed to evaluate Spring expression: %s", expression), e);
+        }
+    }
 
-	public static class QueueNames {
-		private final String consumerGroupQueueName;
-		private final String errorQueueName;
-		private final String physicalGroupName;
+    private static void validateQueueName(String name, String expression) {
+        if (!StringUtils.hasText(name)) {
+            throw new ProvisioningException(String.format("Invalid SpEL expression %s as it resolves to a String that does not contain actual text.", expression));
+        }
+    }
 
-		private QueueNames(String consumerGroupQueueName, String errorQueueName, String physicalGroupName) {
-			this.consumerGroupQueueName = consumerGroupQueueName;
-			this.errorQueueName = errorQueueName;
-			this.physicalGroupName = physicalGroupName;
-		}
+    public static class QueueNames {
+        private final String consumerGroupQueueName;
+        private final String errorQueueName;
+        private final String physicalGroupName;
 
-		public String getConsumerGroupQueueName() {
-			return consumerGroupQueueName;
-		}
+        private QueueNames(String consumerGroupQueueName, String errorQueueName, String physicalGroupName) {
+            this.consumerGroupQueueName = consumerGroupQueueName;
+            this.errorQueueName = errorQueueName;
+            this.physicalGroupName = physicalGroupName;
+        }
 
-		public String getErrorQueueName() {
-			return errorQueueName;
-		}
+        public String getConsumerGroupQueueName() {
+            return consumerGroupQueueName;
+        }
 
-		public String getPhysicalGroupName() {
-			return physicalGroupName;
-		}
-	}
+        public String getErrorQueueName() {
+            return errorQueueName;
+        }
+
+        public String getPhysicalGroupName() {
+            return physicalGroupName;
+        }
+    }
 }

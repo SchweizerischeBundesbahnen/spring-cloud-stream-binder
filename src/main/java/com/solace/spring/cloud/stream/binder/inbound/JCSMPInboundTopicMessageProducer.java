@@ -6,6 +6,7 @@ import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestinat
 import com.solace.spring.cloud.stream.binder.util.XMLMessageMapper;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
@@ -27,6 +28,7 @@ public class JCSMPInboundTopicMessageProducer extends MessageProducerSupport imp
     private static final Log logger = LogFactory.getLog(JCSMPInboundTopicMessageProducer.class);
     private final String id = UUID.randomUUID().toString();
     private final SolaceConsumerDestination consumerDestination;
+    private final String group;
     private final ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties;
     private final AtomicBoolean paused = new AtomicBoolean(false);
     @Nullable
@@ -38,8 +40,9 @@ public class JCSMPInboundTopicMessageProducer extends MessageProducerSupport imp
     private final AcknowledgmentCallback noop = status -> {
     };
 
-    public JCSMPInboundTopicMessageProducer(SolaceConsumerDestination consumerDestination, ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties, @Nullable SolaceMeterAccessor solaceMeterAccessor, JCSMPInboundTopicMessageMultiplexer.LivecycleHooks livecycleHooks) {
+    public JCSMPInboundTopicMessageProducer(SolaceConsumerDestination consumerDestination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties, @Nullable SolaceMeterAccessor solaceMeterAccessor, JCSMPInboundTopicMessageMultiplexer.LivecycleHooks livecycleHooks) {
         this.consumerDestination = consumerDestination;
+        this.group = group;
         this.consumerProperties = consumerProperties;
         this.solaceMeterAccessor = solaceMeterAccessor;
         this.executorService = Executors.newFixedThreadPool(Math.max(1, consumerProperties.getConcurrency()));
@@ -69,9 +72,15 @@ public class JCSMPInboundTopicMessageProducer extends MessageProducerSupport imp
 
     public Set<String> getAllTopics() {
         Set<String> topics = new HashSet<>();
-        topics.add(consumerDestination.getBindingDestinationName());
+        String prefix = "";
+        if (!StringUtils.isEmpty(this.group)) {
+            prefix = "#share/" + this.group + "/";
+        }
+        topics.add(prefix + consumerDestination.getBindingDestinationName());
         if (!CollectionUtils.isEmpty(consumerDestination.getAdditionalSubscriptions())) {
-            topics.addAll(consumerDestination.getAdditionalSubscriptions());
+            for (String additionalSubscription : consumerDestination.getAdditionalSubscriptions()) {
+                topics.add(prefix + additionalSubscription);
+            }
         }
         return topics;
     }
