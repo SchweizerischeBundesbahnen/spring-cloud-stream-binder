@@ -116,9 +116,13 @@ public class JCSMPInboundTopicMessageMultiplexer {
         });
         try {
             for (String topic : toRemove) {
-                jcsmpSession.removeSubscription(JCSMPFactory.onlyInstance().createTopic(topic));
-                appliedSubscriptions.remove(topic);
-                logger.info("remove subscription for topic: " + topic);
+                try {
+                    jcsmpSession.removeSubscription(JCSMPFactory.onlyInstance().createTopic(topic));
+                    appliedSubscriptions.remove(topic);
+                    logger.info("remove subscription for topic: " + topic);
+                } catch (Exception ex) {
+                    logger.warn("could not remove subscription, continuing", ex);
+                }
             }
             for (String topic : toAdd) {
                 jcsmpSession.addSubscription(JCSMPFactory.onlyInstance().createTopic(topic));
@@ -134,7 +138,7 @@ public class JCSMPInboundTopicMessageMultiplexer {
 
     public JCSMPInboundTopicMessageProducer createTopicMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         this.ensureXMLMessageConsumer();
-        return new JCSMPInboundTopicMessageProducer((SolaceConsumerDestination) destination,group, properties, this.solaceMeterAccessorSupplier.get(), livecycleHooks);
+        return new JCSMPInboundTopicMessageProducer((SolaceConsumerDestination) destination, group, properties, this.solaceMeterAccessorSupplier.get(), livecycleHooks);
     }
 
     public interface LivecycleHooks {

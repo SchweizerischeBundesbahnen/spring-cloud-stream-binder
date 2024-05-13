@@ -20,7 +20,7 @@ public class SolaceHealthIndicator implements HealthIndicator {
 	private static final String INFO = "info";
 	private static final String RESPONSE_CODE = "responseCode";
 	@Setter(AccessLevel.PACKAGE)
-	private volatile Health health;
+	private volatile Health health = Health.up().build();
 	private static final Log logger = LogFactory.getLog(SolaceHealthIndicator.class);
 
 	private static void logDebugStatus(String status) {

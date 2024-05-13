@@ -2,6 +2,7 @@ package com.solace.spring.cloud.stream.binder.config;
 
 import com.solace.spring.cloud.stream.binder.SolaceMessageChannelBinder;
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
+import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.handlers.SolaceSessionEventHandler;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
@@ -33,7 +34,7 @@ public class SolaceMessageChannelBinderConfiguration {
     private final JCSMPSessionEventHandler jcsmpSessionEventHandler = new JCSMPSessionEventHandler();
     private final JCSMPProperties jcsmpProperties;
     private final SolaceExtendedBindingProperties solaceExtendedBindingProperties;
-    private final Optional<SessionHealthIndicator> sessionHealthIndicator;
+    private final Optional<SolaceBinderHealthContributor> sessionHealthIndicator;
     private final Optional<SolaceSessionEventHandler> solaceSessionEventHandler;
 
     private JCSMPSession jcsmpSession;
@@ -55,7 +56,7 @@ public class SolaceMessageChannelBinderConfiguration {
             // we should not be worried about setting its status to DOWN,
             // as the call closing JCSMP session also delete the context
             // and terminates the application
-            sessionHealthIndicator.ifPresent(SessionHealthIndicator::up);
+            sessionHealthIndicator.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator).ifPresent(SessionHealthIndicator::up);
             solaceSessionEventHandler.ifPresent(jcsmpSessionEventHandler::addSessionEventHandler);
             if (jcsmpSession instanceof JCSMPBasicSession session && !session.isRequiredSettlementCapable(Set.of(ACCEPTED, FAILED, REJECTED))) {
                 logger.warn("The connected Solace PubSub+ Broker is not compatible. It doesn't support message NACK capability. Consumer bindings will fail to start.");
