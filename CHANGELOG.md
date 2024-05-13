@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.0.1] - 2024-05-13
+### Fixed
+
+- Initialisation error of health indicator resulting in a NPE when checking /actuator/health too early.
+- Exception on shutdown after trying to reconnect to the broker for some minutes.
+
 ## [4.0.0] - 2024-05-07
 
 ### Added

@@ -1,9 +1,11 @@
 # Spring Cloud Stream Binder for Solace
 
 ## Overview
+
 A Spring Cloud Stream Binder for Solace
 
 ## Table of contents
+
 * [Spring Cloud Version Compatibility](#spring-cloud-version-compatibility)
 * [Using it with Maven](#using-it-with-maven)
 * [Building Locally](#building-locally)
@@ -14,25 +16,30 @@ A Spring Cloud Stream Binder for Solace
 * [Authors](#authors)
 * [License](#license)
 * [Support](#support)
+
 ---
+
 ## Spring Cloud Version Compatibility
 
 Consult the table below to determine which version of the BOM you need to use:
 
-| Spring Cloud | Spring Cloud Stream Binder Solace | Spring Boot | sol-jcsmp  |
-|--------------|-----------------------------------|-------------|------------|
-| 2023.0.1     | 4.0.0                             | 3.2.5       | 10.23.0    |
+| Spring Cloud | Spring Cloud Stream Binder Solace | Spring Boot | sol-jcsmp |
+|--------------|-----------------------------------|-------------|-----------|
+| 2023.0.1     | 4.0.1                             | 3.2.5       | 10.23.0   |
+| 2023.0.1     | 4.0.0                             | 3.2.5       | 10.23.0   |
 
 For older versions you can try at your own risk or use the original version from solace:
 https://github.com/SolaceDev/solace-spring-cloud
 
 ## Using it with Maven
+
 ```xml
+
 <dependencies>
     <dependency>
         <groupId>ch.sbb</groupId>
         <artifactId>spring-cloud-stream-binder-solace</artifactId>
-        <version>4.0.0</version>
+        <version>4.0.1</version>
     </dependency>
 </dependencies>
 ```
@@ -40,6 +47,7 @@ https://github.com/SolaceDev/solace-spring-cloud
 ## Documentation
 
 Read [API.adoc](API.adoc) for a description of the properties and API.
+All Changes are documented in the [Changelog](Changelog.md).
 
 ## Contributing
 
@@ -49,16 +57,21 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on the process for su
 
 ## Authors
 
-See the list of [contributors](https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/graphs/contributors) who participated in this project.
+See the list
+of [contributors](https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/graphs/contributors) who
+participated in this project.
 
 ## License
 
 This project is licensed under the Apache License, Version 2.0. - See the [LICENSE](LICENSE) file for details.
 
 ## Code of Conduct
+
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v1.4%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
-Please note that this project is released with a Contributor Code of Conduct. By participating in this project you agree to abide by its terms.
+Please note that this project is released with a Contributor Code of Conduct. By participating in this project you agree
+to abide by its terms.
 
 ## Support
+
 Open an issue at https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/issues
 
