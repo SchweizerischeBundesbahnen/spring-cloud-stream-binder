@@ -117,8 +117,8 @@ public class JCSMPInboundTopicMessageMultiplexer {
         try {
             for (String topic : toRemove) {
                 try {
-                    jcsmpSession.removeSubscription(JCSMPFactory.onlyInstance().createTopic(topic));
                     appliedSubscriptions.remove(topic);
+                    jcsmpSession.removeSubscription(JCSMPFactory.onlyInstance().createTopic(topic));
                     logger.info("remove subscription for topic: " + topic);
                 } catch (Exception ex) {
                     logger.warn("could not remove subscription, continuing", ex);

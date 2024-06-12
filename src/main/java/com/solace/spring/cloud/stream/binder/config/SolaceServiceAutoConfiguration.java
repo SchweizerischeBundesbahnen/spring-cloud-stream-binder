@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Import;
 
 @Configuration
 @ConditionalOnMissingBean(Binder.class)
-@Import({ SolaceMessageChannelBinderConfiguration.class, SolaceJavaAutoConfiguration.class })
+@Import({JCSMPSessionProvider.class, SolaceMessageChannelBinderConfiguration.class, SolaceJavaAutoConfiguration.class})
 public class SolaceServiceAutoConfiguration {
-    
+
 }
