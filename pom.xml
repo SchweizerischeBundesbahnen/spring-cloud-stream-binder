@@ -47,6 +47,13 @@
             <groupId>com.solacesystems</groupId>
             <artifactId>sol-jcsmp</artifactId>
             <version>${solace.jcsmp.version}</version>
+            <exclusions>
+                <exclusion>
+                    <!-- Avoid conflict with spring-jcl -->
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.solace.spring.boot</groupId>
