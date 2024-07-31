@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [5.0.0] - 2024-07-31
+### Added
+- Large message support
+
+### Changed
+- Harmonized Logging to SLF4J
+
+### Removed
+- Batch processing
+- Transactions on batch processing
+- Pollable message sources
+- TopicEndpoint
+
 ## [4.2.4] - 2024-07-22
 ### Changed
 - Change Bean name of context to jcsmpContext to avoid name clashes with jooq
