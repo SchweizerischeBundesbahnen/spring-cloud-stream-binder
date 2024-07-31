@@ -53,11 +53,6 @@ public class SolaceProducerProperties extends SolaceCommonProperties {
      * When set to true, irreversibly convert non-serializable headers to strings. An exception is thrown otherwise.
      */
     private boolean nonserializableHeaderConvertToString = false;
-    /**
-     * When set to true, messages will be sent using local transactions.
-     * The maximum transaction size is 256 messages.
-     */
-    private boolean transacted = false;
 
     /**
      * Indicated if messages should be sending fire and forget or producer has to wait for broker persistence ack.

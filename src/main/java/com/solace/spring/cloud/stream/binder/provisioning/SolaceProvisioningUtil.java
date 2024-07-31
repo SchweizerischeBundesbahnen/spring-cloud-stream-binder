@@ -3,7 +3,6 @@ package com.solace.spring.cloud.stream.binder.provisioning;
 import com.solace.spring.cloud.stream.binder.properties.SolaceCommonProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties;
-import com.solace.spring.cloud.stream.binder.util.EndpointType;
 import com.solace.spring.cloud.stream.binder.util.QualityOfService;
 import com.solacesystems.jcsmp.*;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
@@ -65,21 +64,6 @@ public class SolaceProvisioningUtil {
         ConsumerFlowProperties consumerFlowProperties = new ConsumerFlowProperties();
         final String selector = properties.getExtension().getSelector();
         consumerFlowProperties.setSelector((selector == null || selector.isBlank()) ? null : selector);
-        if (EndpointType.TOPIC_ENDPOINT.equals(properties.getExtension().getEndpointType())) {
-            String subscription;
-            if (properties.getExtension().isAddDestinationAsSubscriptionToQueue()) {
-                subscription = destinationName;
-                if (properties.getExtension().getQueueAdditionalSubscriptions().length > 0) {
-                    throw new IllegalArgumentException("No additional queue subscriptions permitted for topic endpoints");
-                }
-            } else {
-                if (properties.getExtension().getQueueAdditionalSubscriptions().length != 1)
-                    throw new IllegalArgumentException("Exactly one subscription must be provided for topic endpoints");
-                subscription = properties.getExtension().getQueueAdditionalSubscriptions()[0];
-            }
-            consumerFlowProperties.setNewSubscription(JCSMPFactory.onlyInstance().createTopic(subscription));
-        }
-
         return consumerFlowProperties;
     }
 

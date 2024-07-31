@@ -14,10 +14,13 @@ ifdef::env-github[]
 :warning-caption: :warning:
 endif::[]
 
-An implementation of Spring's Cloud Stream Binder for integrating with Solace PubSub+ message brokers. The Spring Cloud Stream Binder project provides a higher-level abstraction towards messaging that standardizes the development of distributed message-based systems.
+An implementation of Spring's Cloud Stream Binder for integrating with Solace PubSub+ message brokers.
+The Spring Cloud Stream Binder project provides a higher-level abstraction towards messaging that standardizes the development of distributed message-based systems.
+
 [IMPORTANT]
 ====
-* Spring Cloud Stream consumer bindings with Solace PubSub+ Binder v5.x and later requires a Solace PubSub+ Broker version 10.2.1 or newer. The https://docs.solace.com/Release-Notes/Release-Info-appliance-sw-releases.htm#Event_Broker_Releases#:~:text=Broker%20Support%20For%20Message%20NACK[Native Message NACK] feature on which Solace consumer binding depends on, was introduced in Solace PubSub+ Broker version 10.2.1.
+* Spring Cloud Stream consumer bindings with Solace PubSub+ Binder v5.x and later requires a Solace PubSub+ Broker version 10.2.1 or newer.
+The https://docs.solace.com/Release-Notes/Release-Info-appliance-sw-releases.htm#Event_Broker_Releases#:~:text=Broker%20Support%20For%20Message%20NACK[Native Message NACK] feature on which Solace consumer binding depends on, was introduced in Solace PubSub+ Broker version 10.2.1.
 * Spring Cloud Stream producer bindings with Solace PubSub+ Binder v5.x and later is compatible with PubSub+ Broker version prior to 10.2.1.
 * See xref:solace-binder-5.x-migration-guide.adoc#_solace_pubsub_binder_5_0_migration_guide[Solace PubSub+ Binder 5.0 Migration Guide] for details, if you are upgrading from older version to Solace Binder v5.x or later.
 ====
@@ -33,27 +36,35 @@ The Solace implementation of the Spring Cloud Stream Binder maps the following c
 ** Consumer bindings always receives messages from queues
 * Anonymous consumer groups to temporary queues (When no group is specified; used for SCS Publish-Subscribe Model)
 
-In Solace, the above setup is called topic-to-queue mapping. So a typical message flow would then appear as follows:
+In Solace, the above setup is called topic-to-queue mapping.
+So a typical message flow would then appear as follows:
 
 . Producer bindings publish messages to their destination topics
 . Each consumer groups' queue receives the messages published to their destination topic
 . The PubSub+ broker distributes messages in a round-robin fashion to each consumer binding for a particular consumer group
 +
-NOTE: Round-robin distribution only occurs if the consumer group's queue is configured for non-exclusive access. If the queue has exclusive access, then only one consumer will receive messages.
+NOTE: Round-robin distribution only occurs if the consumer group's queue is configured for non-exclusive access.
+If the queue has exclusive access, then only one consumer will receive messages.
 
-IMPORTANT: Since consumer bindings always consumes from queues it is required that Assured Delivery is enabled on the Solace PubSub+ Message VPN being used (Assured Delivery is automatically enabled if using Solace Cloud). Additionally, the client username's client profile must be allowed to send and receive guaranteed messages.
+IMPORTANT: Since consumer bindings always consumes from queues it is required that Assured Delivery is enabled on the Solace PubSub+ Message VPN being used (Assured Delivery is automatically enabled if using Solace Cloud).
+Additionally, the client username's client profile must be allowed to send and receive guaranteed messages.
 
-For the sake of brevity, it will be assumed that you have a basic understanding of the Spring Cloud Stream project. If not, then please refer to https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/[Spring's documentation]. This document will solely focus on discussing components unique to Solace.
+For the sake of brevity, it will be assumed that you have a basic understanding of the Spring Cloud Stream project.
+If not, then please refer to https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/[Spring's documentation].
+This document will solely focus on discussing components unique to Solace.
 
 == Spring Cloud Stream Binder
 
-This project extends the Spring Cloud Stream Binder project. If you are new to Spring Cloud Stream, https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/[check out their documentation].
+This project extends the Spring Cloud Stream Binder project.
+If you are new to Spring Cloud Stream, https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/[check out their documentation].
 
 The following is a brief excerpt from that document:
 
-[quote, 'https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#spring-cloud-stream-overview-introducing[Introducing Spring Cloud Stream – Spring Cloud Stream Reference Documentation]']
-____
-Spring Cloud Stream is a framework for building message-driven microservice applications. Spring Cloud Stream builds upon Spring Boot to create standalone, production-grade Spring applications and uses Spring Integration to provide connectivity to message brokers. It provides opinionated configuration of middleware from several vendors, introducing the concepts of persistent publish-subscribe semantics, consumer groups, and partitions.
+[quote,'https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#spring-cloud-stream-overview-introducing[Introducing Spring Cloud Stream – Spring Cloud Stream Reference Documentation]
+']
+____ Spring Cloud Stream is a framework for building message-driven microservice applications.
+Spring Cloud Stream builds upon Spring Boot to create standalone, production-grade Spring applications and uses Spring Integration to provide connectivity to message brokers.
+It provides opinionated configuration of middleware from several vendors, introducing the concepts of persistent publish-subscribe semantics, consumer groups, and partitions.
 ____
 
 == Using it in your Application
@@ -77,7 +88,7 @@ compile("ch.sbb:spring-cloud-stream-binder-solace:{revnumber}")
 
 ==== Using it with Maven
 
-[source,xml, subs="attributes+"]
+[source,xml,subs="attributes+"]
 ----
 <!-- Solace Spring Cloud Stream Binder -->
 <dependency>
@@ -89,7 +100,8 @@ compile("ch.sbb:spring-cloud-stream-binder-solace:{revnumber}")
 
 === Creating a Simple Solace Binding
 
-Starting in Spring Cloud Stream version 3 the recommended way to define binding and binding names is to use the Functional approach, which uses Spring Cloud Functions. You can learn more in the https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#spring_cloud_function[Spring Cloud Function support] and https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_functional_binding_names[Functional Binding Names] sections of the reference guide.
+Starting in Spring Cloud Stream version 3 the recommended way to define binding and binding names is to use the Functional approach, which uses Spring Cloud Functions.
+You can learn more in the https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#spring_cloud_function[Spring Cloud Function support] and https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_functional_binding_names[Functional Binding Names] sections of the reference guide.
 
 Given this example app:
 
@@ -143,7 +155,9 @@ spring:
 #                  ssl_trust_store_password: <trust_store_password>
 #                  ssl_validate_certificate: true
 ----
-<1> The latter half of this configuration where the Solace session is configured actually originates from the https://github.com/SolaceProducts/solace-spring-boot/tree/master/solace-spring-boot-starters/solace-java-spring-boot-starter#updating-your-application-properties[JCSMP Spring Boot Auto-Configuration project]. See <<Solace Session Properties>> for more info.
+
+<1> The latter half of this configuration where the Solace session is configured actually originates from the https://github.com/SolaceProducts/solace-spring-boot/tree/master/solace-spring-boot-starters/solace-java-spring-boot-starter#updating-your-application-properties[JCSMP Spring Boot Auto-Configuration project].
+See <<Solace Session Properties>> for more info.
 
 For more samples see https://github.com/SolaceSamples/solace-samples-spring[Solace Spring Cloud Samples] repository.
 
@@ -153,7 +167,8 @@ For step-by-step instructions refer https://tutorials.solace.dev/spring/spring-c
 
 === Solace Binder Configuration Options
 
-Configuration of the Solace Spring Cloud Stream Binder is done through https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-external-config.html[Spring Boot's externalized configuration]. This is where users can control the binder's configuration options as well as the Solace Java API properties.
+Configuration of the Solace Spring Cloud Stream Binder is done through https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-external-config.html[Spring Boot's externalized configuration].
+This is where users can control the binder's configuration options as well as the Solace Java API properties.
 
 For general binder configuration options and properties, refer to the https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_configuration_options[Spring Cloud Stream Reference Documentation].
 
@@ -161,7 +176,8 @@ For general binder configuration options and properties, refer to the https://do
 
 The binder's Solace session is configurable using properties prefixed by `solace.java` or `spring.cloud.stream.binders.<binder-name>.environment.solace.java`.
 
-IMPORTANT: This binder leverages the JCSMP Spring Boot Auto-Configuration project to configure its session. See the https://github.com/SolaceProducts/solace-spring-boot/tree/master/solace-spring-boot-starters/solace-java-spring-boot-starter#configure-the-application-to-use-your-solace-pubsub-service-credentials[JCSMP Spring Boot Auto-Configuration documentation] for more info on how to configure these properties.
+IMPORTANT: This binder leverages the JCSMP Spring Boot Auto-Configuration project to configure its session.
+See the https://github.com/SolaceProducts/solace-spring-boot/tree/master/solace-spring-boot-starters/solace-java-spring-boot-starter#configure-the-application-to-use-your-solace-pubsub-service-credentials[JCSMP Spring Boot Auto-Configuration documentation] for more info on how to configure these properties.
 
 See <<Creating a Simple Solace Binding>> for a simple example of how to configure a session for this binder.
 
@@ -177,15 +193,10 @@ See https://github.com/SolaceProducts/solace-spring-boot/tree/master/solace-spri
 The following properties are available for Solace consumers only and must be prefixed with `spring.cloud.stream.solace.bindings.&lt;bindingName&gt;.consumer.` where `bindingName` looks something like `functionName-in-0` as defined in https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_functional_binding_names[Functional Binding Names].
 
 See link:src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceCommonProperties.java[SolaceCommonProperties] and link:src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceConsumerProperties.java[SolaceConsumerProperties] for the most updated list.
-endpointType::
-Specifies whether the configured type of endpoint messages are consumed from is a `queue` or a `topic_endpoint`.
-+
-When set to `topic_endpoint`, then instead of provisioning a queue for the consumer group’s endpoint, the binder will instead provision a topic endpoint.
-+
-Default: `queue`
 
 provisionDurableQueue::
-Whether to provision durable queues for non-anonymous consumer groups. This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
+Whether to provision durable queues for non-anonymous consumer groups.
+This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
 +
 Default: `true` +
 See: <<Generated Queue Name Syntax>>
@@ -197,8 +208,7 @@ Default: `true`
 selector::
 If specified, enables client applications to choose which messages they are interested in receiving, as determined by the messages’ header field and property values.
 +
-A selector has a conditional expression syntax that is a subset of SQL92
-Selector can be used with Queue or a Topic Endpoint Subscription
+A selector has a conditional expression syntax that is a subset of SQL92 Selector can be used with Queue or a Topic Endpoint Subscription
 +
 Default: `null`
 See: https://docs.solace.com/API/Solace-JMS-API/Selectors.htm
@@ -211,7 +221,8 @@ See: <<Generated Queue Name Syntax>>
 +
 WARNING: Modifying this can cause naming conflicts between the queue names of consumer groups.
 +
-WARNING: While the default SpEL expression will consistently return a value adhering to <<Generated Queue Name Syntax>>, directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+WARNING: While the default SpEL expression will consistently return a value adhering to <<Generated Queue Name Syntax>>, directly using the SpEL expression string is not supported.
+The default value for this config option is subject to change without notice.
 
 queueAccessType::
 Access type for the consumer group queue.
@@ -231,7 +242,8 @@ If specified, whether to notify sender if a message fails to be enqueued to the 
 Default: `null`
 
 queueMaxMsgRedelivery::
-Sets the maximum message redelivery count on consumer group queue. (Zero means retry forever).
+Sets the maximum message redelivery count on consumer group queue.
+(Zero means retry forever).
 +
 Default: `null`
 
@@ -257,42 +269,17 @@ These subscriptions may also contain wildcards.
 Default: `String[0]` +
 See: <<Overview>> for more info on how this binder uses topic-to-queue mapping to implement Spring Cloud Streams consumer groups.
 
-polledConsumerWaitTimeInMillis::
-Maximum wait time for polled consumers to receive a message from their consumer group queue. +
-Only applicable when `batchMode` is `false`.
-+
-Default: `100`
-transacted::
-When set to `true`, messages will be received using local transactions.
-+
-Default: `false`
-+
-WARNING: A transacted producer cannot be used by multiple threads.
-+
-NOTE: The maximum transaction size is 256 messages. +
-The size of the transaction is controlled by the batched message's size. See <<Batch Consumers>> for more info.
-
-batchMaxSize::
-The maximum number of messages per batch. +
-Only applicable when `batchMode` is `true`.
-+
-Default: `255`
-
-batchTimeout::
-The maximum wait time in milliseconds to receive a batch of messages. If this timeout is reached, then the messages that have already been received will be used to create the batch. A value of `0` means wait forever. +
-Only applicable when `batchMode` is `true`.
-+
-Default: `5000`
-
 autoBindErrorQueue::
-Whether to automatically create a durable error queue to which messages will be republished when message processing failures are encountered. Only applies once all internal retries have been exhausted.
+Whether to automatically create a durable error queue to which messages will be republished when message processing failures are encountered.
+Only applies once all internal retries have been exhausted.
 +
 Default: `false`
 +
 TIP: Your ACL Profile must allow for publishing to this queue if you decide to use `autoBindErrorQueue`.
 
 provisionErrorQueue::
-Whether to provision durable queues for error queues when `autoBindErrorQueue` is `true`. This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
+Whether to provision durable queues for error queues when `autoBindErrorQueue` is `true`.
+This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
 +
 Default: `true` +
 See: <<Generated Error Queue Name Syntax>>
@@ -305,10 +292,12 @@ See: <<Generated Error Queue Name Syntax>>
 +
 WARNING: Modifying this can cause naming conflicts between the error queue names.
 +
-WARNING: While the default SpEL expression will consistently return a value adhering to <<Generated Queue Name Syntax>>, directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+WARNING: While the default SpEL expression will consistently return a value adhering to <<Generated Queue Name Syntax>>, directly using the SpEL expression string is not supported.
+The default value for this config option is subject to change without notice.
 
 errorQueueMaxDeliveryAttempts::
-Maximum number of attempts to send a failed message to the error queue. When all delivery attempts have been exhausted, the failed message will be requeued.
+Maximum number of attempts to send a failed message to the error queue.
+When all delivery attempts have been exhausted, the failed message will be requeued.
 +
 Default: `3`
 
@@ -330,7 +319,8 @@ If specified, whether to notify sender if a message fails to be enqueued to the 
 Default: `null`
 
 errorQueueMaxMsgRedelivery::
-Sets the maximum message redelivery count on the error queue. (Zero means retry forever).
+Sets the maximum message redelivery count on the error queue.
+(Zero means retry forever).
 +
 Default: `null`
 
@@ -365,7 +355,7 @@ The list of headers to exclude when converting consumed Solace message to Spring
 Default: Empty `List&lt;String&gt;`
 
 qualityOfService::
-The  QoS (Quality of Service) to consume Messages.
+The QoS (Quality of Service) to consume Messages.
 Possible Values:
 - `AT_MOST_ONCE`
 * QoS=0
@@ -391,32 +381,30 @@ Specifies whether the configured `destination` is a `topic` or a `queue`.
 +
 When set to `topic`, the `destination` name is a topic subscription added on a queue.
 +
-When set to `queue`, the producer binds to a queue matching the `destination` name. The queue can be auto-provisioned with `provisionDurableQueue=true` however, all naming prefix and queue name generation options do not apply. A queue will be provisioned using the `destination` name explicitly.
+When set to `queue`, the producer binds to a queue matching the `destination` name.
+The queue can be auto-provisioned with `provisionDurableQueue=true` however, all naming prefix and queue name generation options do not apply.
+A queue will be provisioned using the `destination` name explicitly.
 +
 Default: `topic`
 
 headerExclusions::
-The list of headers to exclude from the published message. Excluding Solace message headers is not supported.
+The list of headers to exclude from the published message.
+Excluding Solace message headers is not supported.
 +
 Default: Empty `List&lt;String&gt;`
 
 nonserializableHeaderConvertToString::
-When set to `true`, irreversibly convert non-serializable headers to strings. An exception is thrown otherwise.
+When set to `true`, irreversibly convert non-serializable headers to strings.
+An exception is thrown otherwise.
 +
 Default: `false`
 +
-IMPORTANT: Non-serializable headers should have a meaningful `toString()` implementation. Otherwise enabling this feature may result in potential data loss.
-
-transacted::
-When set to `true`, messages will be delivered using local transactions.
-+
-Default: `false`
-+
-NOTE: The maximum transaction size is 256 messages. +
-The size of the transaction is 1 when the binding receives a regular Spring message. Otherwise, if it receives a <<Batch Producers, batched message>>, then the transaction size is equal to the batch size.
+IMPORTANT: Non-serializable headers should have a meaningful `toString()` implementation.
+Otherwise enabling this feature may result in potential data loss.
 
 provisionDurableQueue::
-Whether to provision durable queues for non-anonymous consumer groups or queue destinations. This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
+Whether to provision durable queues for non-anonymous consumer groups or queue destinations.
+This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
 +
 Default: `true` +
 See: <<Generated Queue Name Syntax>>
@@ -436,7 +424,8 @@ See: <<Generated Queue Name Syntax>>
 +
 WARNING: Modifying this can cause naming conflicts between the queue names of consumer groups.
 +
-WARNING: While the default SpEL expression will consistently return a value adhering to <<Generated Queue Name Syntax>>, directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+WARNING: While the default SpEL expression will consistently return a value adhering to <<Generated Queue Name Syntax>>, directly using the SpEL expression string is not supported.
+The default value for this config option is subject to change without notice.
 
 queueNameExpressionsForRequiredGroups::
 A mapping of required consumer groups to queue name SpEL expressions.
@@ -448,7 +437,8 @@ See: <<Generated Queue Name Syntax>>
 +
 WARNING: Modifying this can cause naming conflicts between the queue names of consumer groups.
 +
-WARNING: While the default SpEL expression will consistently return a value adhering to <<Generated Queue Name Syntax>>, directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+WARNING: While the default SpEL expression will consistently return a value adhering to <<Generated Queue Name Syntax>>, directly using the SpEL expression string is not supported.
+The default value for this config option is subject to change without notice.
 
 queueAccessType::
 Access type for binder provisioned queues.
@@ -463,12 +453,15 @@ Default: `2` (PERMISSION_CONSUME) +
 See: https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/constant-values.html#com.solacesystems.jcsmp.EndpointProperties.PERMISSION_CONSUME[The `PERMISSION_` prefixed constants for other possible values]
 
 queueDiscardBehaviour::
-Queue discard behaviour for binder provisioned queues. Whether to notify sender if a message fails to be enqueued to the endpoint. A null value means use the appliance default.
+Queue discard behaviour for binder provisioned queues.
+Whether to notify sender if a message fails to be enqueued to the endpoint.
+A null value means use the appliance default.
 +
 Default: `null`
 
 queueMaxMsgRedelivery::
-Sets the maximum message redelivery count for binder provisioned queues. (Zero means retry forever).
+Sets the maximum message redelivery count for binder provisioned queues.
+(Zero means retry forever).
 +
 Default: `null`
 
@@ -498,7 +491,8 @@ NOTE: Does not apply when `destinationType=queue`.
 
 deliveryMode::
 See https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm for documentation.
-The deliveryMode on the producer will be used to send messages on the configured binder. Possible values:
+The deliveryMode on the producer will be used to send messages on the configured binder.
+Possible values:
 - `PERSISTENT`
 - `NON_PERSISTENT`
 - `DIRECT`
@@ -512,9 +506,12 @@ Default: `PERSISTENT`
 These properties configure the Solace connection's health indicator configurable under `solace.health-check.connection`.
 
 reconnectAttemptsUntilDown::
-The number of session reconnect attempts until the health goes `DOWN`. This will happen regardless if the underlying session is actually still reconnecting. Setting this to `0` will disable this feature.
+The number of session reconnect attempts until the health goes `DOWN`.
+This will happen regardless if the underlying session is actually still reconnecting.
+Setting this to `0` will disable this feature.
 +
-This feature operates independently of the PubSub+ session reconnect feature. Meaning that if PubSub+ session reconnect is configured to retry less than the value given to this property, then this feature effectively does nothing.
+This feature operates independently of the PubSub+ session reconnect feature.
+Meaning that if PubSub+ session reconnect is configured to retry less than the value given to this property, then this feature effectively does nothing.
 +
 Default: `0`
 
@@ -522,17 +519,21 @@ Default: `0`
 
 Solace-defined Spring headers to get/set Solace metadata from/to Spring `Message` headers.
 
-WARNING: `solace_` is a header space reserved for Solace-defined headers. Creating new `solace_`-prefixed headers is not supported. Doing so may cause unexpected side-effects in future versions of this binder.
+WARNING: `solace_` is a header space reserved for Solace-defined headers.
+Creating new `solace_`-prefixed headers is not supported.
+Doing so may cause unexpected side-effects in future versions of this binder.
 
-CAUTION: Refer to each header's documentation for their expected usage scenario. Using headers outside of their intended type and access-control is not supported.
+CAUTION: Refer to each header's documentation for their expected usage scenario.
+Using headers outside of their intended type and access-control is not supported.
 
 [NOTE]
 ====
 Header inheritance applies to Solace message headers in processor message handlers:
 
-[quote, 'https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_mechanics[Mechanics, Spring Cloud Stream Reference Documentation]']
-____
-When the non-void handler method returns, if the return value is already a `Message`, that `Message` becomes the payload. However, when the return value is not a `Message`, the new `Message` is constructed with the return value as the payload while inheriting headers from the input `Message` minus the headers defined or filtered by `SpringIntegrationProperties.messageHandlerNotPropagatedHeaders`.
+[quote,'https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_mechanics[Mechanics,Spring Cloud Stream Reference Documentation]
+']
+____ When the non-void handler method returns, if the return value is already a `Message`, that `Message` becomes the payload.
+However, when the return value is not a `Message`, the new `Message` is constructed with the return value as the payload while inheriting headers from the input `Message` minus the headers defined or filtered by `SpringIntegrationProperties.messageHandlerNotPropagatedHeaders`.
 ____
 ====
 
@@ -540,9 +541,10 @@ ____
 
 These headers are to get/set Solace message properties.
 
-TIP: Use link:src/main/java/com/solace/spring/cloud/stream/binder/messaging/SolaceHeaders.java[SolaceHeaders] instead of hardcoding the header names. This class also contains the same documentation that you see here.
+TIP: Use link:src/main/java/com/solace/spring/cloud/stream/binder/messaging/SolaceHeaders.java[SolaceHeaders] instead of hardcoding the header names.
+This class also contains the same documentation that you see here.
 
-[cols="1m,1m,1,4", options="header"]
+[cols="1m,1m,1,4",options="header"]
 |===
 | Header Name
 | Type
@@ -665,23 +667,16 @@ These can be used for:
 * Getting/Setting Solace Binder metadata
 * Directive actions for the binder when producing/consuming messages
 
-TIP: Use link:src/main/java/com/solace/spring/cloud/stream/binder/messaging/SolaceBinderHeaders.java[SolaceBinderHeaders] instead of hardcoding the header names. This class also contains the same documentation that you see here.
+TIP: Use link:src/main/java/com/solace/spring/cloud/stream/binder/messaging/SolaceBinderHeaders.java[SolaceBinderHeaders] instead of hardcoding the header names.
+This class also contains the same documentation that you see here.
 
-[cols="1m,1m,1,1m,4", options="header"]
+[cols="1m,1m,1,1m,4",options="header"]
 |===
 | Header Name
 | Type
 | Access
 | Default Value
 | Description
-
-| solace_scst_batchedHeaders
-| List<Map<String, Object>>
-| Read
-|
-| Only applicable when `batchMode` is `true`.
-
-The consolidated list of message headers for a batch of messages where the headers for each payload element is in this list’s corresponding index.
 
 | solace_scst_confirmCorrelation
 | CorrelationData
@@ -731,6 +726,12 @@ The consolidated list of message headers for a batch of messages where the heade
 |
 | Only applicable when `scst_targetDestination` is set.
 
+| solace_scst_largeMessageSupport
+| Boolean
+| Write
+|
+| Set to 'true' to enable sending of large messages (only on producer side). Default is 'false'. If using groups only partitioned queues are supported. Otherwhise the message chunks get delivered to the wrong consumer.
+
 *topic*
 
 Specifies that the dynamic destination is a topic
@@ -746,7 +747,7 @@ When absent, the binding’s configured destination-type is used.
 
 Below are the payload types natively supported by this binder (before/after https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#content-type-management[Content Type Negotiation]):
 
-[cols="1m,1,3", options="header"]
+[cols="1m,1,3",options="header"]
 |===
 | Payload Type | PubSub+ Message Type | Notes
 
@@ -787,7 +788,8 @@ When the binder consumes a binary message which has the `solace_scst_serializedP
 
 [TIP]
 ====
-Typically, the Spring Cloud Stream framework will convert a published payload into a `byte[]` before giving it to the binder. In which case, this binder will publish a binary message.
+Typically, the Spring Cloud Stream framework will convert a published payload into a `byte[]` before giving it to the binder.
+In which case, this binder will publish a binary message.
 
 If this occurs, but you wish to publish other message types, then one option is to set `useNativeEncoding=true` on your producer (https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_producer_properties[but read the caveats carefully before enabling this feature]), and have your message handler return a payload of one of this binder's supported native payload types; e.g. return `Message<SDTStream>` to publish a stream message.
 
@@ -796,9 +798,13 @@ See https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/htm
 
 === Empty Payload VS Null Payload
 
-Spring messages can't contain null payloads, however, message handlers can differentiate between null payloads and empty payloads by looking at the `solace_scst_nullPayload` header. The binder adds the `solace_scst_nullPayload` header when a Solace message with null payload is consumed from the wire. When that is the case, the binder sets the Spring message's payload to a null equivalent payload. Null equivalent payloads are one of the following: empty `byte[]`, empty `String`, empty `SDTMap`, or empty `SDTStream`.
+Spring messages can't contain null payloads, however, message handlers can differentiate between null payloads and empty payloads by looking at the `solace_scst_nullPayload` header.
+The binder adds the `solace_scst_nullPayload` header when a Solace message with null payload is consumed from the wire.
+When that is the case, the binder sets the Spring message's payload to a null equivalent payload.
+Null equivalent payloads are one of the following: empty `byte[]`, empty `String`, empty `SDTMap`, or empty `SDTStream`.
 
-NOTE: Applications can't differentiate between null payloads and empty payloads when consuming binary messages or XML-content messages from the wire. This is because Solace always converts empty payloads to null payloads when those message types are published.
+NOTE: Applications can't differentiate between null payloads and empty payloads when consuming binary messages or XML-content messages from the wire.
+This is because Solace always converts empty payloads to null payloads when those message types are published.
 
 == Generated Queue Name Syntax
 
@@ -807,6 +813,7 @@ By default, generated consumer group queue names have the following form:
 ----
 <prefix>/<familiarity-modifier>/<group>/<destination-encoding>/<encoded-destination>
 ----
+
 prefix::
 A static prefix `scst`.
 
@@ -822,8 +829,10 @@ Indicates the encoding scheme used to encode the destination in the queue name (
 encoded-destination::
 The encoded `destination` as per `<destination-encoding>`.
 
-The `queueNameExpression` property's default SpEL expression conforms to the above format, however, users can provide any valid SpEL expression in order to generate custom queue names. Valid expressions evaluate against the following context:
-[cols="1m,1", options="header"]
+The `queueNameExpression` property's default SpEL expression conforms to the above format, however, users can provide any valid SpEL expression in order to generate custom queue names.
+Valid expressions evaluate against the following context:
+
+[cols="1m,1",options="header"]
 |===
 | Context Variable
 | Description
@@ -857,7 +866,8 @@ The definitions of each segment of the error queue matches that from <<Generated
 group::
 The consumer `group` name.
 
-The `errorQueueNameExpression` property's default SpEL expression conforms to the above format. Users can provide any valid SpEL expression in order to generate custom error queue names using the same evaluation context as described in <<Generated Queue Name Syntax>>.
+The `errorQueueNameExpression` property's default SpEL expression conforms to the above format.
+Users can provide any valid SpEL expression in order to generate custom error queue names using the same evaluation context as described in <<Generated Queue Name Syntax>>.
 
 == Consumer Concurrency
 
@@ -869,94 +879,22 @@ Though note that there are few limitations:
 . `concurrency` &gt; 1 is not supported for consumer bindings which are a part of anonymous consumer groups.
 . `concurrency` &gt; 1 is ignored for polled consumers.
 . `concurrency` &gt; 1 is not supported with auto-provisioned topic endpoints.
-. Setting `provisionDurableQueue` to `false` disables endpoint configuration validation. Meaning that point 1 cannot be validated. In this scenario, it is the developer's responsibility to ensure that point 1 is followed.
+. Setting `provisionDurableQueue` to `false` disables endpoint configuration validation.
+Meaning that point 1 cannot be validated.
+In this scenario, it is the developer's responsibility to ensure that point 1 is followed.
 
-== Batch Consumers (Deprecated)
-Only work with qualityOfService: AT_LEAST_ONCE (Default). We plan to remove the feature.
-
-https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_batch_consumers[Batch consumers] can be enabled by setting `spring.cloud.stream.bindings.<binding-name>.consumer.batch-mode` to `true`. In which case, batched messages may be consumed as follows:
-
-[source,java]
-----
-@Bean
-Consumer<Message<List<Payload>>> input() {
-	return batchMsg -> { // <1>
-		List<Payload> batchedPayloads = batchMsg.getPayload();
-		List<Map<String, Object>> batchedHeaders = (List<Map<String, Object>>) batchMsg.getHeaders().get(SolaceBinderHeaders.BATCHED_HEADERS); // <2>
-
-		for (int i = 0; i < batchedPayloads.size(); i++) {
-			Payload payload = batchedPayloads.get(i);
-			Map<String, Object> headers = batchedHeaders.get(i);
-			// Process inidividual message payload and its headers
-		}
-	};
-}
-----
-<1> A batch of messages is really just a single Spring `Message` whose payload is a list of individual message payloads.
-<2> The `solace_scst_batchedHeaders` message header contains the consolidated list of message headers for each of the individual messages in the batch.
-
-.Transacted Batch Consumers
-[TIP]
-====
-By default, batched messages are non-transacted (i.e. `transacted` is set to `false`). When in this mode, a batch created by this binder is fundamentally a collection of standalone messages. Where messages in the batch have no relationship between each other.
-When `transacted` is set to `true`, a local transaction is used to process the batched message. The batch of messages is then automatically committed (or is rolled back on errors) when the message handler returns.
-====
-
-.Resolving Batch Message Conversion Issues
-[TIP]
-====
-If the Spring Cloud Stream framework fails to convert the batch message, consider setting one of the following consumer config options:
-
-* An explicit https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_common_binding_properties[`contentType`].
-** e.g. `application/octet-stream` for `byte[]` messages.
-* https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_consumer_properties[`useNativeDecoding=true`] if the message handler is just consuming raw payload types.
-** e.g. if PubSub+ delivers a binary message and the consumer message handler accepts `Message<List<byte[]>>`.
-** https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_consumer_properties[Read the caveats carefully before enabling this feature]
-
-See https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#content-type-management[Content Type Negotiation] for more info on how Spring Cloud Streams converts payloads and other options to control message conversion.
-
-See <<Native Payload Types>> for more info regarding this binder's natively supported payload types.
-====
-
-To create a batch of messages, the binder will consume messages from the PubSub+ broker until either a maximum batch size or timeout has been achieved. After which, the binder will compose the batch message and send it to the consumer handler for processing. Both these batching parameters can be configured using the `batchMaxSize` and `batchTimeout` consumer config options.
-
-=== Batch Producers
-Similar to batch consumers, batched messages may also be published through the producer binding:
-[source,java]
-----
-@Bean
-Supplier<Message<List<Payload>>> output() {
-	return () -> {
-		List<Payload> batchedPayloads = new ArrayList<>();
-		List<Map<String, Object>> batchedHeaders = new ArrayList<>();
-		for (int i = 0; i < 100; i++) {
-			// Create batched message contents
-			batchedPayloads.add(new Payload(i));
-			batchedHeaders.add(Map.of("my-header", "my-header-value"));
-		}
-		// construct batched message
-		return MessageBuilder.withPayload(batchedPayloads)
-				.setHeader(SolaceBinderHeaders.BATCHED_HEADERS, batchedHeaders)
-				.build();
-	};
-}
-----
-The producer binding will look for the `solace_scst_batchedHeaders` message header to determine if the supplied Spring message is either a batched Spring message or a regular Spring message.
-If the producer binding detects that it has received a batched Spring message, then it will individually publish each item in the batch.
-[NOTE]
-====
-.Publishing Batched Messages using Transacted Producer Bindings
-When `transacted=true`, the size of the transaction is equal to the size of the batched Spring message.
 ====
 == Partitioning
 
 [NOTE]
 ====
+
 The Solace PubSub+ broker supports partitioning natively.
 
 Only work with qualityOfService: AT_LEAST_ONCE (Default)
 
 The partitioning abstraction as described in the https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#partitioning[Spring Cloud Stream documentation] is not supported.
+
 ====
 
 To publish messages that are intended for partitioned queues, you must provide a partition key by setting the `solace_scst_partitionKey` message header (accessible through the `SolaceBinderHeaders.PARTITION_KEY` constant).
@@ -974,13 +912,12 @@ public class MyMessageBuilder {
 }
 ----
 
-As for consuming messages from partitioned queues, this is handled transparently by the PubSub+ broker. That is to say, consuming messages from a partitioned queue is no different from consuming messages from any other queue.
+As for consuming messages from partitioned queues, this is handled transparently by the PubSub+ broker.
+That is to say, consuming messages from a partitioned queue is no different from consuming messages from any other queue.
 
 See https://docs.solace.com/Messaging/Guaranteed-Msg/Queues.htm#partitioned-queues[Partitioned Queues] for more.
 
-== Manual Message Acknowledgment
-Only work with qualityOfService: AT_LEAST_ONCE (Default)
-NOTE: Manual message acknowledgment is not supported for consumers where `transacted` is set to `true`.
+== Manual Message Acknowledgment Only work with qualityOfService: AT_LEAST_ONCE (Default)
 
 Message handlers can disable auto-acknowledgement and manually invoke the acknowledgement callback as follows:
 
@@ -994,6 +931,7 @@ public void consume(Message<?> message) {
     } catch (SolaceAcknowledgmentException e) {} // <4>
 }
 ----
+
 <1> Get the message's acknowledgement callback header
 <2> Disable auto-acknowledgement
 <3> Acknowledge the message with the `ACCEPT` status
@@ -1001,11 +939,12 @@ public void consume(Message<?> message) {
 
 Refer to the https://docs.spring.io/spring-integration/api/org/springframework/integration/acks/AckUtils.html[AckUtils documentation] and https://javadoc.io/doc/org.springframework.integration/spring-integration-core/latest/org/springframework/integration/acks/AcknowledgmentCallback.html[AcknowledgmentCallback documentation] for more info on these objects.
 
-TIP: If manual acknowledgement is to be done outside of the message handler's thread, then make sure auto-acknowledgement is disabled within the message handler's thread and not an external one. Otherwise, the binder will auto-acknowledge the message when the message handler returns.
+TIP: If manual acknowledgement is to be done outside of the message handler's thread, then make sure auto-acknowledgement is disabled within the message handler's thread and not an external one.
+Otherwise, the binder will auto-acknowledge the message when the message handler returns.
 
 For each acknowledgement status, the binder will perform the following actions:
 
-[cols="1,3", options="header"]
+[cols="1,3",options="header"]
 |===
 | Status
 | Action
@@ -1026,21 +965,30 @@ Refer to <<Message Redelivery>> for more info.
 
 [IMPORTANT]
 ====
-Acknowledgements may throw `SolaceAcknowledgmentException` depending on the current state of the consumer. Particularly if doing asynchronous acknowledgements, your invocation to acknowledge a message should catch `SolaceAcknowledgmentException` and deal with it accordingly.
+
+Acknowledgements may throw `SolaceAcknowledgmentException` depending on the current state of the consumer.
+Particularly if doing asynchronous acknowledgements, your invocation to acknowledge a message should catch `SolaceAcknowledgmentException` and deal with it accordingly.
 
 *Example:* +
 (refer to <<Message Redelivery>> for background info)
 
-A `SolaceAcknowledgmentException` with cause `IllegalStateException` may be thrown when trying to asynchronously `ACCEPT` a message and consumer flow is closed. Though for this particular example, since the message that failed to `ACCEPT` will be redelivered, this exception can be caught and ignored if you have no business logic to revert.
+A `SolaceAcknowledgmentException` with cause `IllegalStateException` may be thrown when trying to asynchronously `ACCEPT` a message and consumer flow is closed.
+Though for this particular example, since the message that failed to `ACCEPT` will be redelivered, this exception can be caught and ignored if you have no business logic to revert.
+
 ====
 
-NOTE: Manual acknowledgements do not support any application-internal error handling strategies (i.e. retry template, error channel forwarding, etc). Also, throwing an exception in the message handler will always acknowledge the message in some way regardless if auto-acknowledgment is disabled.
+NOTE: Manual acknowledgements do not support any application-internal error handling strategies (i.e. retry template, error channel forwarding, etc).
+Also, throwing an exception in the message handler will always acknowledge the message in some way regardless if auto-acknowledgment is disabled.
 
 [TIP]
 ====
+
 If asynchronously acknowledging messages, then if these messages aren’t acknowledged in a timely manner, it is likely for the message consumption rate to stall due to the consumer queue’s configured "Maximum Delivered Unacknowledged Messages per Flow".
 
-This property can be configured for dynamically created queues by using https://docs.solace.com/Configuring-and-Managing/Configuring-Endpoint-Templates.htm#Configur[queue templates]. However note that as per https://docs.solace.com/PubSub-Basics/Endpoints.htm#Which[our documentation], anonymous consumer group queues (i.e. temporary queues) will not match a queue template’s name filter. Only the queue template defined in the client profile’s "Copy Settings From Queue Template" setting will apply to those.
+This property can be configured for dynamically created queues by using https://docs.solace.com/Configuring-and-Managing/Configuring-Endpoint-Templates.htm#Configur[queue templates].
+However note that as per https://docs.solace.com/PubSub-Basics/Endpoints.htm#Which[our documentation], anonymous consumer group queues (i.e. temporary queues) will not match a queue template’s name filter.
+Only the queue template defined in the client profile’s "Copy Settings From Queue Template" setting will apply to those.
+
 ====
 
 == Dynamic Producer Destinations
@@ -1062,14 +1010,17 @@ public class MyMessageBuilder {
     }
 }
 ----
+
 <1> This message will be sent to the `some-dynamic-destination` topic, ignoring the producer's configured destination.
 <2> Optionally, the configured producer `destination-type` can be overridden.
 
-NOTE: Those 2 headers are cleared from the message before it is sent off to the message broker. So you should attach that information to your message payload if you want to get that information on the consumer-side.
+NOTE: Those 2 headers are cleared from the message before it is sent off to the message broker.
+So you should attach that information to your message payload if you want to get that information on the consumer-side.
 
 == Failed Consumer Message Error Handling
 
-The Spring cloud stream framework already provides a number of application-internal reprocessing strategies for failed messages during message consumption. You can read more about that https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#spring-cloud-stream-overview-error-handling[here]:
+The Spring cloud stream framework already provides a number of application-internal reprocessing strategies for failed messages during message consumption.
+You can read more about that https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#spring-cloud-stream-overview-error-handling[here]:
 
 However, after all internal error handling strategies have been exhausted, the Solace implementation of the binder would either:
 
@@ -1078,56 +1029,70 @@ However, after all internal error handling strategies have been exhausted, the S
 
 === Message Redelivery
 
-A simple error handling strategy in which failed messages are redelivered from the consumer group's queue. This is very similar to simply enabling the retry template (setting `maxAttempts` to a value greater than `1`), but allows for the failed messages to be re-processed by the message broker.
+A simple error handling strategy in which failed messages are redelivered from the consumer group's queue.
+This is very similar to simply enabling the retry template (setting `maxAttempts` to a value greater than `1`), but allows for the failed messages to be re-processed by the message broker.
 
 [IMPORTANT]
 ====
+
 The internal implementation of redelivery has changed from Solace Binder v5.0.0.
 Previously, redelivery was initiated by rebinding consumer flows; however, as of v5.0.0 and later, the Solace API now leverages the Solace broker's native NACK (Negative Acknowledgement) capabilities.
 
 Here is what happens under the hood when this is triggered:
 
-1. Say the current message is marked for 'REQUEUE'. Any subsequent messages that are currently spooled on the client side, despite having been acknowledged `ACCEPTed` by binder, the Solace broker will discard their ACK.
+1. Say the current message is marked for 'REQUEUE'.
+Any subsequent messages that are currently spooled on the client side, despite having been acknowledged `ACCEPTed` by binder, the Solace broker will discard their ACK.
 2. The Solace Broker will redeliver all messages starting with the one tagged as 'REQUEUE', if the message's max redelivery count is not exceeded.
 
 The redelivery may result in message duplication, and the application should be designed to handle this.
+
 ====
 
-=== Error Queue Republishing
+=== Error Queue Republishing First, it must be noted that an Error Queue is different from a https://docs.solace.com/Configuring-and-Managing/Setting-Dead-Msg-Queues.htm[Dead Message Queue (DMQ)].
+In particular, a DMQ is used to capture re-routed failed messages as a consequence of Solace PubSub+ messaging features such as TTL expiration or exceeding a message's max redelivery count.
+Whereas the purpose of an Error Queue is to capture re-routed messages which have been successfully consumed from the message broker, yet cannot be processed by the application.
 
-NOTE: Error queue republishing is not supported for consumers where `transacted` is set to `true`.
-First, it must be noted that an Error Queue is different from a https://docs.solace.com/Configuring-and-Managing/Setting-Dead-Msg-Queues.htm[Dead Message Queue (DMQ)]. In particular, a DMQ is used to capture re-routed failed messages as a consequence of Solace PubSub+ messaging features such as TTL expiration or exceeding a message's max redelivery count. Whereas the purpose of an Error Queue is to capture re-routed messages which have been successfully consumed from the message broker, yet cannot be processed by the application.
-
-An Error Queue can be provisioned for a particular consumer group by setting the `autoBindErrorQueue` consumer config option to `true`. This Error Queue is simply another durable queue which is named as per the <<Generated Error Queue Name Syntax>> section. And like the queues used for consumer groups, its endpoint properties can be configured by means of any consumer properties whose names begin with "errorQueue".
+An Error Queue can be provisioned for a particular consumer group by setting the `autoBindErrorQueue` consumer config option to `true`.
+This Error Queue is simply another durable queue which is named as per the <<Generated Error Queue Name Syntax>> section.
+And like the queues used for consumer groups, its endpoint properties can be configured by means of any consumer properties whose names begin with "errorQueue".
 
 [NOTE]
 ====
+
 Error Queues should not be used with anonymous consumer groups.
 
-Since the names of anonymous consumer groups, and in turn the name of their would-be Error Queues, are randomly generated at runtime, it would provide little value to create bindings to these Error Queues because of their unpredictable naming and temporary existence. Also, your environment will be polluted with orphaned Error Queues whenever these consumers rebind.
+Since the names of anonymous consumer groups, and in turn the name of their would-be Error Queues, are randomly generated at runtime, it would provide little value to create bindings to these Error Queues because of their unpredictable naming and temporary existence.
+Also, your environment will be polluted with orphaned Error Queues whenever these consumers rebind.
+
 ====
 
 == Consumer Bindings Pause/Resume
 
-The Solace binder supports pausing and resuming consumer bindings. See link:https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#binding_visualization_control[Spring Cloud Stream documentation] to learn how to pause and resume consumer bindings.
+The Solace binder supports pausing and resuming consumer bindings.
+See link:https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#binding_visualization_control[Spring Cloud Stream documentation] to learn how to pause and resume consumer bindings.
 
 NOTE: There is no guarantee that the effect of pausing a binding will be instantaneous: messages already in-flight or being processed by the binder may still be delivered after the call to pause returns.
 
 == Failed Producer Message Error Handling
 
-By default, asynchronous producer errors aren't handled by the framework. Producer error channels can be enabled using the link:https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_producer_properties[`errorChannelEnabled` producer config option].
+By default, asynchronous producer errors aren't handled by the framework.
+Producer error channels can be enabled using the link:https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_producer_properties[`errorChannelEnabled` producer config option].
 
-Beyond that, this binder also supports using a `Future` to wait for publish confirmations. See <<Publisher Confirms>> for more info.
+Beyond that, this binder also supports using a `Future` to wait for publish confirmations.
+See <<Publisher Confirms>> for more info.
 
 == Publisher Confirmations
 
 For each message you can create a new link:../../solace-spring-cloud-stream-binder/solace-spring-cloud-stream-binder-core/src/main/java/com/solace/spring/cloud/stream/binder/util/CorrelationData.java[`CorrelationData`] instance and set it as the value of your message's `SolaceBinderHeaders.CONFIRM_CORRELATION` header.
 
-NOTE: `CorrelationData` can be extended to add more correlation info. The `SolaceBinderHeaders.CONFIRM_CORRELATION` header is not reflected in the actual message published to the broker.
+NOTE: `CorrelationData` can be extended to add more correlation info.
+The `SolaceBinderHeaders.CONFIRM_CORRELATION` header is not reflected in the actual message published to the broker.
 
-Now using `CorrelationData.getFuture().get()`, you can wait for a publish acknowledgment from the broker. If the publish failed, then this future will throw an exception.
+Now using `CorrelationData.getFuture().get()`, you can wait for a publish acknowledgment from the broker.
+If the publish failed, then this future will throw an exception.
 
 For example:
+
 [source,java]
 ----
 @Autowired
@@ -1149,18 +1114,15 @@ public void send(String payload, long timeout, TimeUnit unit) {
     }
 }
 ----
-.CorrelationData with Batched Messages
-[NOTE]
 ====
-When using <<Batch Producers>>, the `SolaceBinderHeaders.CONFIRM_CORRELATION` header must be set at the root of the batched message, and **not** in the `SolaceBinderHeaders.BATCHED_HEADERS` header.
-The `CorrelationData.getFuture()` will be resolved:
-* Successfully once all messages in the batch have been successfully delivered to the destination.
-* Failed upon the first delivery error encountered while publishing the batch of messages.
-====
-== Solace Binder Health Indicator
-Solace binders can report health statuses via the https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_health_indicator[Spring Boot Actuator health endpoint]. To enable this feature, add Spring Boot Actuator to the classpath. To manually disable this feature, set `management.health.binders.enabled=false`.
 
-[cols="1,3", options="header"]
+== Solace Binder Health Indicator
+
+Solace binders can report health statuses via the https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_health_indicator[Spring Boot Actuator health endpoint].
+To enable this feature, add Spring Boot Actuator to the classpath.
+To manually disable this feature, set `management.health.binders.enabled=false`.
+
+[cols="1,3",options="header"]
 |===
 | Health Status
 | Description
@@ -1181,7 +1143,7 @@ This is a custom health status. It isn't included in the health severity order l
 
 Leveraging https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html#actuator.metrics[Spring Metrics], the Solace PubSub+ binder exposes the following metrics:
 
-[cols="2m,1,2a,2", options="header"]
+[cols="2m,1,2a,2",options="header"]
 |===
 | Name
 | Type

@@ -6,6 +6,7 @@ import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.util.*;
 import com.solacesystems.jcsmp.*;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
@@ -19,13 +20,10 @@ import org.springframework.integration.support.ErrorMessageUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 
-import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 @Slf4j
 abstract class InboundXMLMessageListener implements Runnable {
@@ -33,7 +31,6 @@ abstract class InboundXMLMessageListener implements Runnable {
     final ConsumerDestination consumerDestination;
     private final ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties;
     final ThreadLocal<AttributeAccessor> attributesHolder;
-    private final BatchCollector batchCollector;
     private final XMLMessageMapper xmlMessageMapper;
     private final Consumer<Message<?>> messageConsumer;
     private final JCSMPAcknowledgementCallbackFactory ackCallbackFactory;
@@ -41,24 +38,15 @@ abstract class InboundXMLMessageListener implements Runnable {
     private final SolaceMeterAccessor solaceMeterAccessor;
     private final boolean needHolder;
     private final boolean needAttributes;
+    @Getter
     private final AtomicBoolean stopFlag = new AtomicBoolean(false);
     private final Supplier<Boolean> remoteStopFlag;
+    private final LargeMessageSupport largeMessageSupport = new LargeMessageSupport();
 
-    InboundXMLMessageListener(FlowReceiverContainer flowReceiverContainer,
-                              ConsumerDestination consumerDestination,
-                              ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
-                              @Nullable BatchCollector batchCollector,
-                              Consumer<Message<?>> messageConsumer,
-                              JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
-                              @Nullable SolaceMeterAccessor solaceMeterAccessor,
-                              @Nullable AtomicBoolean remoteStopFlag,
-                              ThreadLocal<AttributeAccessor> attributesHolder,
-                              boolean needHolder,
-                              boolean needAttributes) {
+    InboundXMLMessageListener(FlowReceiverContainer flowReceiverContainer, ConsumerDestination consumerDestination, ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties, Consumer<Message<?>> messageConsumer, JCSMPAcknowledgementCallbackFactory ackCallbackFactory, @Nullable SolaceMeterAccessor solaceMeterAccessor, @Nullable AtomicBoolean remoteStopFlag, ThreadLocal<AttributeAccessor> attributesHolder, boolean needHolder, boolean needAttributes) {
         this.flowReceiverContainer = flowReceiverContainer;
         this.consumerDestination = consumerDestination;
         this.consumerProperties = consumerProperties;
-        this.batchCollector = batchCollector;
         this.messageConsumer = messageConsumer;
         this.ackCallbackFactory = ackCallbackFactory;
         this.solaceMeterAccessor = solaceMeterAccessor;
@@ -67,32 +55,25 @@ abstract class InboundXMLMessageListener implements Runnable {
         this.needHolder = needHolder;
         this.needAttributes = needAttributes;
         this.xmlMessageMapper = flowReceiverContainer.getXMLMessageMapper();
+        this.largeMessageSupport.startHousekeeping();
     }
 
-    abstract void handleMessage(Supplier<Message<?>> messageSupplier, Consumer<Message<?>> sendToConsumerHandler,
-                                AcknowledgmentCallback acknowledgmentCallback, boolean isBatched)
-            throws SolaceAcknowledgmentException;
+    abstract void handleMessage(Supplier<Message<?>> messageSupplier, Consumer<Message<?>> sendToConsumerHandler, AcknowledgmentCallback acknowledgmentCallback) throws SolaceAcknowledgmentException;
 
     @Override
     public void run() {
         try {
-            if (batchCollector != null) {
-                // So that first batch doesn't timeout early if was delayed between BatchCollector init and polling
-                batchCollector.resetLastSentTimeIfEmpty();
-            }
             while (keepPolling()) {
                 try {
                     receive();
                 } catch (RuntimeException | UnboundFlowReceiverContainerException e) {
-                    log.warn(String.format("Exception received while consuming messages from destination %s",
-                            consumerDestination.getName()), e);
+                    log.warn(String.format("Exception received while consuming messages from destination %s", consumerDestination.getName()), e);
                 }
             }
         } catch (StaleSessionException e) {
             log.error("Session has lost connection", e);
         } catch (Throwable t) {
-            log.error(String.format("Received unexpected error while consuming from destination %s",
-                    consumerDestination.getName()), t);
+            log.error(String.format("Received unexpected error while consuming from destination %s", consumerDestination.getName()), t);
             throw t;
         } finally {
             log.info(String.format("Closing flow receiver to destination %s", consumerDestination.getName()));
@@ -106,18 +87,12 @@ abstract class InboundXMLMessageListener implements Runnable {
 
     private void receive() throws UnboundFlowReceiverContainerException, StaleSessionException {
         MessageContainer messageContainer;
-
         try {
-            if (batchCollector != null && consumerProperties.getExtension().getBatchTimeout() > 0) {
-                messageContainer = flowReceiverContainer.receive(consumerProperties.getExtension().getBatchTimeout());
-            } else {
-                messageContainer = flowReceiverContainer.receive();
-            }
+            messageContainer = flowReceiverContainer.receive();
         } catch (StaleSessionException e) {
             throw e;
         } catch (JCSMPException e) {
-            String msg = String.format("Received error while trying to read message from endpoint %s",
-                    flowReceiverContainer.getEndpointName());
+            String msg = String.format("Received error while trying to read message from endpoint %s", flowReceiverContainer.getEndpointName());
             if ((e instanceof JCSMPTransportException || e instanceof ClosedFacilityException) && !keepPolling()) {
                 log.debug(msg, e);
             } else {
@@ -131,12 +106,7 @@ abstract class InboundXMLMessageListener implements Runnable {
         }
 
         try {
-            if (batchCollector != null) {
-                if (messageContainer != null) {
-                    batchCollector.addToBatch(messageContainer);
-                }
-                processBatchIfAvailable();
-            } else if (messageContainer != null) {
+            if (messageContainer != null) {
                 processMessage(messageContainer);
             }
         } finally {
@@ -149,80 +119,35 @@ abstract class InboundXMLMessageListener implements Runnable {
     private void processMessage(MessageContainer messageContainer) {
         BytesXMLMessage bytesXMLMessage = messageContainer.getMessage();
         AcknowledgmentCallback acknowledgmentCallback = ackCallbackFactory.createCallback(messageContainer);
+        LargeMessageSupport.MessageContext messageContext = largeMessageSupport.assemble(bytesXMLMessage, acknowledgmentCallback);
+        // we got an incomplete large message and wait for more chunks
+        if (messageContext == null) {
+            return;
+        }
+        processMessage(messageContext.bytesMessage(), messageContext.acknowledgmentCallback());
+    }
 
+    private void processMessage(BytesXMLMessage bytesXMLMessage, AcknowledgmentCallback acknowledgmentCallback) {
         try {
-            handleMessage(() -> createOneMessage(bytesXMLMessage, acknowledgmentCallback),
-                    m -> sendOneToConsumer(m, bytesXMLMessage),
-                    acknowledgmentCallback,
-                    false);
+            handleMessage(() -> createOneMessage(bytesXMLMessage, acknowledgmentCallback), m -> sendOneToConsumer(m, bytesXMLMessage), acknowledgmentCallback);
         } catch (SolaceAcknowledgmentException e) {
             throw e;
         } catch (Exception e) {
             try {
                 if (ExceptionUtils.indexOfType(e, RequeueCurrentMessageException.class) > -1) {
-                    log.warn(String.format(
-                            "Exception thrown while processing XMLMessage %s. Message will be requeued.",
-                            bytesXMLMessage.getMessageId()), e);
+                    log.warn(String.format("Exception thrown while processing XMLMessage %s. Message will be requeued.", bytesXMLMessage.getMessageId()), e);
                     AckUtils.requeue(acknowledgmentCallback);
                 } else {
-                    log.warn(String.format(
-                            "Exception thrown while processing XMLMessage %s. Message will be requeued.",
-                            bytesXMLMessage.getMessageId()), e);
+                    log.warn(String.format("Exception thrown while processing XMLMessage %s. Message will be requeued.", bytesXMLMessage.getMessageId()), e);
                     if (!SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)) {
                         AckUtils.requeue(acknowledgmentCallback);
                     }
                 }
             } catch (SolaceAcknowledgmentException e1) {
                 e1.addSuppressed(e);
-                log.warn(String.format("Exception thrown while re-queuing XMLMessage %s.",
-                        bytesXMLMessage.getMessageId()), e1);
+                log.warn(String.format("Exception thrown while re-queuing XMLMessage %s.", bytesXMLMessage.getMessageId()), e1);
                 throw e1;
             }
-        }
-    }
-
-    private void processBatchIfAvailable() {
-        Optional<List<MessageContainer>> batchedMessages = batchCollector.collectBatchIfAvailable();
-        if (batchedMessages.isEmpty()) {
-            return;
-        }
-
-        AcknowledgmentCallback acknowledgmentCallback = consumerProperties.getExtension().isTransacted() ?
-                ackCallbackFactory.createTransactedBatchCallback(batchedMessages.get(),
-                        flowReceiverContainer.getTransactedSession()) :
-                ackCallbackFactory.createBatchCallback(batchedMessages.get());
-        try {
-            List<BytesXMLMessage> xmlMessages = batchedMessages.get()
-                    .stream()
-                    .map(MessageContainer::getMessage)
-                    .collect(Collectors.toList());
-            handleMessage(() -> createBatchMessage(xmlMessages,
-                            consumerProperties.getExtension().isTransacted() ? null : acknowledgmentCallback),
-                    m -> sendBatchToConsumer(m, xmlMessages, acknowledgmentCallback),
-                    acknowledgmentCallback,
-                    true);
-        } catch (Exception e) {
-            try {
-                if (ExceptionUtils.indexOfType(e, RequeueCurrentMessageException.class) > -1) {
-                    if (log.isWarnEnabled()) {
-                        log.warn("Exception thrown while processing batch. Batch's message will be requeued.", e);
-                    }
-                    AckUtils.requeue(acknowledgmentCallback);
-                } else {
-                    if (log.isWarnEnabled()) {
-                        log.warn("Exception thrown while processing batch. Batch's messages will be requeued.", e);
-                    }
-                    if (!SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)) {
-                        AckUtils.requeue(acknowledgmentCallback);
-                    }
-                }
-            } catch (SolaceAcknowledgmentException e1) {
-                e1.addSuppressed(e);
-                log.warn("Exception thrown while re-queuing batch.", e1);
-                throw e1;
-            }
-        } finally {
-            batchCollector.confirmDelivery();
         }
     }
 
@@ -231,24 +156,8 @@ abstract class InboundXMLMessageListener implements Runnable {
         return xmlMessageMapper.map(bytesXMLMessage, acknowledgmentCallback, consumerProperties.getExtension());
     }
 
-    Message<?> createBatchMessage(List<BytesXMLMessage> bytesXMLMessages,
-                                  AcknowledgmentCallback acknowledgmentCallback) {
-        setBatchAttributesIfNecessary(bytesXMLMessages, null, acknowledgmentCallback);
-        return xmlMessageMapper.mapBatchMessage(bytesXMLMessages, acknowledgmentCallback, consumerProperties.getExtension());
-    }
-
-    void sendOneToConsumer(final Message<?> message, final BytesXMLMessage bytesXMLMessage)
-            throws RuntimeException {
+    void sendOneToConsumer(final Message<?> message, final BytesXMLMessage bytesXMLMessage) throws RuntimeException {
         setAttributesIfNecessary(bytesXMLMessage, message);
-        sendToConsumer(message);
-    }
-
-    private void sendBatchToConsumer(
-            final Message<?> message,
-            final List<BytesXMLMessage> bytesXMLMessages,
-            final AcknowledgmentCallback acknowledgmentCallback)
-            throws RuntimeException {
-        setBatchAttributesIfNecessary(bytesXMLMessages, message, acknowledgmentCallback);
         sendToConsumer(message);
     }
 
@@ -268,19 +177,7 @@ abstract class InboundXMLMessageListener implements Runnable {
         setAttributesIfNecessary(xmlMessage, message, null);
     }
 
-    void setBatchAttributesIfNecessary(List<? extends XMLMessage> xmlMessages,
-                                       @Nullable Message<?> batchMessage,
-                                       AcknowledgmentCallback acknowledgmentCallback) {
-        if (batchMessage != null && StaticMessageHeaderAccessor.getAcknowledgmentCallback(batchMessage) != null) {
-            setAttributesIfNecessary(xmlMessages, batchMessage, null);
-        } else {
-            setAttributesIfNecessary(xmlMessages, batchMessage, acknowledgmentCallback);
-        }
-
-    }
-
-    private void setAttributesIfNecessary(Object rawXmlMessage, Message<?> message,
-                                          AcknowledgmentCallback acknowledgmentCallback) {
+    private void setAttributesIfNecessary(Object rawXmlMessage, Message<?> message, AcknowledgmentCallback acknowledgmentCallback) {
         if (needHolder) {
             attributesHolder.set(ErrorMessageUtils.getAttributeAccessor(null, null));
         }
@@ -290,13 +187,8 @@ abstract class InboundXMLMessageListener implements Runnable {
             if (attributes != null) {
                 attributes.setAttribute(ErrorMessageUtils.INPUT_MESSAGE_CONTEXT_KEY, message);
                 attributes.setAttribute(SolaceMessageHeaderErrorMessageStrategy.ATTR_SOLACE_RAW_MESSAGE, rawXmlMessage);
-                attributes.setAttribute(SolaceMessageHeaderErrorMessageStrategy.ATTR_SOLACE_ACKNOWLEDGMENT_CALLBACK,
-                        acknowledgmentCallback);
+                attributes.setAttribute(SolaceMessageHeaderErrorMessageStrategy.ATTR_SOLACE_ACKNOWLEDGMENT_CALLBACK, acknowledgmentCallback);
             }
         }
-    }
-
-    public AtomicBoolean getStopFlag() {
-        return stopFlag;
     }
 }

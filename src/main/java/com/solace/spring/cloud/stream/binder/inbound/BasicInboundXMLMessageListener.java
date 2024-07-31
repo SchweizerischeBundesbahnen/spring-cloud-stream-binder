@@ -27,7 +27,6 @@ public class BasicInboundXMLMessageListener extends InboundXMLMessageListener {
     BasicInboundXMLMessageListener(FlowReceiverContainer flowReceiverContainer,
                                    ConsumerDestination consumerDestination,
                                    ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
-                                   @Nullable BatchCollector batchCollector,
                                    Consumer<Message<?>> messageConsumer,
                                    JCSMPAcknowledgementCallbackFactory ackCallbackFactory,
                                    BiFunction<Message<?>, RuntimeException, Boolean> errorHandlerFunction,
@@ -38,7 +37,6 @@ public class BasicInboundXMLMessageListener extends InboundXMLMessageListener {
         super(flowReceiverContainer,
                 consumerDestination,
                 consumerProperties,
-                batchCollector,
                 messageConsumer,
                 ackCallbackFactory,
                 solaceMeterAccessor,
@@ -51,7 +49,7 @@ public class BasicInboundXMLMessageListener extends InboundXMLMessageListener {
 
     @Override
     void handleMessage(Supplier<Message<?>> messageSupplier, Consumer<Message<?>> sendToConsumerHandler,
-                       AcknowledgmentCallback acknowledgmentCallback, boolean isBatched)
+                       AcknowledgmentCallback acknowledgmentCallback)
             throws SolaceAcknowledgmentException {
         Message<?> message;
         try {
@@ -61,9 +59,8 @@ public class BasicInboundXMLMessageListener extends InboundXMLMessageListener {
             if (processedByErrorHandler) {
                 AckUtils.autoAck(acknowledgmentCallback);
             } else {
-                log.warn(String.format("Failed to map %s to a Spring Message and no error channel " +
-                        "was configured. Message will be rejected.", isBatched ? "a batch of XMLMessages" :
-                        "an XMLMessage"), e);
+                log.warn("Failed to map %s to a Spring Message and no error channel " +
+                        "was configured. Message will be rejected. an XMLMessage", e);
                 if (!SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)) {
                     AckUtils.requeue(acknowledgmentCallback);
                 }

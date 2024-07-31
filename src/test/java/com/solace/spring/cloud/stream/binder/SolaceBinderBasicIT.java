@@ -13,7 +13,6 @@ import com.solace.spring.cloud.stream.binder.test.util.SimpleJCSMPEventHandler;
 import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
 import com.solace.spring.cloud.stream.binder.util.CorrelationData;
 import com.solace.spring.cloud.stream.binder.util.DestinationType;
-import com.solace.spring.cloud.stream.binder.util.EndpointType;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
@@ -24,10 +23,8 @@ import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueue;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueTxFlow;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.*;
-import com.solacesystems.jcsmp.transaction.RollbackException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.*;
@@ -51,8 +48,6 @@ import org.springframework.messaging.support.ErrorMessage;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -106,26 +101,18 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
      *
      * @see #testSendAndReceive(TestInfo)
      */
-    @CartesianTest(name = "[{index}] channelType={0}, endpointType={1}, numMessages={2}, batchMode={3}, transacted={4}")
+    @CartesianTest(name = "[{index}] endpointType={0}, numMessages={1}")
     @Execution(ExecutionMode.CONCURRENT)
     public <T> void testReceive(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @CartesianTest.Enum(EndpointType.class) EndpointType endpointType,
             @Values(ints = {1, 256}) int numMessages,
-            @Values(booleans = {false, true}) boolean batchMode,
-            @Values(booleans = {false, true}) boolean transacted,
             SempV2Api sempV2Api,
             SoftAssertions softly,
             TestInfo testInfo) throws Exception {
-        if (!batchMode && transacted) {
-            log.info("non-batched, transacted consumers not yet supported");
-            return;
-        }
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
 
@@ -133,11 +120,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
-        consumerProperties.getExtension().setEndpointType(endpointType);
-        consumerProperties.getExtension().setBatchMaxSize(numMessages);
-        consumerProperties.getExtension().setTransacted(transacted);
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         List<Message<?>> messages = IntStream.range(0, numMessages)
@@ -149,58 +132,31 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         binderBindUnbindLatency();
 
         Iterator<Message<?>> messageIterator = messages.iterator();
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, batchMode ? 1 : numMessages,
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, numMessages,
                 () -> messages.forEach(moduleOutputChannel::send),
-                msg -> softly.assertThat(msg).satisfies(isValidMessage(channelType, consumerProperties,
-                        batchMode ? messages : List.of(messageIterator.next()))));
+                msg -> softly.assertThat(msg).satisfies(isValidMessage(consumerProperties,
+                        List.of(messageIterator.next()))));
 
         String vpnName = (String) getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
-        if (transacted) {
-            retryAssert(() -> assertThat(sempV2Api.monitor().getMsgVpnClientTransactedSessions(vpnName,
-                            (String) getJcsmpSession().getProperty(JCSMPProperties.CLIENT_NAME), null, null, null, null)
-                    .getData())
-                    .singleElement()
-                    .satisfies(
-                            d -> assertThat(d.getSuccessCount()).isEqualTo(batchMode ? 1 : numMessages),
-                            d -> assertThat(d.getCommitCount()).isEqualTo(batchMode ? 1 : numMessages),
-                            d -> assertThat(d.getFailureCount()).isEqualTo(0),
-                            d -> assertThat(d.getConsumedMsgCount()).isEqualTo(numMessages),
-                            d -> assertThat(d.getPendingConsumedMsgCount()).isEqualTo(0)
-                    ));
-        }
 
-        retryAssert(() -> assertThat(switch (endpointType) {
-            case QUEUE -> sempV2Api.monitor()
-                    .getMsgVpnQueueMsgs(vpnName, binder.getConsumerQueueName(consumerBinding), 2, null, null, null)
-                    .getData();
-            case TOPIC_ENDPOINT -> sempV2Api.monitor()
-                    .getMsgVpnTopicEndpointMsgs(vpnName, binder.getConsumerQueueName(consumerBinding), 2, null, null, null)
-                    .getData();
-        }).hasSize(0));
-
+        retryAssert(() -> assertThat(sempV2Api.monitor()
+                .getMsgVpnQueueMsgs(vpnName, binder.getConsumerQueueName(consumerBinding), 2, null, null, null)
+                .getData()).hasSize(0));
         producerBinding.unbind();
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}, transacted={2} namedConsumerGroup={3}")
+    @CartesianTest(name = "[{index}] namedConsumerGroup={0}")
     @Execution(ExecutionMode.CONCURRENT)
     public <T> void testReceiveBad(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
-            @Values(booleans = {false, true}) boolean transacted,
             @Values(booleans = {false, true}) boolean namedConsumerGroup,
-            SempV2Api sempV2Api,
             SoftAssertions softly,
             TestInfo testInfo) throws Exception {
-        if (!batchMode && transacted) {
-            log.info("non-batched, transacted consumers not yet supported");
-            return;
-        }
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         String group0 = namedConsumerGroup ? RandomStringUtils.randomAlphanumeric(10) : null;
@@ -208,13 +164,10 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         Binding<MessageChannel> producerBinding = binder.bindProducer(
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
-        consumerProperties.getExtension().setTransacted(transacted);
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, group0, moduleInputChannel, consumerProperties);
 
-        List<Message<?>> messages = IntStream.range(0,
-                        batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1)
+        List<Message<?>> messages = IntStream.range(0, 1)
                 .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
                         .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
                         .build())
@@ -226,45 +179,21 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts(),
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
-                    softly.assertThat(msg).satisfies(isValidMessage(channelType, consumerProperties, messages));
-                    if (channelType.equals(PollableSource.class)) {
-                        // Polled consumers don't increment delivery attempt header
-                        softly.assertThat(StaticMessageHeaderAccessor.getDeliveryAttempt(msg)).satisfiesAnyOf(
-                                deliveryAttempt -> assertThat(deliveryAttempt).isNull(),
-                                deliveryAttempt -> assertThat(deliveryAttempt).isNotNull().hasValue(0));
-                    } else {
-                        softly.assertThat(StaticMessageHeaderAccessor.getDeliveryAttempt(msg))
-                                .isNotNull()
-                                .hasValue(expectedDeliveryAttempt.getAndIncrement());
-                    }
+                    softly.assertThat(msg).satisfies(isValidMessage(consumerProperties, messages));
+
+                    softly.assertThat(StaticMessageHeaderAccessor.getDeliveryAttempt(msg))
+                            .isNotNull()
+                            .hasValue(expectedDeliveryAttempt.getAndIncrement());
                     callback.run();
                     throw new RuntimeException("bad");
                 });
-        if (transacted) {
-            retryAssert(() -> assertThat(sempV2Api.monitor().getMsgVpnClientTransactedSessions(
-                            (String) getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME),
-                            (String) getJcsmpSession().getProperty(JCSMPProperties.CLIENT_NAME),
-                            null, null, null, null)
-                    .getData())
-                    .singleElement()
-                    .satisfies(
-                            d -> assertThat(d.getSuccessCount()).isEqualTo(batchMode ? 1 : messages.size()),
-                            d -> assertThat(d.getCommitCount()).isEqualTo(0),
-                            d -> assertThat(d.getRollbackCount()).isEqualTo(batchMode ? 1 : messages.size()),
-                            d -> assertThat(d.getFailureCount()).isEqualTo(0),
-                            d -> assertThat(d.getConsumedMsgCount()).isEqualTo(0),
-                            d -> assertThat(d.getPendingConsumedMsgCount()).isEqualTo(messages.size())
-                    ));
-        }
 
         producerBinding.unbind();
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0}, batched={1}, transacted={2} withConfirmCorrelation={3}")
+    @CartesianTest(name = "[{index}] numMessages={0} withConfirmCorrelation={1}")
     public void testSend(@Values(ints = {1, 256}) int numMessages,
-                         @Values(booleans = {false, true}) boolean batched,
-                         @Values(booleans = {false, true}) boolean transacted,
                          @Values(booleans = {false, true}) boolean withConfirmCorrelation,
                          SempV2Api sempV2Api,
                          SoftAssertions softly,
@@ -274,7 +203,6 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 DirectChannel.class);
         ExtendedProducerProperties<SolaceProducerProperties> producerProperties = createProducerProperties(testInfo);
         producerProperties.setUseNativeEncoding(true);
-        producerProperties.getExtension().setTransacted(transacted);
         BindingProperties producerBindingProperties = new BindingProperties();
         producerBindingProperties.setProducer(producerProperties);
         DirectChannel moduleOutputChannel = createBindableChannel("output", producerBindingProperties);
@@ -291,7 +219,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         List<Message<?>> messages = IntStream.range(0, numMessages)
                 .mapToObj(i -> {
                     CorrelationData correlationData;
-                    if (withConfirmCorrelation && !batched) {
+                    if (withConfirmCorrelation) {
                         correlationData = new CorrelationData();
                         correlationDataList.add(correlationData);
                     } else {
@@ -306,24 +234,10 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         binderBindUnbindLatency();
         Iterator<Message<?>> messageIterator = messages.iterator();
         consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, numMessages, () -> {
-            if (batched) {
-                CorrelationData correlationData;
-                if (withConfirmCorrelation) {
-                    correlationData = new CorrelationData();
-                    correlationDataList.add(correlationData);
-                } else {
-                    correlationData = null;
-                }
-                moduleOutputChannel.send(MessageBuilder.withPayload(messages.stream().map(Message::getPayload).toList())
-                        .setHeader(SolaceBinderHeaders.BATCHED_HEADERS,
-                                messages.stream().map(Message::getHeaders).toList())
-                        .setHeader(SolaceBinderHeaders.CONFIRM_CORRELATION, correlationData)
-                        .build());
-            } else {
-                messages.forEach(moduleOutputChannel::send);
-            }
-        }, msg -> softly.assertThat(msg).satisfies(isValidMessage(DirectChannel.class, consumerProperties,
-                messageIterator.next())));
+
+            messages.forEach(moduleOutputChannel::send);
+
+        }, msg -> softly.assertThat(msg).satisfies(isValidMessage(consumerProperties, messageIterator.next())));
 
         String vpnName = (String) getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
 
@@ -332,41 +246,16 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 .getData())
                 .hasSize(0));
 
-        if (transacted) {
-            String clientName = (String) getJcsmpSession().getProperty(JCSMPProperties.CLIENT_NAME);
-            assertThat(sempV2Api.monitor().getMsgVpnClientRxFlows(vpnName, clientName, null, null, null, null)
-                    .getData())
-                    .filteredOn(f -> f.getSessionName() != null)
-                    .singleElement()
-                    .satisfies(
-                            f -> assertThat(f.getGuaranteedMsgCount()).isEqualTo(numMessages),
-                            f -> assertThat(sempV2Api.monitor().getMsgVpnClientTransactedSession(
-                                            vpnName, clientName, f.getSessionName(), null)
-                                    .getData())
-                                    .satisfies(
-                                            s -> assertThat(s.getSuccessCount()).isEqualTo(batched ? 1 : numMessages),
-                                            s -> assertThat(s.getCommitCount()).isEqualTo(batched ? 1 : numMessages),
-                                            s -> assertThat(s.getFailureCount()).isEqualTo(0),
-                                            s -> assertThat(s.getPublishedMsgCount()).isEqualTo(numMessages),
-                                            s -> assertThat(s.getPendingPublishedMsgCount()).isEqualTo(0)
-                                    )
-                    );
-        }
-
         assertThat(correlationDataList)
-                .hasSize(withConfirmCorrelation ? (batched ? 1 : messages.size()) : 0)
+                .hasSize(withConfirmCorrelation ? (messages.size()) : 0)
                 .allSatisfy(c -> assertThat(c.getFuture()).succeedsWithin(1, TimeUnit.MINUTES));
 
         producerBinding.unbind();
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0} batched={1}, transacted={2}")
-    @Execution(ExecutionMode.CONCURRENT)
+    @Test
     public void testProducerErrorChannel(
-            @Values(ints = {1, 256}) int numMessages,
-            @Values(booleans = {false, true}) boolean batched,
-            @Values(booleans = {false, true}) boolean transacted,
             JCSMPSession jcsmpSession,
             TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = getBinder();
@@ -376,7 +265,6 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 getDestinationNameDelimiter(), destination0, getDestinationNameDelimiter());
 
         ExtendedProducerProperties<SolaceProducerProperties> producerProperties = createProducerProperties(testInfo);
-        producerProperties.getExtension().setTransacted(transacted);
         producerProperties.setErrorChannelEnabled(true);
         producerProperties.setUseNativeEncoding(true);
         producerProperties.populateBindingName(destination0);
@@ -387,13 +275,9 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         DirectChannel moduleOutputChannel = createBindableChannel("output", bindingProperties);
         Binding<MessageChannel> producerBinding = binder.bindProducer(destination0, moduleOutputChannel, producerProperties);
 
-        MessageGenerator.BatchingConfig batchingConfig = new MessageGenerator.BatchingConfig()
-                .setEnabled(batched)
-                .setNumberOfMessages(numMessages);
         Message<?> message = MessageGenerator.generateMessage(
                         i -> UUID.randomUUID().toString().getBytes(),
-                        i -> Map.of(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE),
-                        batchingConfig)
+                        i -> Map.of(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE))
                 .build();
 
         final CompletableFuture<Message<?>> bindingSpecificErrorMessage = new CompletableFuture<>();
@@ -423,120 +307,30 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                         m -> assertThat(m.getOriginalMessage()).isEqualTo(message),
                         m -> assertThat(m.getHeaders().get(IntegrationMessageHeaderAccessor.SOURCE_DATA))
                                 .satisfies(d -> {
-                                    if (batched) {
-                                        assertThat(d)
-                                                .asInstanceOf(InstanceOfAssertFactories.list(XMLMessage.class))
-                                                .hasSize(batchingConfig.getNumberOfMessages());
-                                    } else {
-                                        assertThat(d).isInstanceOf(XMLMessage.class);
-                                    }
+                                    assertThat(d).isInstanceOf(XMLMessage.class);
                                 }))
                 .extracting(ErrorMessage::getPayload)
                 .asInstanceOf(InstanceOfAssertFactories.throwable(MessagingException.class))
                 .cause()
                 .isInstanceOf(ClosedFacilityException.class)
                 .satisfies(e -> {
-                    if (transacted) {
-                        assertThat(e.getSuppressed())
-                                .singleElement()
-                                .asInstanceOf(InstanceOfAssertFactories.throwable(ClosedFacilityException.class))
-                                .hasMessageContaining("Operation ROLLBACK disallowed");
-                    } else {
-                        assertThat(e).hasNoSuppressedExceptions();
-                    }
+                    assertThat(e).hasNoSuppressedExceptions();
                 });
 
         producerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] numberOfMessages={0}")
+    @CartesianTest(name = "[{index}] namedConsumerGroup={0}")
     @Execution(ExecutionMode.CONCURRENT)
-    public void testSendBatchOverTransactionLimit(
-            @Values(ints = {257, 300}) int numberOfMessages,
-            SempV2Api sempV2Api,
-            TestInfo testInfo) throws Exception {
-        SolaceTestBinder binder = getBinder();
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(10);
-        String destination0EC = String.format("%s%s%s%serrors", binder.getBinder().getBinderIdentity(),
-                getDestinationNameDelimiter(), destination0, getDestinationNameDelimiter());
-
-        ExtendedProducerProperties<SolaceProducerProperties> producerProperties = createProducerProperties(testInfo);
-        producerProperties.getExtension().setTransacted(true);
-        producerProperties.setErrorChannelEnabled(true);
-        producerProperties.setUseNativeEncoding(true);
-        producerProperties.populateBindingName(destination0);
-
-        BindingProperties bindingProperties = new BindingProperties();
-        bindingProperties.setProducer(producerProperties);
-
-        DirectChannel moduleOutputChannel = createBindableChannel("output", bindingProperties);
-        Binding<MessageChannel> producerBinding = binder.bindProducer(destination0, moduleOutputChannel, producerProperties);
-
-        Message<?> message = MessageGenerator.generateMessage(
-                        i -> UUID.randomUUID().toString().getBytes(),
-                        i -> Map.of(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE),
-                        new MessageGenerator.BatchingConfig().setEnabled(true).setNumberOfMessages(numberOfMessages))
-                .build();
-
-        final CompletableFuture<Message<?>> bindingSpecificErrorMessage = new CompletableFuture<>();
-        log.info("Subscribing to binding-specific error channel");
-        binder.getApplicationContext()
-                .getBean(destination0EC, SubscribableChannel.class)
-                .subscribe(bindingSpecificErrorMessage::complete);
-
-        assertThatThrownBy(() -> moduleOutputChannel.send(message));
-
-        assertThat(bindingSpecificErrorMessage)
-                .succeedsWithin(10, TimeUnit.SECONDS)
-                .asInstanceOf(InstanceOfAssertFactories.type(ErrorMessage.class))
-                .satisfies(m -> assertThat(m.getOriginalMessage()).isEqualTo(message))
-                .extracting(ErrorMessage::getPayload)
-                .asInstanceOf(InstanceOfAssertFactories.throwable(MessagingException.class))
-                .cause()
-                .isInstanceOf(RollbackException.class);
-
-        String vpnName = (String) getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
-        String clientName = (String) getJcsmpSession().getProperty(JCSMPProperties.CLIENT_NAME);
-        assertThat(sempV2Api.monitor().getMsgVpnClientRxFlows(vpnName, clientName, null, null, null, null)
-                .getData())
-                .filteredOn(f -> f.getSessionName() != null)
-                .singleElement()
-                .satisfies(
-                        f -> assertThat(f.getGuaranteedMsgCount()).isEqualTo(numberOfMessages),
-                        f -> assertThat(sempV2Api.monitor().getMsgVpnClientTransactedSession(
-                                        vpnName, clientName, f.getSessionName(), null)
-                                .getData())
-                                .satisfies(
-                                        s -> assertThat(s.getSuccessCount()).isEqualTo(0),
-                                        s -> assertThat(s.getFailureCount()).isEqualTo(1),
-                                        s -> assertThat(s.getPublishedMsgCount()).isEqualTo(0),
-                                        s -> assertThat(s.getPendingPublishedMsgCount()).isEqualTo(0)
-                                )
-                );
-
-        producerBinding.unbind();
-    }
-
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}, transacted={2}, namedConsumerGroup={3}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testConsumerRequeue(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
-            @Values(booleans = {false, true}) boolean transacted,
+    public void testConsumerRequeue(
             @Values(booleans = {false, true}) boolean namedConsumerGroup,
-            SempV2Api sempV2Api,
             SoftAssertions softly,
             TestInfo testInfo) throws Exception {
-        if (!batchMode && transacted) {
-            log.info("non-batched, transacted consumers not yet supported");
-            return;
-        }
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         String group0 = namedConsumerGroup ? RandomStringUtils.randomAlphanumeric(10) : null;
@@ -545,13 +339,10 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
-        consumerProperties.getExtension().setTransacted(transacted);
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, group0, moduleInputChannel, consumerProperties);
 
-        List<Message<?>> messages = IntStream.range(0,
-                        batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1)
+        List<Message<?>> messages = IntStream.range(0, 1)
                 .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
                         .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
                         .build())
@@ -563,52 +354,33 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, numRetriesRemaining.get() + 1,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
-                    softly.assertThat(msg).satisfies(isValidMessage(channelType, consumerProperties, messages));
+                    softly.assertThat(msg).satisfies(isValidMessage(consumerProperties, messages));
                     if (numRetriesRemaining.getAndDecrement() > 0) {
                         callback.run();
                         throw new RuntimeException("Throwing expected exception!");
                     } else {
                         log.info("Received message");
-                        softly.assertThat(msg).satisfies(hasNestedHeader(SolaceHeaders.REDELIVERED, Boolean.class,
-                                consumerProperties.isBatchMode(), v -> assertThat(v).isTrue()));
+                        softly.assertThat(msg).satisfies(hasNestedHeader(SolaceHeaders.REDELIVERED, Boolean.class, v -> assertThat(v).isTrue()));
                         callback.run();
                     }
                 });
-        if (transacted) {
-            retryAssert(() -> assertThat(sempV2Api.monitor().getMsgVpnClientTransactedSessions(
-                            (String) getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME),
-                            (String) getJcsmpSession().getProperty(JCSMPProperties.CLIENT_NAME),
-                            null, null, null, null)
-                    .getData())
-                    .singleElement()
-                    .satisfies(
-                            d -> assertThat(d.getSuccessCount()).isEqualTo(batchMode ? 2 : 2L * messages.size()),
-                            d -> assertThat(d.getCommitCount()).isEqualTo(batchMode ? 1 : messages.size()),
-                            d -> assertThat(d.getRollbackCount()).isEqualTo(batchMode ? 1 : messages.size()),
-                            d -> assertThat(d.getFailureCount()).isEqualTo(0),
-                            d -> assertThat(d.getConsumedMsgCount()).isEqualTo(messages.size()),
-                            d -> assertThat(d.getPendingConsumedMsgCount()).isEqualTo(0)
-                    ));
-        }
 
         producerBinding.unbind();
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}, namedConsumerGroup={2}")
+    @CartesianTest(name = "[{index}] namedConsumerGroup={0}")
     @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testConsumerErrorQueueRepublish(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
+    public void testConsumerErrorQueueRepublish(
             @Values(booleans = {false, true}) boolean namedConsumerGroup,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
             TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         String group0 = namedConsumerGroup ? RandomStringUtils.randomAlphanumeric(10) : null;
@@ -619,13 +391,11 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
         consumerProperties.getExtension().setAutoBindErrorQueue(true);
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, group0, moduleInputChannel, consumerProperties);
 
-        List<Message<?>> messages = IntStream.range(0,
-                        batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1)
+        List<Message<?>> messages = IntStream.range(0, 1)
                 .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
                         .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
                         .build())
@@ -652,11 +422,9 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     }
 
     @Test
-    @Execution(ExecutionMode.CONCURRENT)
     public void testFailProducerProvisioningOnRequiredQueuePropertyChange(JCSMPSession jcsmpSession, TestInfo testInfo)
             throws Exception {
         SolaceTestBinder binder = getBinder();
-
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         String group0 = RandomStringUtils.randomAlphanumeric(10);
 
@@ -689,7 +457,6 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     }
 
     @Test
-    @Execution(ExecutionMode.CONCURRENT)
     public void testFailConsumerProvisioningOnQueuePropertyChange(JCSMPSession jcsmpSession) throws Exception {
         SolaceTestBinder binder = getBinder();
 
@@ -724,7 +491,6 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     }
 
     @Test
-    @Execution(ExecutionMode.CONCURRENT)
     public void testFailConsumerProvisioningOnErrorQueuePropertyChange(JCSMPSession jcsmpSession) throws Exception {
         SolaceTestBinder binder = getBinder();
 
@@ -760,7 +526,6 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     }
 
     @Test
-    @Execution(ExecutionMode.CONCURRENT)
     public void testConsumerAdditionalSubscriptions(TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = getBinder();
 
@@ -810,7 +575,6 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     }
 
     @Test
-    @Execution(ExecutionMode.CONCURRENT)
     public void testProducerAdditionalSubscriptions(TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = getBinder();
 
@@ -862,25 +626,17 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1} transacted={2}")
-    @Execution(ExecutionMode.SAME_THREAD)
+    @Test
     public <T> void testConsumerReconnect(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
-            @Values(booleans = {false, true}) boolean transacted,
             SempV2Api sempV2Api,
             SoftAssertions softly,
             @ExecSvc(scheduled = true, poolSize = 5) ScheduledExecutorService executor,
             TestInfo testInfo) throws Exception {
-        if (!batchMode && transacted) {
-            log.info("non-batched, transacted consumers not yet supported");
-            return;
-        }
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         String group0 = RandomStringUtils.randomAlphanumeric(10);
@@ -889,16 +645,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
-        consumerProperties.getExtension().setTransacted(transacted);
-        if (consumerProperties.isBatchMode()) {
-            // Batch messaging needs a timeout to drain incomplete batches when egress is disabled
-            consumerProperties.getExtension().setBatchTimeout((int) TimeUnit.SECONDS.toMillis(20));
-        } else {
-            consumerProperties.getExtension().setBatchMaxSize(1);
-        }
-
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, group0, moduleInputChannel, consumerProperties);
 
         binderBindUnbindLatency();
@@ -908,12 +655,12 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
         // Minimize message pre-fetch since we're not testing JCSMP, and this influences the test counters
         sempV2Api.config().updateMsgVpnQueue(new ConfigMsgVpnQueue()
-                .maxDeliveredUnackedMsgsPerFlow((long) consumerProperties.getExtension().getBatchMaxSize()), vpnName, queue0, null, null);
+                .maxDeliveredUnackedMsgsPerFlow((long) 255), vpnName, queue0, null, null);
         retryAssert(() -> assertThat(sempV2Api.monitor()
                 .getMsgVpnQueue(vpnName, queue0, null)
                 .getData()
                 .getMaxDeliveredUnackedMsgsPerFlow())
-                .isEqualTo(consumerProperties.getExtension().getBatchMaxSize()));
+                .isEqualTo(255));
 
         final AtomicInteger numMsgsConsumed = new AtomicInteger(0);
         final Set<String> uniquePayloadsReceived = new HashSet<>();
@@ -990,25 +737,17 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}, transacted={2}")
-    @Execution(ExecutionMode.SAME_THREAD)
-    public <T> void testConsumerRebind(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
-            @Values(booleans = {false, true}) boolean transacted,
+    @Test
+    public void testConsumerRebind(
             SempV2Api sempV2Api,
             SoftAssertions softly,
             @ExecSvc(scheduled = true, poolSize = 5) ScheduledExecutorService executor,
             TestInfo testInfo) throws Exception {
-        if (!batchMode && transacted) {
-            log.info("non-batched, transacted consumers not yet supported");
-            return;
-        }
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         String group0 = RandomStringUtils.randomAlphanumeric(10);
@@ -1017,16 +756,8 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
-        consumerProperties.getExtension().setTransacted(transacted);
-        if (consumerProperties.isBatchMode()) {
-            // Batch messaging needs a timeout to drain incomplete batches when egress is disabled
-            consumerProperties.getExtension().setBatchTimeout((int) TimeUnit.SECONDS.toMillis(20));
-        } else {
-            consumerProperties.getExtension().setBatchMaxSize(1);
-        }
 
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, group0, moduleInputChannel, consumerProperties);
 
         binderBindUnbindLatency();
@@ -1036,12 +767,12 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
         // Minimize message pre-fetch since we're not testing JCSMP, and this influences the test counters
         sempV2Api.config().updateMsgVpnQueue(new ConfigMsgVpnQueue()
-                .maxDeliveredUnackedMsgsPerFlow((long) consumerProperties.getExtension().getBatchMaxSize()), vpnName, queue0, null, null);
+                .maxDeliveredUnackedMsgsPerFlow((long) 255), vpnName, queue0, null, null);
         retryAssert(() -> assertThat(sempV2Api.monitor()
                 .getMsgVpnQueue(vpnName, queue0, null)
                 .getData()
                 .getMaxDeliveredUnackedMsgsPerFlow())
-                .isEqualTo(consumerProperties.getExtension().getBatchMaxSize()));
+                .isEqualTo(255));
 
         final AtomicInteger numMsgsConsumed = new AtomicInteger(0);
         final Set<String> uniquePayloadsReceived = new HashSet<>();
@@ -1113,7 +844,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         // Give margin of error. Redelivered messages might be untracked if it's consumer was shutdown before it could
         // be added to the consumed msg count.
         softly.assertThat(numMsgsConsumed.get() - redeliveredMsgs)
-                .isBetween((long) numMsgsSent - consumerProperties.getExtension().getBatchMaxSize(), (long) numMsgsSent);
+                .isBetween((long) numMsgsSent - 255, (long) numMsgsSent);
 
         log.info("num-sent: {}, num-consumed: {}, num-redelivered: {}", numMsgsSent, numMsgsConsumed.get(),
                 redeliveredMsgs);
@@ -1121,57 +852,10 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] batchMode={0}")
-    public void testBatchTimeoutHasPrecedenceOverPolledConsumerWaitTime(
-            @Values(booleans = {false, true}) boolean batchMode) throws Exception {
-        SolaceTestBinder binder = getBinder();
-
-        PollableSource<MessageHandler> moduleInputChannel = createBindableMessageSource("input",
-                new BindingProperties());
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(10);
-
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
-        consumerProperties.getExtension().setBatchTimeout((int) TimeUnit.SECONDS.toMillis(10));
-        consumerProperties.getExtension().setPolledConsumerWaitTimeInMillis((int) TimeUnit.SECONDS.toMillis(1));
-
-        assertThat(consumerProperties.getExtension().getPolledConsumerWaitTimeInMillis())
-                .as("polled-consumer-wait-time should be at least 1 second for this test")
-                .isGreaterThanOrEqualTo((int) TimeUnit.SECONDS.toMillis(1));
-
-        assertThat(consumerProperties.getExtension().getBatchTimeout())
-                .as("Batch timeout needs to be at least 10 times larger than polled-consumer-wait-time")
-                .isGreaterThanOrEqualTo(10 * consumerProperties.getExtension().getPolledConsumerWaitTimeInMillis());
-
-        Binding<PollableSource<MessageHandler>> consumerBinding = binder.bindPollableConsumer(destination0,
-                RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
-
-        binderBindUnbindLatency();
-
-        Instant start = Instant.now();
-        assertThat(moduleInputChannel.poll(m -> {
-        })).isFalse();
-        Duration duration = Duration.between(start, Instant.now()).abs();
-        if (batchMode) {
-            assertThat(duration)
-                    .isGreaterThanOrEqualTo(Duration.ofMillis(consumerProperties.getExtension().getBatchTimeout()));
-        } else {
-            assertThat(duration)
-                    .isGreaterThanOrEqualTo(Duration.ofMillis(consumerProperties.getExtension()
-                            .getPolledConsumerWaitTimeInMillis()))
-                    .isLessThan(Duration.ofMillis(consumerProperties.getExtension().getBatchTimeout()).dividedBy(2));
-        }
-
-        consumerBinding.unbind();
-    }
-
     @Test
-    @Execution(ExecutionMode.CONCURRENT)
     public void testRequestReplyWithRequestor(JCSMPSession jcsmpSession, SoftAssertions softly,
                                               TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = getBinder();
-
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
         DirectChannel moduleInputChannel = createBindableChannel("input", new BindingProperties());
 
@@ -1233,24 +917,19 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         producer.close();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, transacted={1}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testPauseResume(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean transacted,
+    @Test
+    public void testPauseResume(
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
         String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
         int defaultWindowSize = (int) jcsmpSession.getProperty(JCSMPProperties.SUB_ACK_WINDOW_SIZE);
 
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setTransacted(transacted);
-        consumerProperties.setBatchMode(transacted); // Transacted-mode requires batch-mode=true
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
@@ -1264,25 +943,20 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, transacted={1}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testPauseBeforeConsumerStart(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean transacted,
+    @Test
+    public void testPauseBeforeConsumerStart(
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
         String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
 
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
         consumerProperties.setAutoStartup(false);
-        consumerProperties.getExtension().setTransacted(transacted);
-        consumerProperties.setBatchMode(transacted); // Transacted-mode requires batch-mode=true
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
@@ -1305,23 +979,18 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, transacted={1}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testPauseStateIsMaintainedWhenConsumerIsRestarted(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean transacted,
+    @Test
+    public void testPauseStateIsMaintainedWhenConsumerIsRestarted(
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
         String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
 
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setTransacted(transacted);
-        consumerProperties.setBatchMode(transacted); // Transacted-mode requires batch-mode=true
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
@@ -1337,23 +1006,18 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, transacted={1}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testPauseOnStoppedConsumer(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean transacted,
+    @Test
+    public void testPauseOnStoppedConsumer(
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
         String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
 
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setTransacted(transacted);
-        consumerProperties.setBatchMode(transacted); // Transacted-mode requires batch-mode=true
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
@@ -1368,24 +1032,19 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, transacted={1}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testResumeOnStoppedConsumer(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean transacted,
+    @Test
+    public void testResumeOnStoppedConsumer(
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
         String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
         int defaultWindowSize = (int) jcsmpSession.getProperty(JCSMPProperties.SUB_ACK_WINDOW_SIZE);
 
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setTransacted(transacted);
-        consumerProperties.setBatchMode(transacted); // Transacted-mode requires batch-mode=true
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
@@ -1401,24 +1060,19 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, transacted={1}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testPauseResumeOnStoppedConsumer(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean transacted,
+    @Test
+    public void testPauseResumeOnStoppedConsumer(
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
         String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
         int defaultWindowSize = (int) jcsmpSession.getProperty(JCSMPProperties.SUB_ACK_WINDOW_SIZE);
 
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setTransacted(transacted);
-        consumerProperties.setBatchMode(transacted); // Transacted-mode requires batch-mode=true
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
@@ -1433,23 +1087,18 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, transacted={1}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testFailResumeOnClosedConsumer(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean transacted,
+    @Test
+    public void testFailResumeOnClosedConsumer(
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
         String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
 
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setTransacted(transacted);
-        consumerProperties.setBatchMode(transacted); // Transacted-mode requires batch-mode=true
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
@@ -1544,11 +1193,8 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         }
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}")
-    @Execution(ExecutionMode.CONCURRENT)
+    @Test
     public <T> void testConsumerHeaderExclusion(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
             JCSMPProperties jcsmpProperties,
             SempV2Api sempV2Api,
             SoftAssertions softly,
@@ -1558,23 +1204,21 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                 "solace_dmqEligible", "solace_priority");
 
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
 
         Binding<MessageChannel> producerBinding = binder.bindProducer(
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
         consumerProperties.getExtension().setHeaderExclusions(excludedHeaders);
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
-        List<Message<?>> messages = IntStream.range(0,
-                        batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1)
+        List<Message<?>> messages = IntStream.range(0, 1)
                 .mapToObj(i -> {
                     MessageBuilder<byte[]> messageBuilder =
                             MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
@@ -1593,17 +1237,12 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                     moduleOutputChannel.send(msg);
                 }),
                 msg -> {
-                    softly.assertThat(msg).satisfies(isValidMessage(channelType, consumerProperties, messages));
+                    softly.assertThat(msg).satisfies(isValidMessage(consumerProperties, messages));
 
                     MessageHeaders springMessageHeaders;
-                    if (batchMode) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> messageHeaders = (Map<String, Object>) Objects.requireNonNull(
-                                msg.getHeaders().get(SolaceBinderHeaders.BATCHED_HEADERS, List.class)).get(0);
-                        springMessageHeaders = new MessageHeaders(messageHeaders);
-                    } else {
-                        springMessageHeaders = msg.getHeaders();
-                    }
+
+                    springMessageHeaders = msg.getHeaders();
+
                     softly.assertThat(springMessageHeaders)
                             .doesNotContainKeys(excludedHeaders.toArray(new String[0]));
                 }
@@ -1623,31 +1262,26 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     /**
      * Tests if selected message is received and other message is not
      */
-    @CartesianTest(name = "[{index}] channelType={0}, endpointType={1} ,batchMode={2}, selector=[{3}]")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testConsumerWithSelectorMismatch(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @CartesianTest.Enum(EndpointType.class) EndpointType endpointType,
-            @Values(strings = {"uProperty= 'willBeReceived'"}) String selector,
+    @Test
+    public void testConsumerWithSelectorMismatch(
             JCSMPProperties jcsmpProperties,
             SempV2Api sempV2Api,
             SoftAssertions softly,
             TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
 
         Binding<MessageChannel> producerBinding = binder.bindProducer(
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setEndpointType(endpointType);
-        consumerProperties.getExtension().setSelector(selector);
+        consumerProperties.getExtension().setSelector("uProperty= 'willBeReceived'");
 
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
         Message<?> badMessage = MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
@@ -1668,17 +1302,12 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, 1,
                 () -> messages.forEach(moduleOutputChannel::send),
                 // receiving only good message
-                msg -> softly.assertThat(msg).satisfies(isValidMessage(channelType, consumerProperties, goodMessage)));
+                msg -> softly.assertThat(msg).satisfies(isValidMessage(consumerProperties, goodMessage)));
 
-        retryAssert(() -> assertThat(
-                switch (endpointType) {
-                    case QUEUE -> getQueueTxFlows(sempV2Api, jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME), endpointName, 1).get(0).getSelector();
-                    case TOPIC_ENDPOINT -> sempV2Api.monitor().getMsgVpnTopicEndpoint(jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME),
-                            endpointName, null).getData().getSelector();
-                }
-        ).as("Selector not found for endpoint subscription %s", endpointName)
+        retryAssert(() -> assertThat(getQueueTxFlows(sempV2Api, jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME), endpointName, 1).get(0).getSelector())
+                .as("Selector not found for endpoint subscription %s", endpointName)
                 // all variants of blank selectors will be defaulted to ""
-                .isEqualTo((selector == null || selector.isBlank()) ? "" : selector));
+                .isEqualTo("uProperty= 'willBeReceived'"));
 
         producerBinding.unbind();
         consumerBinding.unbind();
@@ -1688,37 +1317,31 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     /**
      * Tests if selectors are added to queue or durable topic endpoint when connector subscribes for messages
      */
-    @CartesianTest(name = "[{index}] channelType={0}, endpointType={1} ,batchMode={2}, selector=[{3}]")
+    @CartesianTest(name = "[{index}] selector=[{0}]")
     @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testConsumerWithSelector(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @CartesianTest.Enum(EndpointType.class) EndpointType endpointType,
-            @Values(booleans = {false, true}) boolean batchMode,
+    public void testConsumerWithSelector(
             @Values(strings = {"", " ", "uProperty= 'selectorTest'"}) String selector,
             JCSMPProperties jcsmpProperties,
             SempV2Api sempV2Api,
             SoftAssertions softly,
             TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
 
         DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
 
         Binding<MessageChannel> producerBinding = binder.bindProducer(
                 destination0, moduleOutputChannel, createProducerProperties(testInfo));
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
-        consumerProperties.getExtension().setEndpointType(endpointType);
         consumerProperties.getExtension().setSelector(selector);
 
-        Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
+        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
-        List<Message<?>> messages = IntStream.range(0,
-                        batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1)
+        List<Message<?>> messages = IntStream.range(0, 1)
                 .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
                         .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
                         .setHeader("uProperty", "selectorTest")
@@ -1729,14 +1352,9 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         String endpointName = binder.getConsumerQueueName(consumerBinding);
         consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, 1,
                 () -> messages.forEach(moduleOutputChannel::send),
-                msg -> softly.assertThat(msg).satisfies(isValidMessage(channelType, consumerProperties, messages)));
+                msg -> softly.assertThat(msg).satisfies(isValidMessage(consumerProperties, messages)));
 
-        retryAssert(() -> assertThat(
-                switch (endpointType) {
-                    case QUEUE -> getQueueTxFlows(sempV2Api, jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME), endpointName, 1).get(0).getSelector();
-                    case TOPIC_ENDPOINT -> sempV2Api.monitor().getMsgVpnTopicEndpoint(jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME),
-                            endpointName, null).getData().getSelector();
-                }
+        retryAssert(() -> assertThat(getQueueTxFlows(sempV2Api, jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME), endpointName, 1).get(0).getSelector()
         ).as("Selector not found for endpoint subscription %s", endpointName)
                 // all variants of blank selectors will be defaulted to ""
                 .isEqualTo((selector == null || selector.isBlank()) ? "" : selector));
@@ -1745,65 +1363,9 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testFailConsumerCreateTransactedNonBatched(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType) throws Exception {
-        SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
-
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setTransacted(true);
-        assertThatThrownBy(() ->
-                consumerInfrastructureUtil.createBinding(
-                        binder,
-                        RandomStringUtils.randomAlphanumeric(10),
-                        RandomStringUtils.randomAlphanumeric(10),
-                        moduleInputChannel,
-                        consumerProperties))
-                .satisfies(e -> {
-                    if (channelType.equals(DirectChannel.class)) {
-                        assertThat(e).isInstanceOf(BinderException.class);
-                    }
-                })
-                .extracting(ExceptionUtils::getRootCause)
-                .asInstanceOf(InstanceOfAssertFactories.throwable(IllegalArgumentException.class))
-                .hasMessage("Non-batched, transacted consumers are not supported");
-    }
-
-    @CartesianTest(name = "[{index}] channelType={0}")
-    @Execution(ExecutionMode.CONCURRENT)
-    public <T> void testFailConsumerCreateTransactedAutoBindErrorQueue(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType) throws Exception {
-        SolaceTestBinder binder = getBinder();
-        ConsumerInfrastructureUtil<T> consumerInfrastructureUtil = createConsumerInfrastructureUtil(channelType);
-        T moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.setBatchMode(true); // transactions only supported in batch mode
-        consumerProperties.getExtension().setAutoBindErrorQueue(true);
-        consumerProperties.getExtension().setTransacted(true);
-        assertThatThrownBy(() ->
-                consumerInfrastructureUtil.createBinding(
-                        binder,
-                        RandomStringUtils.randomAlphanumeric(10),
-                        RandomStringUtils.randomAlphanumeric(10),
-                        moduleInputChannel,
-                        consumerProperties))
-                .satisfies(e -> {
-                    if (channelType.equals(DirectChannel.class)) {
-                        assertThat(e).isInstanceOf(BinderException.class);
-                    }
-                })
-                .extracting(ExceptionUtils::getRootCause)
-                .asInstanceOf(InstanceOfAssertFactories.throwable(IllegalArgumentException.class))
-                .hasMessage("transacted consumers do not support error queues");
-    }
-
     private List<MonitorMsgVpnQueueTxFlow> getQueueTxFlows(SempV2Api sempV2Api, String vpnName, String queueName, Integer count) throws ApiException {
         return sempV2Api.monitor()
                 .getMsgVpnQueueTxFlows(vpnName, queueName, count, null, null, null)
                 .getData();
     }
-
 }

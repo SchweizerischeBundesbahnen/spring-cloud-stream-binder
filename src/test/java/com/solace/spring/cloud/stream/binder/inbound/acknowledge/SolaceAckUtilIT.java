@@ -17,6 +17,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
@@ -27,6 +29,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static com.solace.spring.cloud.stream.binder.test.util.RetryableAssertions.retryAssert;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +41,7 @@ import static org.mockito.Mockito.spy;
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(PubSubPlusExtension.class)
 @Timeout(value = 2, unit = TimeUnit.MINUTES)
+@Execution(ExecutionMode.SAME_THREAD)
 class SolaceAckUtilIT {
 
     private final AtomicReference<FlowReceiverContainer> flowReceiverContainerReference = new AtomicReference<>();
@@ -73,12 +77,16 @@ class SolaceAckUtilIT {
                 flowReceiverContainer);
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer,
                 numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(
+
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
                 acknowledgementCallbackFactory, messageContainers);
 
-        assertThat(SolaceAckUtil.isErrorQueueEnabled(acknowledgmentCallback)).isFalse();
-        assertThat(SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)).isFalse();
-        assertThat(acknowledgmentCallback.isAcknowledged()).isFalse();
+        acknowledgmentCallback.forEach(ac -> {
+            assertThat(SolaceAckUtil.isErrorQueueEnabled(ac)).isFalse();
+            assertThat(SolaceAckUtil.republishToErrorQueue(ac)).isFalse();
+            assertThat(ac.isAcknowledged()).isFalse();
+        });
+
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
@@ -97,11 +105,13 @@ class SolaceAckUtilIT {
                 numMessages);
         ErrorQueueInfrastructure errorQueueInfrastructure = initErrorQueueInfrastructure(jcsmpSession,
                 acknowledgementCallbackFactory);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
                 acknowledgementCallbackFactory, messageContainers);
 
-        assertThat(SolaceAckUtil.isErrorQueueEnabled(acknowledgmentCallback)).isTrue();
-        assertThat(SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)).isTrue();
+        acknowledgmentCallback.forEach(ac -> {
+            assertThat(SolaceAckUtil.isErrorQueueEnabled(ac)).isTrue();
+            assertThat(SolaceAckUtil.republishToErrorQueue(ac)).isTrue();
+        });
 
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), 0);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
@@ -124,13 +134,14 @@ class SolaceAckUtilIT {
                 numMessages);
         ErrorQueueInfrastructure errorQueueInfrastructure = initErrorQueueInfrastructure(jcsmpSession,
                 acknowledgementCallbackFactory);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
                 acknowledgementCallbackFactory, messageContainers);
 
-        acknowledgmentCallback.acknowledge(Status.ACCEPT);
-
-        assertThat(SolaceAckUtil.isErrorQueueEnabled(acknowledgmentCallback)).isTrue();
-        assertThat(SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)).isFalse();
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(Status.ACCEPT);
+            assertThat(SolaceAckUtil.isErrorQueueEnabled(ac)).isTrue();
+            assertThat(SolaceAckUtil.republishToErrorQueue(ac)).isFalse();
+        });
 
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), 0);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
@@ -152,13 +163,14 @@ class SolaceAckUtilIT {
                 numMessages);
         ErrorQueueInfrastructure errorQueueInfrastructure = initErrorQueueInfrastructure(jcsmpSession,
                 acknowledgementCallbackFactory);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
                 acknowledgementCallbackFactory, messageContainers);
 
-        acknowledgmentCallback.acknowledge(Status.REQUEUE);
-
-        assertThat(SolaceAckUtil.isErrorQueueEnabled(acknowledgmentCallback)).isTrue();
-        assertThat(SolaceAckUtil.republishToErrorQueue(acknowledgmentCallback)).isFalse();
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(Status.REQUEUE);
+            assertThat(SolaceAckUtil.isErrorQueueEnabled(ac)).isTrue();
+            assertThat(SolaceAckUtil.republishToErrorQueue(ac)).isFalse();
+        });
 
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), numMessages);
@@ -172,7 +184,6 @@ class SolaceAckUtilIT {
         if (flowReceiverContainerReference.compareAndSet(null, spy(new FlowReceiverContainer(
                 jcsmpSession,
                 JCSMPFactory.onlyInstance().createQueue(queue.getName()),
-                false,
                 new EndpointProperties(),
                 new ConsumerFlowProperties())))) {
             flowReceiverContainerReference.get().bind();
@@ -242,15 +253,11 @@ class SolaceAckUtilIT {
         }
     }
 
-    private AcknowledgmentCallback createAcknowledgmentCallback(
+    private List<AcknowledgmentCallback> createAcknowledgmentCallback(
             JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory,
             List<MessageContainer> messageContainers) {
         assertThat(messageContainers).hasSizeGreaterThan(0);
-        if (messageContainers.size() > 1) {
-            return acknowledgementCallbackFactory.createBatchCallback(messageContainers);
-        } else {
-            return acknowledgementCallbackFactory.createCallback(messageContainers.get(0));
-        }
+        return messageContainers.stream().map(acknowledgementCallbackFactory::createCallback).collect(Collectors.toList());
     }
 
     private void validateNumEnqueuedMessages(SempV2Api sempV2Api, String queueName, int expectedCount)

@@ -45,7 +45,7 @@ public class SolaceBinderConfigIT {
         clientName = UUID.randomUUID().toString();
         jcsmpProperties.setProperty(JCSMPProperties.CLIENT_NAME, clientName);
         jcsmpSessionConfiguration = new JCSMPSessionConfiguration();
-        binderConfiguration = new SolaceMessageChannelBinderConfiguration(new SolaceExtendedBindingProperties(), jcsmpSessionConfiguration.jcsmpSession(jcsmpProperties, Optional.empty(), Optional.empty()), jcsmpSessionConfiguration.context(jcsmpProperties, Optional.empty(), Optional.empty()));
+        binderConfiguration = new SolaceMessageChannelBinderConfiguration(new SolaceExtendedBindingProperties(), jcsmpSessionConfiguration.jcsmpSession(jcsmpProperties, Optional.empty(), Optional.empty()), jcsmpSessionConfiguration.jcsmpContext(jcsmpProperties, Optional.empty(), Optional.empty()));
         AutowireCapableBeanFactory beanFactory = applicationContext.getAutowireCapableBeanFactory();
         beanFactory.autowireBean(binderConfiguration);
         binderConfiguration = (SolaceMessageChannelBinderConfiguration) beanFactory.initializeBean(binderConfiguration, testInfo.toString());
@@ -54,7 +54,7 @@ public class SolaceBinderConfigIT {
     @Test
     public void testClientInfoProvider(JCSMPProperties jcsmpProperties, SempV2Api sempV2Api, SoftAssertions softly) throws Exception {
         MonitorMsgVpnClient client;
-        SolaceMessageChannelBinder solaceMessageChannelBinder = binderConfiguration.solaceMessageChannelBinder(jcsmpSessionConfiguration.provisioningProvider(jcsmpProperties, Optional.empty(), Optional.empty()), null, null);
+        SolaceMessageChannelBinder solaceMessageChannelBinder = binderConfiguration.solaceMessageChannelBinder(jcsmpSessionConfiguration.jcsmpProvisioningProvider(jcsmpProperties, Optional.empty(), Optional.empty()), null, null);
         try {
             String vpnName = jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME);
             client = sempV2Api.monitor().getMsgVpnClient(vpnName, clientName, null).getData();

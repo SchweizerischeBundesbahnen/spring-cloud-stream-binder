@@ -4,9 +4,7 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceCommonProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties;
 import com.solace.spring.cloud.stream.binder.util.DestinationType;
-import com.solace.spring.cloud.stream.binder.util.EndpointType;
 import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
-import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +16,10 @@ import org.springframework.cloud.stream.provisioning.ProvisioningException;
 import org.springframework.cloud.stream.provisioning.ProvisioningProvider;
 import org.springframework.util.StringUtils;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -99,14 +100,6 @@ public class SolaceEndpointProvisioner
         EndpointProperties endpointProperties = SolaceProvisioningUtil.getEndpointProperties(properties.getExtension());
         ConsumerFlowProperties consumerFlowProperties = SolaceProvisioningUtil.getConsumerFlowProperties(name, properties);
 
-        EndpointType endpointType = properties.getExtension().getEndpointType();
-        if (EndpointType.TOPIC_ENDPOINT.equals(endpointType)) {
-            consumerFlowProperties.setNewSubscription(JCSMPFactory.onlyInstance().createTopic(name));
-        }
-
-
-        EndpointProvider<?> endpointProvider = EndpointProvider.from(endpointType);
-
         if (properties.getConcurrency() > 1) {
             if (endpointProperties.getAccessType().equals(EndpointProperties.ACCESSTYPE_EXCLUSIVE)) {
                 String msg = "Concurrency > 1 is not supported when using exclusive queues, " +
@@ -118,27 +111,17 @@ public class SolaceEndpointProvisioner
                         "either configure a concurrency of 1 or define a consumer group";
                 log.warn(msg);
                 throw new ProvisioningException(msg);
-            } else if (EndpointType.TOPIC_ENDPOINT.equals(endpointType) &&
-                    properties.getExtension().isProvisionDurableQueue()) {
-                // JCSMP can't set max client number >1 while provisioning topic endpoints
-                String msg = "Concurrency > 1 is not supported with auto-provisioned topic endpoints. "
-                        + "Either configure a concurrency of 1, or administratively provision a topic endpoint "
-                        + "and set the maximum number of connected clients to fit your use case.";
-                log.warn(msg);
-                throw new ProvisioningException(msg);
             }
         }
 
         log.info(isAnonEndpoint ?
-                String.format("Creating anonymous (temporary) %s %s", endpointType, groupQueueName) :
-                String.format("Creating %s %s %s for consumer group %s",
-                        isDurableEndpoint ? "durable" : "temporary", endpointType, groupQueueName, group));
-        Endpoint endpoint = provisionEndpoint(groupQueueName, endpointProvider, isDurableEndpoint, endpointProperties,
+                String.format("Creating anonymous (temporary) queue %s", groupQueueName) :
+                String.format("Creating queue %s %s for consumer group %s",
+                        isDurableEndpoint ? "durable" : "temporary", groupQueueName, group));
+        Endpoint endpoint = provisionEndpoint(groupQueueName, isDurableEndpoint, endpointProperties,
                 consumerFlowProperties, properties.getExtension().isProvisionDurableQueue(), properties.isAutoStartup());
 
-        Set<String> additionalSubscriptions = EndpointType.QUEUE.equals(endpointType) ?
-                Set.of(properties.getExtension().getQueueAdditionalSubscriptions()) :
-                Collections.emptySet();
+        Set<String> additionalSubscriptions = Set.of(properties.getExtension().getQueueAdditionalSubscriptions());
 
         String errorQueueName = null;
         if (properties.getExtension().isAutoBindErrorQueue()) {
@@ -152,23 +135,22 @@ public class SolaceEndpointProvisioner
     private Queue provisionQueueIfRequired(String queueName, ExtendedProducerProperties<SolaceProducerProperties> properties) {
         EndpointProperties endpointProperties = SolaceProvisioningUtil.getEndpointProperties(properties.getExtension());
         boolean doDurableQueueProvisioning = properties.getExtension().isProvisionDurableQueue();
-        return provisionEndpoint(queueName, EndpointProvider.QUEUE_PROVIDER, true, endpointProperties,
+        return provisionEndpoint(queueName, true, endpointProperties,
                 new ConsumerFlowProperties(), doDurableQueueProvisioning, properties.isAutoStartup());
     }
 
-    private <T extends Endpoint> T provisionEndpoint(
+    private Queue provisionEndpoint(
             String name,
-            EndpointProvider<T> endpointProvider,
             boolean isDurable,
             EndpointProperties endpointProperties,
             ConsumerFlowProperties consumerFlowProperties,
             boolean doDurableProvisioning,
             boolean testFlowCxn) throws ProvisioningException {
 
-        T endpoint;
+        Queue endpoint;
         try {
             if (isDurable) {
-                endpoint = endpointProvider.createInstance(name);
+                endpoint = JCSMPFactory.onlyInstance().createQueue(name);
                 if (doDurableProvisioning) {
                     jcsmpSession.provision(endpoint, endpointProperties, JCSMPSession.FLAG_IGNORE_ALREADY_EXISTS);
                 } else {
@@ -177,7 +159,7 @@ public class SolaceEndpointProvisioner
                 }
             } else {
                 // EndpointProperties will be applied during consumer creation
-                endpoint = endpointProvider.createTemporaryEndpoint(name, jcsmpSession);
+                endpoint = jcsmpSession.createTemporaryQueue(name);
             }
         } catch (Exception e) {
             String action = isDurable ? "provision durable" : "create temporary";
@@ -231,7 +213,6 @@ public class SolaceEndpointProvisioner
         log.info("Provisioning error queue {}", errorQueueName);
         EndpointProperties endpointProperties = SolaceProvisioningUtil.getErrorQueueEndpointProperties(properties.getExtension());
         return provisionEndpoint(errorQueueName,
-                EndpointProvider.QUEUE_PROVIDER,
                 true,
                 endpointProperties,
                 new ConsumerFlowProperties(),

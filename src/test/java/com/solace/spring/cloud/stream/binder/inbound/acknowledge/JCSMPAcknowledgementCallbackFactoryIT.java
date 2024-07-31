@@ -14,39 +14,29 @@ import com.solace.test.integration.semp.v2.monitor.model.MonitorSempPaging;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.XMLMessage.Outcome;
-import com.solacesystems.jcsmp.transaction.RollbackException;
-import com.solacesystems.jcsmp.transaction.TransactedSession;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.assertj.core.api.SoftAssertions;
 import org.junit.function.ThrowingRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.integration.acks.AcknowledgmentCallback;
-import org.springframework.lang.Nullable;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static com.solace.spring.cloud.stream.binder.test.util.RetryableAssertions.retryAssert;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -59,7 +49,6 @@ import static org.mockito.Mockito.*;
 @Timeout(value = 2, unit = TimeUnit.MINUTES)
 public class JCSMPAcknowledgementCallbackFactoryIT {
     private final AtomicReference<FlowReceiverContainer> flowReceiverContainerReference = new AtomicReference<>();
-    private final AtomicReference<FlowReceiverContainer> transactedFlowReceiverContainerReference = new AtomicReference<>();
     private XMLMessageProducer producer;
     private String vpnName;
     private Runnable closeErrorQueueInfrastructureCallback;
@@ -83,87 +72,64 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0}, transacted={1} isDurable={2}")
+    @CartesianTest(name = "[{index}] numMessages={0}, isDurable={1}")
     public void testAccept(@Values(ints = {1, 255}) int numMessages,
-                           @Values(booleans = {false, true}) boolean transacted,
                            @Values(booleans = {false, true}) boolean isDurable,
                            JCSMPSession jcsmpSession,
                            Queue durableQueue,
                            SempV2Api sempV2Api) throws Exception {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
-
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.ACCEPT);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.ACCEPT);
+            assertThat(ac.isAcknowledged()).isTrue();
+        });
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), 0);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
-
-        if (transacted) {
-            validateTransaction(sempV2Api, jcsmpSession, numMessages, true);
-        }
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0}, transacted={1}, isDurable={2}")
+    @CartesianTest(name = "[{index}] numMessages={0}, isDurable={1}")
     public void testReject(@Values(ints = {1, 255}) int numMessages,
-                           @Values(booleans = {false, true}) boolean transacted,
                            @Values(booleans = {false, true}) boolean isDurable,
                            JCSMPSession jcsmpSession,
                            Queue durableQueue,
                            SempV2Api sempV2Api)
             throws Exception {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
 
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REJECT);
+            assertThat(ac.isAcknowledged()).isTrue();
+        });
 
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REJECT);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
-
-        validateNumEnqueuedMessages(sempV2Api, queue.getName(), transacted ? numMessages : 0);
-        validateNumRedeliveredMessages(sempV2Api, queue.getName(), transacted ? numMessages : 0);
+        validateNumEnqueuedMessages(sempV2Api, queue.getName(), 0);
+        validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
-
-        if (transacted) {
-            validateTransaction(sempV2Api, jcsmpSession, numMessages, false);
-        }
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0}, transacted={1}")
+    @CartesianTest(name = "[{index}] numMessages={0}")
     public void testRejectFail(@Values(ints = {1, 255}) int numMessages,
-                               @Values(booleans = {false, true}) boolean transacted,
                                JCSMPSession jcsmpSession,
                                Queue queue,
                                SempV2Api sempV2Api) throws Exception {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
 
         log.info(String.format("Disabling egress for queue %s", queue.getName()));
         sempV2Api.config().updateMsgVpnQueue(new ConfigMsgVpnQueue().egressEnabled(false), (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME),
@@ -174,8 +140,11 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
                 .isEgressEnabled()));
 
         log.info("Acknowledging messages");
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REJECT);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REJECT);
+            assertThat(ac.isAcknowledged()).isTrue();
+        });
+
 
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
@@ -199,9 +168,6 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), numMessages);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 2);
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
-        if (transacted) {
-            validateTransaction(sempV2Api, jcsmpSession, numMessages, false);
-        }
     }
 
     @CartesianTest(name = "[{index}] numMessages={0}, isDurable={1}")
@@ -211,19 +177,20 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
                                          Queue durableQueue,
                                          SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, false); //TODO Add support for transacted error queue
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
         ErrorQueueInfrastructure errorQueueInfrastructure = initializeErrorQueueInfrastructure(jcsmpSession,
                 acknowledgementCallbackFactory);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REJECT);
+            assertThat(ac.isAcknowledged()).isTrue();
+        });
 
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REJECT);
-
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), 0);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
@@ -238,15 +205,16 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
                                              Queue durableQueue,
                                              SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, false); //TODO add support for transacted error queue
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
         ErrorQueueInfrastructure errorQueueInfrastructure = initializeErrorQueueInfrastructure(jcsmpSession,
                 acknowledgementCallbackFactory);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
+
 
         log.info(String.format("Disabling ingress for error queue %s",
                 errorQueueInfrastructure.getErrorQueueName()));
@@ -258,8 +226,11 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
                 .isIngressEnabled()));
 
         log.info("Acknowledging messages");
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REJECT);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REJECT);
+            assertThat(ac.isAcknowledged()).isTrue();
+        });
+
 
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), numMessages);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
@@ -270,56 +241,43 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
         validateNumRedeliveredMessages(sempV2Api, errorQueueInfrastructure.getErrorQueueName(), 0);
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0}, transacted={1} isDurable={2}")
+    @CartesianTest(name = "[{index}] numMessages={0}, isDurable={1}")
     public void testRequeue(@Values(ints = {1, 255}) int numMessages,
-                            @Values(booleans = {false, true}) boolean transacted,
                             @Values(booleans = {false, true}) boolean isDurable,
                             JCSMPSession jcsmpSession,
                             Queue durableQueue,
                             SempV2Api sempV2Api) throws Exception {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REQUEUE);
+            assertThat(ac.isAcknowledged()).isTrue();
+        });
 
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REQUEUE);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), numMessages);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
-
-        if (transacted) {
-            validateTransaction(sempV2Api, jcsmpSession, numMessages, false);
-        }
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0}, transacted={1}")
+    @CartesianTest(name = "[{index}] numMessages={0}")
     public void testRequeueFail(@Values(ints = {1, 255}) int numMessages,
-                                @Values(booleans = {false, true}) boolean transacted,
                                 JCSMPSession jcsmpSession,
                                 Queue queue,
                                 SempV2Api sempV2Api) throws Exception {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
+
 
         log.info(String.format("Disabling egress for queue %s", queue.getName()));
         sempV2Api.config().updateMsgVpnQueue(new ConfigMsgVpnQueue().egressEnabled(false), (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME),
@@ -330,8 +288,11 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
                 .isEgressEnabled()));
 
         log.info("Acknowledging messages");
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REQUEUE);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REQUEUE);
+            assertThat(ac.isAcknowledged()).isTrue();
+        });
+
 
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
@@ -355,32 +316,56 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), numMessages);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 2);
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
-
-        if (transacted) {
-            validateTransaction(sempV2Api, jcsmpSession, numMessages, false);
-        }
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0}, transacted={1} isDurable={2}")
+    @CartesianTest(name = "[{index}] numMessages={0}, isDurable={1}")
     public void testReAckAfterAccept(@Values(ints = {1, 255}) int numMessages,
-                                     @Values(booleans = {false, true}) boolean transacted,
                                      @Values(booleans = {false, true}) boolean isDurable,
                                      JCSMPSession jcsmpSession,
                                      Queue durableQueue,
                                      SempV2Api sempV2Api) throws Throwable {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
+
+
+        ThrowingRunnable verifyExpectedState = () -> {
+            validateNumEnqueuedMessages(sempV2Api, queue.getName(), 0);
+            validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
+            validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
+        };
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.ACCEPT);
+            assertThat(ac.isAcknowledged()).isTrue();
+
+            for (AcknowledgmentCallback.Status status : AcknowledgmentCallback.Status.values()) {
+                ac.acknowledge(status);
+                assertThat(ac.isAcknowledged()).isTrue();
+            }
+        });
+        verifyExpectedState.run();
+    }
+
+    @CartesianTest(name = "[{index}] numMessages={0}, isDurable={1}")
+    public void testReAckAfterReject(@Values(ints = {1, 255}) int numMessages,
+                                     @Values(booleans = {false, true}) boolean isDurable,
+                                     JCSMPSession jcsmpSession,
+                                     Queue durableQueue,
+                                     SempV2Api sempV2Api) throws Throwable {
+        Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
+        JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
+                flowReceiverContainer);
+
+        List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
+
 
         ThrowingRunnable verifyExpectedState = () -> {
             validateNumEnqueuedMessages(sempV2Api, queue.getName(), 0);
@@ -388,61 +373,16 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
             validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
         };
 
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.ACCEPT);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REJECT);
+            assertThat(ac.isAcknowledged()).isTrue();
+
+            for (AcknowledgmentCallback.Status status : AcknowledgmentCallback.Status.values()) {
+                ac.acknowledge(status);
+                assertThat(ac.isAcknowledged()).isTrue();
+            }
+        });
         verifyExpectedState.run();
-
-        for (AcknowledgmentCallback.Status status : AcknowledgmentCallback.Status.values()) {
-            acknowledgmentCallback.acknowledge(status);
-            assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
-            verifyExpectedState.run();
-        }
-
-        if (transacted) {
-            validateTransaction(sempV2Api, jcsmpSession, numMessages, true);
-        }
-    }
-
-    @CartesianTest(name = "[{index}] numMessages={0}, transacted={1}, isDurable={2}")
-    public void testReAckAfterReject(@Values(ints = {1, 255}) int numMessages,
-                                     @Values(booleans = {false, true}) boolean transacted,
-                                     @Values(booleans = {false, true}) boolean isDurable,
-                                     JCSMPSession jcsmpSession,
-                                     Queue durableQueue,
-                                     SempV2Api sempV2Api) throws Throwable {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
-        Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
-        JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
-                flowReceiverContainer);
-
-        List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
-
-        ThrowingRunnable verifyExpectedState = () -> {
-            validateNumEnqueuedMessages(sempV2Api, queue.getName(), transacted ? numMessages : 0);
-            validateNumRedeliveredMessages(sempV2Api, queue.getName(), transacted ? numMessages : 0);
-            validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
-        };
-
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REJECT);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
-        verifyExpectedState.run();
-
-        for (AcknowledgmentCallback.Status status : AcknowledgmentCallback.Status.values()) {
-            acknowledgmentCallback.acknowledge(status);
-            assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
-            verifyExpectedState.run();
-        }
-
-        if (transacted) {
-            validateTransaction(sempV2Api, jcsmpSession, numMessages, false);
-        }
     }
 
     @CartesianTest(name = "[{index}] numMessages={0}, isDurable={1}")
@@ -452,15 +392,15 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
                                                    Queue durableQueue,
                                                    SempV2Api sempV2Api) throws Throwable {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, false); //TODO Add transacted error queue support
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
         ErrorQueueInfrastructure errorQueueInfrastructure = initializeErrorQueueInfrastructure(jcsmpSession,
                 acknowledgementCallbackFactory);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
 
         ThrowingRunnable verifyExpectedState = () -> {
             validateNumEnqueuedMessages(sempV2Api, queue.getName(), 0);
@@ -470,76 +410,68 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
             validateNumRedeliveredMessages(sempV2Api, errorQueueInfrastructure.getErrorQueueName(), 0);
         };
 
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REJECT);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REJECT);
+            assertThat(ac.isAcknowledged()).isTrue();
+        });
         verifyExpectedState.run();
 
-        for (AcknowledgmentCallback.Status status : AcknowledgmentCallback.Status.values()) {
-            acknowledgmentCallback.acknowledge(status);
-            assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
-            verifyExpectedState.run();
-        }
+        acknowledgmentCallback.forEach(ac -> {
+            for (AcknowledgmentCallback.Status status : AcknowledgmentCallback.Status.values()) {
+                ac.acknowledge(status);
+                assertThat(ac.isAcknowledged()).isTrue();
+            }
+        });
+        verifyExpectedState.run();
     }
 
-    @CartesianTest(name = "[{index}] numMessages={0}, transacted={1}, isDurable={2}")
+    @CartesianTest(name = "[{index}] numMessages={0}, isDurable={1}")
     public void testReAckAfterRequeue(@Values(ints = {1, 255}) int numMessages,
-                                      @Values(booleans = {false, true}) boolean transacted,
                                       @Values(booleans = {false, true}) boolean isDurable,
                                       JCSMPSession jcsmpSession,
                                       Queue durableQueue,
                                       SempV2Api sempV2Api) throws Throwable {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
         List<MessageContainer> messageContainers = sendAndReceiveMessages(queue, flowReceiverContainer, numMessages);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
 
         ThrowingRunnable verifyExpectedState = () -> {
             validateNumRedeliveredMessages(sempV2Api, queue.getName(), numMessages);
             validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
             validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
         };
+        acknowledgmentCallback.forEach(ac -> {
+            ac.acknowledge(AcknowledgmentCallback.Status.REQUEUE);
+            assertThat(ac.isAcknowledged()).isTrue();
 
-        acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.REQUEUE);
-        assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
+        });
         verifyExpectedState.run();
 
-        for (AcknowledgmentCallback.Status status : AcknowledgmentCallback.Status.values()) {
-            acknowledgmentCallback.acknowledge(status);
-            assertThat(acknowledgmentCallback.isAcknowledged()).isTrue();
-            verifyExpectedState.run();
-        }
-
-        if (transacted) {
-            validateTransaction(sempV2Api, jcsmpSession, numMessages, false);
-        }
+        acknowledgmentCallback.forEach(ac -> {
+            for (AcknowledgmentCallback.Status status : AcknowledgmentCallback.Status.values()) {
+                ac.acknowledge(status);
+                assertThat(ac.isAcknowledged()).isTrue();
+            }
+        });
+        verifyExpectedState.run();
     }
 
-    @CartesianTest(name = "[{index}] status={0}, numMessages={1}, transacted={2}, isDurable={3}, createErrorQueue={4}")
+    @CartesianTest(name = "[{index}] status={0}, numMessages={1}, isDurable={2}, createErrorQueue={3}")
     public void testAckWhenFlowUnbound(
             @CartesianTest.Enum(AcknowledgmentCallback.Status.class) AcknowledgmentCallback.Status status,
             @Values(ints = {1, 255}) int numMessages,
-            @Values(booleans = {false, true}) boolean transacted,
             @Values(booleans = {false, true}) boolean isDurable,
             @Values(booleans = {false, true}) boolean createErrorQueue,
             JCSMPSession jcsmpSession,
             Queue durableQueue,
             SempV2Api sempV2Api) throws Exception {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
@@ -552,27 +484,30 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
                 .filter(e -> e)
                 .map(c -> initializeErrorQueueInfrastructure(jcsmpSession, acknowledgementCallbackFactory))
                 .map(ErrorQueueInfrastructure::getErrorQueueName);
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers, flowReceiverContainer.getTransactedSession());
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
 
         flowReceiverContainer.unbind();
 
-        SolaceAcknowledgmentException exception = assertThrows(SolaceAcknowledgmentException.class,
-                () -> acknowledgmentCallback.acknowledge(status));
-        Class<? extends Throwable> expectedRootCause = transacted ? ClosedFacilityException.class :
-                IllegalStateException.class;
+        acknowledgmentCallback.forEach(ac -> {
 
-        assertThat(acknowledgmentCallback.isAcknowledged())
-                .describedAs("Unexpected ack state for %s re-ack", status)
-                .isFalse();
-        assertThat(exception)
-                .describedAs("Unexpected root cause for %s re-ack", status)
-                .hasRootCauseInstanceOf(expectedRootCause);
-        if (exception instanceof SolaceBatchAcknowledgementException) {
-            assertThat((SolaceBatchAcknowledgementException) exception)
-                    .describedAs("Unexpected stale batch state for %s re-ack", status)
+            SolaceAcknowledgmentException exception = assertThrows(SolaceAcknowledgmentException.class,
+                    () -> ac.acknowledge(status));
+            Class<? extends Throwable> expectedRootCause = IllegalStateException.class;
+
+            assertThat(ac.isAcknowledged())
+                    .describedAs("Unexpected ack state for %s re-ack", status)
+                    .isFalse();
+
+            assertThat(exception)
+                    .describedAs("Unexpected root cause for %s re-ack", status)
                     .hasRootCauseInstanceOf(expectedRootCause);
-        }
+            if (exception instanceof SolaceBatchAcknowledgementException) {
+                assertThat((SolaceBatchAcknowledgementException) exception)
+                        .describedAs("Unexpected stale batch state for %s re-ack", status)
+                        .hasRootCauseInstanceOf(expectedRootCause);
+            }
+        });
 
         if (isDurable) {
             validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
@@ -585,20 +520,14 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] status={0}, numMessages={1}, transacted={2}, isDurable={3}")
+    @CartesianTest(name = "[{index}] status={0}, numMessages={1}, isDurable={2}")
     public void testAckThrowsException(
             @CartesianTest.Enum(AcknowledgmentCallback.Status.class) AcknowledgmentCallback.Status status,
             @Values(ints = {1, 255}) int numMessages,
-            @Values(booleans = {false, true}) boolean transacted,
             @Values(booleans = {false, true}) boolean isDurable,
             JCSMPSession jcsmpSession, Queue durableQueue, SempV2Api sempV2Api) throws Exception {
-        if (numMessages == 1 && transacted) {
-            log.info("No support yet for non-batched, transacted consumers");
-            return;
-        }
-
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, queue);
         JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
                 flowReceiverContainer);
 
@@ -617,112 +546,30 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
                     }
                 }).collect(Collectors.toList());
 
-        AcknowledgmentCallback acknowledgmentCallback = createAcknowledgmentCallback(acknowledgementCallbackFactory,
-                messageContainers,
-                Optional.ofNullable(flowReceiverContainer.getTransactedSession())
-                        .map(txnSession -> {
-                            TransactedSession spy = spy(txnSession);
-                            try {
-                                doThrow(expectedException).when(spy).commit();
-                                doThrow(expectedException).when(spy).rollback();
-                            } catch (Exception e) {
-                                fail("Unwanted exception", e);
-                            }
-                            return spy;
-                        })
-                        .orElse(null));
+        List<AcknowledgmentCallback> acknowledgmentCallback = createAcknowledgmentCallback(
+                acknowledgementCallbackFactory, messageContainers);
 
-        assertThat(acknowledgmentCallback.isAcknowledged()).isFalse();
-        assertThat(acknowledgmentCallback.isAutoAck()).isTrue();
-        assertThat(SolaceAckUtil.isErrorQueueEnabled(acknowledgmentCallback)).isFalse();
+        acknowledgmentCallback.forEach(ac -> {
 
-        SolaceAcknowledgmentException exception = assertThrows(SolaceAcknowledgmentException.class,
-                () -> acknowledgmentCallback.acknowledge(status));
 
-        assertThat(acknowledgmentCallback.isAcknowledged())
-                .describedAs("Unexpected ack state for %s re-ack", status)
-                .isFalse();
-        assertThat(exception)
-                .describedAs("Unexpected root cause for %s re-ack", status)
-                .hasRootCause(expectedException);
+            assertThat(ac.isAcknowledged()).isFalse();
+            assertThat(ac.isAutoAck()).isTrue();
+            assertThat(SolaceAckUtil.isErrorQueueEnabled(ac)).isFalse();
 
+            SolaceAcknowledgmentException exception = assertThrows(SolaceAcknowledgmentException.class,
+                    () -> ac.acknowledge(status));
+
+            assertThat(ac.isAcknowledged())
+                    .describedAs("Unexpected ack state for %s re-ack", status)
+                    .isFalse();
+            assertThat(exception)
+                    .describedAs("Unexpected root cause for %s re-ack", status)
+                    .hasRootCause(expectedException);
+
+        });
         validateNumEnqueuedMessages(sempV2Api, queue.getName(), numMessages);
         validateNumRedeliveredMessages(sempV2Api, queue.getName(), 0);
         validateQueueBindSuccesses(sempV2Api, queue.getName(), 1);
-    }
-
-    @CartesianTest(name = "[{index}] exceptionType={0}")
-    public void testTransactedAcceptThrowsExceptionAndRollback(
-            @Values(classes = {JCSMPException.class, RollbackException.class}) Class<? extends JCSMPException> exceptionType,
-            JCSMPSession jcsmpSession,
-            Queue durableQueue) throws Exception {
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, durableQueue, true);
-        JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
-                flowReceiverContainer);
-
-        TransactedSession transactedSession = spy(Objects.requireNonNull(flowReceiverContainer.getTransactedSession()));
-        JCSMPException expectedException = exceptionType.getConstructor(String.class).newInstance("expected exception");
-        JCSMPException expectedRollbackException = exceptionType.getConstructor(String.class).newInstance("expected exception during rollback");
-        doThrow(expectedException).when(transactedSession).commit();
-        doThrow(expectedRollbackException).when(transactedSession).rollback();
-
-        AcknowledgmentCallback acknowledgmentCallback = acknowledgementCallbackFactory.createTransactedBatchCallback(
-                sendAndReceiveMessages(durableQueue, flowReceiverContainer, 1),
-                transactedSession);
-
-        assertThatThrownBy(() -> acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.ACCEPT))
-                .isInstanceOf(SolaceAcknowledgmentException.class)
-                .rootCause()
-                .isInstanceOf(expectedException.getClass())
-                .hasMessage(expectedException.getMessage())
-                .satisfies(e -> {
-                    if (RollbackException.class.isAssignableFrom(exceptionType)) {
-                        Mockito.verify(transactedSession, never()).rollback();
-                        assertThat(e.getSuppressed()).isEmpty();
-                    } else {
-                        Mockito.verify(transactedSession, times(1)).rollback();
-                        assertThat(e.getSuppressed()).containsExactly(expectedRollbackException);
-                    }
-                });
-    }
-
-    @Test
-    public void testTransactedNoAutoAckThrowsException(JCSMPSession jcsmpSession, Queue durableQueue)
-            throws Exception {
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, durableQueue, true);
-        JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
-                flowReceiverContainer);
-        AcknowledgmentCallback acknowledgmentCallback = acknowledgementCallbackFactory.createTransactedBatchCallback(
-                sendAndReceiveMessages(durableQueue, flowReceiverContainer, 1),
-                flowReceiverContainer.getTransactedSession());
-
-        assertThatThrownBy(acknowledgmentCallback::noAutoAck)
-                .isInstanceOf(UnsupportedOperationException.class);
-    }
-
-    @ParameterizedTest
-    @EnumSource(AcknowledgmentCallback.Status.class)
-    public void testTransactedAsyncThrowsException(AcknowledgmentCallback.Status status,
-                                                   JCSMPSession jcsmpSession,
-                                                   Queue durableQueue,
-                                                   SoftAssertions softly) throws Exception {
-        FlowReceiverContainer flowReceiverContainer = initializeFlowReceiverContainer(jcsmpSession, durableQueue, true);
-        JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory = new JCSMPAcknowledgementCallbackFactory(
-                flowReceiverContainer);
-        AcknowledgmentCallback acknowledgmentCallback = acknowledgementCallbackFactory.createTransactedBatchCallback(
-                sendAndReceiveMessages(durableQueue, flowReceiverContainer, 1),
-                flowReceiverContainer.getTransactedSession());
-
-        ExecutorService executorService = Executors.newSingleThreadExecutor();
-        try {
-            executorService.submit(() -> {
-                softly.assertThatThrownBy(() -> acknowledgmentCallback.acknowledge(status))
-                        .isInstanceOf(UnsupportedOperationException.class)
-                        .hasMessage("Transactions must be resolved on the message handler's thread");
-            }).get(1, TimeUnit.MINUTES);
-        } finally {
-            executorService.shutdownNow();
-        }
     }
 
     private List<MessageContainer> sendAndReceiveMessages(Queue queue,
@@ -752,43 +599,26 @@ public class JCSMPAcknowledgementCallbackFactoryIT {
         }
     }
 
-    private AcknowledgmentCallback createAcknowledgmentCallback(
+    private List<AcknowledgmentCallback> createAcknowledgmentCallback(
             JCSMPAcknowledgementCallbackFactory acknowledgementCallbackFactory,
-            List<MessageContainer> messageContainers,
-            @Nullable TransactedSession transactedSession) {
+            List<MessageContainer> messageContainers) {
         assertThat(messageContainers).hasSizeGreaterThan(0);
-        if (messageContainers.size() > 1) {
-            return transactedSession != null ?
-                    acknowledgementCallbackFactory.createTransactedBatchCallback(messageContainers, transactedSession) :
-                    acknowledgementCallbackFactory.createBatchCallback(messageContainers);
-        } else {
-            return acknowledgementCallbackFactory.createCallback(messageContainers.get(0));
-        }
+        return messageContainers.stream().map(acknowledgementCallbackFactory::createCallback).collect(Collectors.toList());
     }
 
     private FlowReceiverContainer initializeFlowReceiverContainer(
-            JCSMPSession jcsmpSession, Queue queue, boolean transacted)
+            JCSMPSession jcsmpSession, Queue queue)
             throws JCSMPException {
-        AtomicReference<FlowReceiverContainer> ref = transacted ?
-                transactedFlowReceiverContainerReference :
-                flowReceiverContainerReference;
+        AtomicReference<FlowReceiverContainer> ref = flowReceiverContainerReference;
 
         if (ref.compareAndSet(null, spy(new FlowReceiverContainer(
                 jcsmpSession,
                 JCSMPFactory.onlyInstance().createQueue(queue.getName()),
-                transacted,
                 new EndpointProperties(),
                 new ConsumerFlowProperties())))) {
             ref.get().bind();
         }
-        FlowReceiverContainer flowReceiverContainer = ref.get();
-        if (transacted) {
-            assertThat(flowReceiverContainer.getTransactedSession()).isNotNull();
-        } else {
-            assertThat(flowReceiverContainer.getTransactedSession()).isNull();
-        }
-
-        return flowReceiverContainer;
+        return ref.get();
     }
 
     private ErrorQueueInfrastructure initializeErrorQueueInfrastructure(JCSMPSession jcsmpSession,

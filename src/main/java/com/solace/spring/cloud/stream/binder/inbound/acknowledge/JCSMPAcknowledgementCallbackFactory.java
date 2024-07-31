@@ -22,16 +22,6 @@ public class JCSMPAcknowledgementCallbackFactory {
         return createJCSMPCallback(messageContainer);
     }
 
-    public AcknowledgmentCallback createBatchCallback(List<MessageContainer> messageContainers) {
-        return new JCSMPBatchAcknowledgementCallback(messageContainers.stream()
-                .map(this::createJCSMPCallback).toList());
-    }
-
-    public AcknowledgmentCallback createTransactedBatchCallback(List<MessageContainer> messageContainers,
-                                                                TransactedSession transactedSession) {
-        return new TransactedJCSMPAcknowledgementCallback(transactedSession, errorQueueInfrastructure);
-    }
-
     private JCSMPAcknowledgementCallback createJCSMPCallback(MessageContainer messageContainer) {
         return new JCSMPAcknowledgementCallback(messageContainer, flowReceiverContainer,
                 errorQueueInfrastructure);

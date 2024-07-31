@@ -19,10 +19,7 @@ public class SolaceAckUtil {
     public static boolean isErrorQueueEnabled(AcknowledgmentCallback acknowledgmentCallback) {
         if (acknowledgmentCallback instanceof JCSMPAcknowledgementCallback jcsmpAcknowledgementCallback) {
             return jcsmpAcknowledgementCallback.isErrorQueueEnabled();
-        } else if (acknowledgmentCallback instanceof JCSMPBatchAcknowledgementCallback batchAcknowledgementCallback) {
-            return batchAcknowledgementCallback.isErrorQueueEnabled();
         }
-
         return false;
     }
 
@@ -42,8 +39,6 @@ public class SolaceAckUtil {
 
         if (ackCallback instanceof JCSMPAcknowledgementCallback jcsmpAckCallback) {
             return jcsmpAckCallback.republishToErrorQueue();
-        } else if (ackCallback instanceof JCSMPBatchAcknowledgementCallback jcsmpBatchAckCallback) {
-            return jcsmpBatchAckCallback.republishToErrorQueue();
         }
 
         return false;

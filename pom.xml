@@ -11,7 +11,7 @@
     </parent>
     <groupId>ch.sbb</groupId>
     <artifactId>spring-cloud-stream-binder-solace</artifactId>
-    <version>4.2.4</version>
+    <version>5.0.0</version>
 
     <name>Spring Cloud Stream Binder Solace</name>
     <description>A Spring Cloud Stream Binder implementation using the Solace Java API (JCSMP)</description>
@@ -47,6 +47,13 @@
             <groupId>com.solacesystems</groupId>
             <artifactId>sol-jcsmp</artifactId>
             <version>${solace.jcsmp.version}</version>
+            <exclusions>
+                <exclusion>
+                    <!-- Avoid conflict with spring-jcl -->
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.solace.spring.boot</groupId>
@@ -200,11 +207,6 @@
                     <groupId>io.gsonfire</groupId>
                     <artifactId>gson-fire</artifactId>
                     <version>1.9.0</version>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-test</artifactId>
-                    <scope>test</scope>
                 </dependency>
             </dependencies>
             <build>

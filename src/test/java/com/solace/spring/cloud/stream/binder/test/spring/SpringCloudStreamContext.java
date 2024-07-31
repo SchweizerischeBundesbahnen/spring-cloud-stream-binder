@@ -6,6 +6,8 @@ import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
 import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solacesystems.jcsmp.JCSMPSession;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -31,8 +33,19 @@ import java.util.Objects;
 public class SpringCloudStreamContext extends PartitionCapableBinderTests<SolaceTestBinder,
         ExtendedConsumerProperties<SolaceConsumerProperties>, ExtendedProducerProperties<SolaceProducerProperties>>
         implements ExtensionContext.Store.CloseableResource {
+    /**
+     * -- SETTER --
+     *  Should only be used by subclasses.
+     */
+    @Getter
+    @Setter
     private JCSMPSession jcsmpSession;
     private final JCSMPSessionEventHandler jcsmpSessionEventHandler = new JCSMPSessionEventHandler();
+    /**
+     * -- SETTER --
+     *  Should only be used by subclasses.
+     */
+    @Setter
     private SempV2Api sempV2Api;
 
     public SpringCloudStreamContext(JCSMPSession jcsmpSession, SempV2Api sempV2Api) {
@@ -76,14 +89,8 @@ public class SpringCloudStreamContext extends PartitionCapableBinderTests<Solace
     }
 
     public ExtendedConsumerProperties<SolaceConsumerProperties> createConsumerProperties(boolean useDefaultOverrides) {
-        ExtendedConsumerProperties<SolaceConsumerProperties> properties = new ExtendedConsumerProperties<>(
+        return new ExtendedConsumerProperties<>(
                 new SolaceConsumerProperties());
-
-        if (useDefaultOverrides) {
-            // Disable timeout for batch messaging consistency
-            properties.getExtension().setBatchTimeout(0);
-        }
-        return properties;
     }
 
     @Override
@@ -113,7 +120,7 @@ public class SpringCloudStreamContext extends PartitionCapableBinderTests<Solace
 
     @Override
     public DefaultPollableMessageSource createBindableMessageSource(String bindingName, BindingProperties bindingProperties) throws Exception {
-        return super.createBindableMessageSource(bindingName, bindingProperties);
+        throw new UnsupportedOperationException("PollableMessageSource is not supported");
     }
 
     @Override
@@ -143,24 +150,6 @@ public class SpringCloudStreamContext extends PartitionCapableBinderTests<Solace
         }
         channel.subscribe(messageHandler);
         return channel;
-    }
-
-    public JCSMPSession getJcsmpSession() {
-        return jcsmpSession;
-    }
-
-    /**
-     * Should only be used by subclasses.
-     */
-    protected void setJcsmpSession(JCSMPSession jcsmpSession) {
-        this.jcsmpSession = jcsmpSession;
-    }
-
-    /**
-     * Should only be used by subclasses.
-     */
-    protected void setSempV2Api(SempV2Api sempV2Api) {
-        this.sempV2Api = sempV2Api;
     }
 
     public <T> ConsumerInfrastructureUtil<T> createConsumerInfrastructureUtil(Class<T> type) {

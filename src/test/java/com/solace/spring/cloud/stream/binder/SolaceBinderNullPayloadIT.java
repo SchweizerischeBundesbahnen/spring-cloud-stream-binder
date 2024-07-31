@@ -16,9 +16,10 @@ import org.assertj.core.api.AbstractListAssert;
 import org.assertj.core.api.ObjectAssert;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junitpioneer.jupiter.cartesian.CartesianArgumentsSource;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
-import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
@@ -43,12 +44,12 @@ import static org.assertj.core.api.Assertions.fail;
         initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
+@Execution(ExecutionMode.SAME_THREAD)
 public class SolaceBinderNullPayloadIT {
 
-    @CartesianTest(name = "[{index}] messageType={0} batchMode={1}")
+    @CartesianTest(name = "[{index}] messageType={0}")
     public void testNullPayload(
             @CartesianArgumentsSource(JCSMPMessageTypeArgumentsProvider.class) Class<? extends Message> messageType,
-            @Values(booleans = {false, true}) boolean batchMode,
             JCSMPSession jcsmpSession,
             SpringCloudStreamContext context,
             SoftAssertions softly) throws Exception {
@@ -60,7 +61,6 @@ public class SolaceBinderNullPayloadIT {
         String group = RandomStringUtils.randomAlphanumeric(10);
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
         Binding<MessageChannel> consumerBinding = binder.bindConsumer(dest, group, moduleInputChannel, consumerProperties);
 
         final CountDownLatch latch = new CountDownLatch(1);
@@ -68,11 +68,9 @@ public class SolaceBinderNullPayloadIT {
             log.info("Received message {}", StaticMessageHeaderAccessor.getId(msg));
 
             softly.assertThat(msg).satisfies(hasNestedHeader(SolaceBinderHeaders.NULL_PAYLOAD, Boolean.class,
-                    batchMode, nullPayload -> assertThat(nullPayload).isTrue()));
+                    nullPayload -> assertThat(nullPayload).isTrue()));
 
-            AbstractListAssert<?, List<?>, Object, ObjectAssert<Object>> payloadsAssert = batchMode ?
-                    softly.assertThat(msg.getPayload()).asList()
-                            .hasSize(consumerProperties.getExtension().getBatchMaxSize()) :
+            AbstractListAssert<?, List<?>, Object, ObjectAssert<Object>> payloadsAssert =
                     softly.assertThat(Collections.singletonList(msg.getPayload()));
 
             payloadsAssert.allSatisfy(payload -> {
@@ -101,7 +99,7 @@ public class SolaceBinderNullPayloadIT {
 
         XMLMessageProducer producer = jcsmpSession.getMessageProducer(new SimpleJCSMPEventHandler());
 
-        for (int i = 0; i < (batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1); i++) {
+        for (int i = 0; i < (1); i++) {
             //Not setting payload
             producer.send(JCSMPFactory.onlyInstance().createMessage(messageType),
                     JCSMPFactory.onlyInstance().createTopic(dest));
@@ -114,10 +112,9 @@ public class SolaceBinderNullPayloadIT {
         producer.close();
     }
 
-    @CartesianTest(name = "[{index}] messageType={0} batchMode={1}")
+    @CartesianTest(name = "[{index}] messageType={0}")
     public void testEmptyPayload(
             @CartesianArgumentsSource(JCSMPMessageTypeArgumentsProvider.class) Class<? extends Message> messageType,
-            @Values(booleans = {false, true}) boolean batchMode,
             JCSMPSession jcsmpSession,
             SpringCloudStreamContext context,
             SoftAssertions softly) throws Exception {
@@ -129,7 +126,6 @@ public class SolaceBinderNullPayloadIT {
         String group = RandomStringUtils.randomAlphanumeric(10);
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
         Binding<MessageChannel> consumerBinding = binder.bindConsumer(dest, group, moduleInputChannel, consumerProperties);
 
         final CountDownLatch latch = new CountDownLatch(1);
@@ -140,14 +136,12 @@ public class SolaceBinderNullPayloadIT {
                 //LIMITATION: BytesMessage doesn't support EMPTY payloads since publishing byte[0] is received as a null payload
                 //LIMITATION: XMLContentMessage doesn't support EMPTY payloads since publishing "" is received as a null payload
                 softly.assertThat(msg).satisfies(hasNestedHeader(SolaceBinderHeaders.NULL_PAYLOAD, Boolean.class,
-                        batchMode, nullPayload -> assertThat(nullPayload).isTrue()));
+                        nullPayload -> assertThat(nullPayload).isTrue()));
             } else {
-                softly.assertThat(msg).satisfies(noNestedHeader(SolaceBinderHeaders.NULL_PAYLOAD, batchMode));
+                softly.assertThat(msg).satisfies(noNestedHeader(SolaceBinderHeaders.NULL_PAYLOAD));
             }
 
-            AbstractListAssert<?, List<?>, Object, ObjectAssert<Object>> payloadsAssert = batchMode ?
-                    softly.assertThat(msg.getPayload()).asList()
-                            .hasSize(consumerProperties.getExtension().getBatchMaxSize()) :
+            AbstractListAssert<?, List<?>, Object, ObjectAssert<Object>> payloadsAssert =
                     softly.assertThat(Collections.singletonList(msg.getPayload()));
 
             payloadsAssert.allSatisfy(payload -> {
@@ -175,7 +169,7 @@ public class SolaceBinderNullPayloadIT {
 
         XMLMessageProducer producer = jcsmpSession.getMessageProducer(new SimpleJCSMPEventHandler());
 
-        for (int i = 0; i < (batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1); i++) {
+        for (int i = 0; i < (1); i++) {
             //Not setting payload
             XMLMessage solMsg = JCSMPFactory.onlyInstance().createMessage(messageType);
             //Setting empty payload

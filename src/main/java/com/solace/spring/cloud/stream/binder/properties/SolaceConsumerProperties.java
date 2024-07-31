@@ -1,6 +1,5 @@
 package com.solace.spring.cloud.stream.binder.properties;
 
-import com.solace.spring.cloud.stream.binder.util.EndpointType;
 import com.solace.spring.cloud.stream.binder.util.QualityOfService;
 import com.solacesystems.jcsmp.EndpointProperties;
 import jakarta.validation.constraints.Min;
@@ -19,32 +18,6 @@ import static com.solace.spring.cloud.stream.binder.properties.SolaceExtendedBin
 @SuppressWarnings("ConfigurationProperties")
 @ConfigurationProperties(DEFAULTS_PREFIX + ".consumer")
 public class SolaceConsumerProperties extends SolaceCommonProperties {
-    /**
-     * The type of endpoint messages are consumed from.
-     */
-    private EndpointType endpointType = EndpointType.QUEUE;
-
-    /**
-     * <p>The maximum number of messages per batch.</p>
-     * <p>Only applicable when {@code batchMode} is {@code true}.</p>
-     */
-    @Min(1)
-    private int batchMaxSize = 255;
-
-    /**
-     * <p>The maximum wait time in milliseconds to receive a batch of messages. If this timeout is reached, then the
-     * messages that have already been received will be used to create the batch. A value of {@code 0} means wait
-     * forever.</p>
-     * <p>Only applicable when {@code batchMode} is {@code true}.</p>
-     */
-    @Min(0)
-    private int batchTimeout = 5000;
-
-    /**
-     * Maximum wait time for polled consumers to receive a message from their consumer group queue.
-     * <p>Only applicable when {@code batchMode} is {@code false}.</p>
-     */
-    private int polledConsumerWaitTimeInMillis = 100;
 
     /**
      * An array of additional topic subscriptions to be applied on the consumer group queue.
@@ -63,6 +36,7 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
     /**
      * A SQL-92 selector expression to use for selection of messages for consumption. Max of 2000 characters.
      */
+    @Deprecated
     private String selector = null;
 
     // Error Queue Properties ---------
@@ -135,16 +109,4 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * The list of headers to exclude when converting consumed Solace message to Spring message.
      */
     private List<String> headerExclusions = new ArrayList<>();
-
-
-    public void setBatchMaxSize(int batchMaxSize) {
-        Assert.isTrue(batchMaxSize >= 1, "max batch size must be greater than 0");
-        this.batchMaxSize = batchMaxSize;
-    }
-
-
-    public void setBatchTimeout(int batchTimeout) {
-        Assert.isTrue(batchTimeout >= 0, "batch timeout must be greater than or equal to 0");
-        this.batchTimeout = batchTimeout;
-    }
 }

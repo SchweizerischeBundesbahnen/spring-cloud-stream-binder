@@ -1,8 +1,9 @@
-package com.solace.spring.cloud.stream.binder.inbound;
+package com.solace.spring.cloud.stream.binder.inbound.topic;
 
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestination;
+import com.solace.spring.cloud.stream.binder.util.LargeMessageSupport;
 import com.solacesystems.jcsmp.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ public class JCSMPInboundTopicMessageMultiplexer {
     private final Supplier<SolaceMeterAccessor> solaceMeterAccessorSupplier;
     private final List<JCSMPInboundTopicMessageProducer> jcsmpInboundTopicMessageProducers = new ArrayList<>();
     private final AtomicReference<XMLMessageConsumer> msgConsumer = new AtomicReference<>(null);
+    private final LargeMessageSupport largeMessageSupport = new LargeMessageSupport();
 
     private final LivecycleHooks livecycleHooks = new LivecycleHooks() {
         @Override
@@ -33,6 +35,7 @@ public class JCSMPInboundTopicMessageMultiplexer {
                 jcsmpInboundTopicMessageProducers.add(producer);
             }
             updateTopics();
+            largeMessageSupport.startHousekeeping();
         }
 
         @Override
@@ -60,7 +63,11 @@ public class JCSMPInboundTopicMessageMultiplexer {
                 this.msgConsumer.set(jcsmpSession.getMessageConsumer(new XMLMessageListener() {
                     @Override
                     public void onReceive(final BytesXMLMessage msg) {
-                        JCSMPInboundTopicMessageMultiplexer.this.onReceive(msg);
+                        LargeMessageSupport.MessageContext messageContext = largeMessageSupport.assemble(msg, null);
+                        if (messageContext == null) {
+                            return;
+                        }
+                        JCSMPInboundTopicMessageMultiplexer.this.onReceive(messageContext.bytesMessage());
                     }
 
                     @Override

@@ -37,9 +37,6 @@ public class JCSMPSessionProducerManager extends SharedResourceManager<XMLMessag
 
         @Override
         public void responseReceivedEx(Object correlationKey) {
-            if (correlationKey instanceof BatchProxyCorrelationKey batchProxyCorrelationKey) {
-                correlationKey = batchProxyCorrelationKey.getCorrelationKeyForSuccess();
-            }
             if (correlationKey instanceof ErrorChannelSendingCorrelationKey key) {
                 if (log.isTraceEnabled()) {
                     log.trace("Producer received response for message " +
@@ -65,9 +62,6 @@ public class JCSMPSessionProducerManager extends SharedResourceManager<XMLMessag
 
         @Override
         public void handleErrorEx(Object correlationKey, JCSMPException cause, long timestamp) {
-            if (correlationKey instanceof BatchProxyCorrelationKey batchProxyCorrelationKey) {
-                correlationKey = batchProxyCorrelationKey.getCorrelationKeyForFailure();
-            }
             if (correlationKey instanceof ErrorChannelSendingCorrelationKey key) {
                 UUID springMessageId = Optional.ofNullable(key.getInputMessage())
                         .map(Message::getHeaders)

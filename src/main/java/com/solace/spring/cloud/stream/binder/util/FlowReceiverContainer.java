@@ -3,12 +3,12 @@ package com.solace.spring.cloud.stream.binder.util;
 import com.solace.spring.cloud.stream.binder.health.handlers.SolaceFlowHealthEventHandler;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.XMLMessage.Outcome;
-import com.solacesystems.jcsmp.transaction.TransactedSession;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -21,10 +21,10 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Slf4j
 public class FlowReceiverContainer {
+    @Getter
     private final UUID id = UUID.randomUUID();
     private final JCSMPSession session;
     private final Endpoint endpoint;
-    private final boolean transacted;
     private final EndpointProperties endpointProperties;
     private final ConsumerFlowProperties consumerFlowProperties;
     private final AtomicReference<FlowReceiverReference> flowReceiverAtomicReference = new AtomicReference<>();
@@ -34,16 +34,15 @@ public class FlowReceiverContainer {
     private final ReentrantLock writeLock = new ReentrantLock();
 
     private final XMLMessageMapper xmlMessageMapper = new XMLMessageMapper();
+    @Setter
     private FlowEventHandler eventHandler;
 
     public FlowReceiverContainer(JCSMPSession session,
                                  Endpoint endpoint,
-                                 boolean transacted,
                                  EndpointProperties endpointProperties,
                                  ConsumerFlowProperties consumerFlowProperties) {
         this.session = session;
         this.endpoint = endpoint;
-        this.transacted = transacted;
         this.endpointProperties = endpointProperties;
         this.consumerFlowProperties = consumerFlowProperties
                 .setEndpoint(endpoint)
@@ -73,29 +72,16 @@ public class FlowReceiverContainer {
             } else {
                 log.info("Flow receiver container {} started in state '{}'", id, isPaused.get() ? "Paused" : "Running");
                 consumerFlowProperties.setStartState(!isPaused.get());
-                if (!transacted) {
-                    consumerFlowProperties.addRequiredSettlementOutcomes(Outcome.ACCEPTED, Outcome.FAILED, Outcome.REJECTED);
-                }
+                consumerFlowProperties.addRequiredSettlementOutcomes(Outcome.ACCEPTED, Outcome.FAILED, Outcome.REJECTED);
 
-                TransactedSession transactedSession = transacted ? session.createTransactedSession() : null;
-                try {
-                    FlowReceiver flowReceiver = transactedSession != null ?
-                            transactedSession.createFlow(null, consumerFlowProperties, endpointProperties, eventHandler) :
-                            session.createFlow(null, consumerFlowProperties, endpointProperties, eventHandler);
-                    if (eventHandler != null && eventHandler instanceof SolaceFlowHealthEventHandler) {
-                        ((SolaceFlowHealthEventHandler) eventHandler).setHealthStatusUp();
-                    }
-                    FlowReceiverReference newFlowReceiverReference = new FlowReceiverReference(flowReceiver, transactedSession);
-                    flowReceiverAtomicReference.set(newFlowReceiverReference);
-                    xmlMessageMapper.resetIgnoredProperties(id.toString());
-                    return newFlowReceiverReference.getId();
-                } catch (Throwable t) {
-                    if (transactedSession != null) {
-                        log.debug("Closing transacted session for flow receiver container {} due to bind error", id);
-                        transactedSession.close();
-                    }
-                    throw t;
+                FlowReceiver flowReceiver = session.createFlow(null, consumerFlowProperties, endpointProperties, eventHandler);
+                if (eventHandler != null && eventHandler instanceof SolaceFlowHealthEventHandler) {
+                    ((SolaceFlowHealthEventHandler) eventHandler).setHealthStatusUp();
                 }
+                FlowReceiverReference newFlowReceiverReference = new FlowReceiverReference(flowReceiver);
+                flowReceiverAtomicReference.set(newFlowReceiverReference);
+                xmlMessageMapper.resetIgnoredProperties(id.toString());
+                return newFlowReceiverReference.getId();
             }
         } finally {
             writeLock.unlock();
@@ -113,10 +99,6 @@ public class FlowReceiverContainer {
                 log.info("Unbinding flow receiver container {}", id);
                 flowReceiverReference.getStaleMessagesFlag().set(true);
                 flowReceiverReference.get().close();
-                TransactedSession transactedSession = flowReceiverReference.getTransactedSession();
-                if (transactedSession != null) {
-                    transactedSession.close();
-                }
             }
         } finally {
             writeLock.unlock();
@@ -188,9 +170,6 @@ public class FlowReceiverContainer {
      * @param messageContainer The message
      */
     public void acknowledge(MessageContainer messageContainer) {
-        if (transacted) {
-            throw new UnsupportedOperationException("Transactions do not support message settlements");
-        }
         if (messageContainer == null || messageContainer.isAcknowledged()) {
             return;
         }
@@ -215,9 +194,6 @@ public class FlowReceiverContainer {
      * @param messageContainer The message
      */
     public void requeue(MessageContainer messageContainer) {
-        if (transacted) {
-            throw new UnsupportedOperationException("Transactions do not support message settlements");
-        }
         if (messageContainer == null || messageContainer.isAcknowledged()) {
             return;
         }
@@ -242,13 +218,9 @@ public class FlowReceiverContainer {
      * @param messageContainer The message
      */
     public void reject(MessageContainer messageContainer) {
-        if (transacted) {
-            throw new UnsupportedOperationException("Transactions do not support message settlements");
-        }
         if (messageContainer == null || messageContainer.isAcknowledged()) {
             return;
         }
-
         try {
             messageContainer.getMessage().settle(Outcome.REJECTED);
         } catch (JCSMPException | IllegalStateException ex) {
@@ -332,10 +304,6 @@ public class FlowReceiverContainer {
         return flowReceiverAtomicReference.get();
     }
 
-    public UUID getId() {
-        return id;
-    }
-
     public String getEndpointName() {
         return endpoint.getName();
     }
@@ -344,56 +312,30 @@ public class FlowReceiverContainer {
         return xmlMessageMapper;
     }
 
-    public void setEventHandler(FlowEventHandler eventHandler) {
-        this.eventHandler = eventHandler;
-    }
-
-    @Nullable
-    public TransactedSession getTransactedSession() {
-        if (!transacted) { // short-circuit
-            return null;
-        }
-        return Optional.ofNullable(flowReceiverAtomicReference.get())
-                .map(FlowReceiverReference::getTransactedSession)
-                .orElse(null);
-    }
-
     static class FlowReceiverReference {
-        private final UUID id = UUID.randomUUID();
-        private final FlowReceiver flowReceiver;
-        @Nullable
-        private final TransactedSession transactedSession;
-        private final AtomicBoolean staleMessagesFlag = new AtomicBoolean(false);
-
-        public FlowReceiverReference(FlowReceiver flowReceiver, @Nullable TransactedSession transactedSession) {
-            this.flowReceiver = flowReceiver;
-            this.transactedSession = transactedSession;
-        }
-
         /**
+         * -- GETTER --
          * Get the flow receiver reference ID.
          * This is <b>NOT</b> the actual flow ID, but just a reference ID used by this binder to identify a
-         * particular {@link FlowReceiver} instance.
+         * particular
+         * instance.
          * We can't use the actual flow ID for this since that can transparently change by itself due to
          * events such as reconnection.
          *
          * @return the flow receiver reference ID.
          */
-        public UUID getId() {
-            return id;
+        @Getter
+        private final UUID id = UUID.randomUUID();
+        private final FlowReceiver flowReceiver;
+        @Getter
+        private final AtomicBoolean staleMessagesFlag = new AtomicBoolean(false);
+
+        public FlowReceiverReference(FlowReceiver flowReceiver) {
+            this.flowReceiver = flowReceiver;
         }
 
         public FlowReceiver get() {
             return flowReceiver;
-        }
-
-        @Nullable
-        public TransactedSession getTransactedSession() {
-            return transactedSession;
-        }
-
-        public AtomicBoolean getStaleMessagesFlag() {
-            return staleMessagesFlag;
         }
 
         private void pause() {

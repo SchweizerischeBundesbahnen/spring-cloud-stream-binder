@@ -13,7 +13,6 @@ import com.solace.spring.cloud.stream.binder.test.spring.SpringCloudStreamContex
 import com.solace.spring.cloud.stream.binder.test.spring.configuration.TestMeterRegistryConfiguration;
 import com.solace.spring.cloud.stream.binder.test.util.SimpleJCSMPEventHandler;
 import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
-import com.solace.spring.cloud.stream.binder.util.EndpointType;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
@@ -26,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
@@ -35,7 +35,6 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.cloud.stream.binder.ExtendedProducerProperties;
-import org.springframework.cloud.stream.binder.PollableSource;
 import org.springframework.cloud.stream.config.BindingProperties;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.messaging.Message;
@@ -80,11 +79,9 @@ public class SolaceBinderMeterIT {
         context.getBinder().getBinder().setSolaceMeterAccessor(solaceMeterAccessor);
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}")
+    @CartesianTest(name = "[{index}] channelType={0}")
     public <T> void testConsumerMeters(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @CartesianTest.Enum(EndpointType.class) EndpointType endpointType,
-            @Values(booleans = {false, true}) boolean batchMode,
+            @Values(classes = {DirectChannel.class}) Class<T> channelType,
             @Autowired SimpleMeterRegistry meterRegistry,
             JCSMPSession jcsmpSession,
             SpringCloudStreamContext context,
@@ -99,12 +96,10 @@ public class SolaceBinderMeterIT {
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        consumerProperties.setBatchMode(batchMode);
-        consumerProperties.getExtension().setEndpointType(endpointType);
         Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
 
-        int numMessages = batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1;
+        int numMessages = 1;
         List<XMLMessage> messages = IntStream.range(0, numMessages)
                 .mapToObj(i -> JCSMPFactory.onlyInstance().createMessage(BytesMessage.class))
                 .peek(m -> {
@@ -191,9 +186,8 @@ public class SolaceBinderMeterIT {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] batched={0}")
-    public void testProducerMeters(@Values(booleans = {false, true}) boolean batched,
-                                   @Autowired SimpleMeterRegistry meterRegistry,
+    @Test
+    public void testProducerMeters(@Autowired SimpleMeterRegistry meterRegistry,
                                    JCSMPSession jcsmpSession,
                                    SpringCloudStreamContext context,
                                    Queue queue,
@@ -222,14 +216,11 @@ public class SolaceBinderMeterIT {
         context.binderBindUnbindLatency();
         producerProperties.populateBindingName(producerBinding.getBindingName());
 
-        MessageGenerator.BatchingConfig batchingConfig = new MessageGenerator.BatchingConfig()
-                .setEnabled(batched);
         Message<?> message = MessageGenerator.generateMessage(
                         i -> RandomStringUtils.randomAlphanumeric(100),
-                        i -> Map.of(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE),
-                        batchingConfig)
+                        i -> Map.of(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE))
                 .build();
-        int numMessages = batched ? batchingConfig.getNumberOfMessages() : 1;
+        int numMessages = 1;
 
         moduleOutputChannel.send(message);
 
