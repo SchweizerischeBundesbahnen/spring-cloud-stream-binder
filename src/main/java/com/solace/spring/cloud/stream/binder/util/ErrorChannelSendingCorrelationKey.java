@@ -1,7 +1,8 @@
 package com.solace.spring.cloud.stream.binder.util;
 
-import com.solace.spring.cloud.stream.binder.messaging.SolaceBinderHeaders;
 import com.solacesystems.jcsmp.XMLMessage;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.AttributeAccessor;
 import org.springframework.integration.support.ErrorMessageStrategy;
@@ -14,10 +15,15 @@ import java.util.List;
 
 @Slf4j
 public class ErrorChannelSendingCorrelationKey {
+    @Getter
     private final Message<?> inputMessage;
     private final MessageChannel errorChannel;
     private final ErrorMessageStrategy errorMessageStrategy;
+    @Getter
+    @Setter
     private List<XMLMessage> rawMessages;
+    @Getter
+    @Setter
     private CorrelationData confirmCorrelation;
 
 
@@ -26,26 +32,6 @@ public class ErrorChannelSendingCorrelationKey {
         this.inputMessage = inputMessage;
         this.errorChannel = errorChannel;
         this.errorMessageStrategy = errorMessageStrategy;
-    }
-
-    public Message<?> getInputMessage() {
-        return inputMessage;
-    }
-
-    public List<XMLMessage> getRawMessages() {
-        return rawMessages;
-    }
-
-    public void setRawMessages(List<XMLMessage> rawMessages) {
-        this.rawMessages = rawMessages;
-    }
-
-    public CorrelationData getConfirmCorrelation() {
-        return confirmCorrelation;
-    }
-
-    public void setConfirmCorrelation(CorrelationData confirmCorrelation) {
-        this.confirmCorrelation = confirmCorrelation;
     }
 
     /**
@@ -61,8 +47,7 @@ public class ErrorChannelSendingCorrelationKey {
             AttributeAccessor attributes = ErrorMessageUtils.getAttributeAccessor(inputMessage, null);
             if (rawMessages != null && !rawMessages.isEmpty()) {
                 attributes.setAttribute(SolaceMessageHeaderErrorMessageStrategy.ATTR_SOLACE_RAW_MESSAGE,
-                        inputMessage.getHeaders().containsKey(SolaceBinderHeaders.BATCHED_HEADERS) ?
-                                rawMessages : rawMessages.get(0));
+                        rawMessages.get(0));
             }
             log.debug(String.format("Sending message %s to error channel %s", inputMessage.getHeaders().getId(),
                     errorChannel));

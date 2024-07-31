@@ -4,7 +4,6 @@ import com.solace.spring.cloud.stream.binder.health.contributors.BindingHealthCo
 import com.solace.spring.cloud.stream.binder.health.contributors.BindingsHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.contributors.FlowsHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.indicators.FlowHealthIndicator;
-import com.solace.spring.cloud.stream.binder.messaging.SolaceBinderHeaders;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMessageMeterBinder;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solacesystems.jcsmp.*;
@@ -17,7 +16,6 @@ import org.assertj.core.api.ThrowingConsumer;
 import org.springframework.boot.actuate.health.NamedContributor;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
-import org.springframework.cloud.stream.binder.PollableSource;
 import org.springframework.integration.IntegrationMessageHeaderAccessor;
 import org.springframework.integration.StaticMessageHeaderAccessor;
 import org.springframework.integration.channel.AbstractSubscribableChannel;
@@ -26,7 +24,6 @@ import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.support.ErrorMessage;
 import org.springframework.util.MimeType;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,33 +48,19 @@ public class SolaceSpringCloudStreamAssertions {
      *
      * @param header       header key
      * @param type         header type
-     * @param isBatched    is message expected to be a batched message?
      * @param requirements requirements which the header value must satisfy. See
      *                     {@link org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[]) satisfies(ThrowingConsumer)}.
      * @param <T>          header type
      * @return message header requirements evaluator
      * @see org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[])
      */
-    public static <T> ThrowingConsumer<Message<?>> hasNestedHeader(String header, Class<T> type, boolean isBatched,
+    public static <T> ThrowingConsumer<Message<?>> hasNestedHeader(String header, Class<T> type,
                                                                    ThrowingConsumer<T> requirements) {
         return message -> {
             ThrowingConsumer<Map<String, Object>> satisfiesHeader = msgHeaders -> assertThat(msgHeaders.get(header))
                     .isInstanceOf(type)
                     .satisfies(headerValue -> requirements.accept(type.cast(headerValue)));
-
-            if (isBatched) {
-                assertThat(message.getHeaders())
-                        .extractingByKey(SolaceBinderHeaders.BATCHED_HEADERS)
-                        .isNotNull()
-                        .isInstanceOf(List.class)
-                        .asList()
-                        .isNotEmpty()
-                        .allSatisfy(msgHeaders -> assertThat(msgHeaders)
-                                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                                .satisfies(satisfiesHeader));
-            } else {
-                assertThat(message.getHeaders()).satisfies(satisfiesHeader);
-            }
+            assertThat(message.getHeaders()).satisfies(satisfiesHeader);
         };
     }
 
@@ -87,27 +70,13 @@ public class SolaceSpringCloudStreamAssertions {
      * <p>Should be used as a parameter of
      * {@link org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[]) satisfies(ThrowingConsumer[])}.</p>
      *
-     * @param header    header key
-     * @param isBatched is message expected to be a batched message?
-     *                  {@link org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[]) satisfies(ThrowingConsumer[])}.
+     * @param header header key
      * @return message header requirements evaluator
      * @see org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[])
      */
-    public static ThrowingConsumer<Message<?>> noNestedHeader(String header, boolean isBatched) {
+    public static ThrowingConsumer<Message<?>> noNestedHeader(String header) {
         return message -> {
-            if (isBatched) {
-                assertThat(message.getHeaders())
-                        .extractingByKey(SolaceBinderHeaders.BATCHED_HEADERS)
-                        .isNotNull()
-                        .isInstanceOf(List.class)
-                        .asList()
-                        .isNotEmpty()
-                        .allSatisfy(msgHeaders -> assertThat(msgHeaders)
-                                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                                .doesNotContainKey(header));
-            } else {
-                assertThat(message.getHeaders()).doesNotContainKey(header);
-            }
+            assertThat(message.getHeaders()).doesNotContainKey(header);
         };
     }
 
@@ -123,10 +92,9 @@ public class SolaceSpringCloudStreamAssertions {
      * @see org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[])
      */
     public static ThrowingConsumer<Message<?>> isValidMessage(
-            Class<?> channelType,
             ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
             List<Message<?>> expectedMessages) {
-        return isValidMessage(channelType, consumerProperties, expectedMessages.toArray(new Message<?>[0]));
+        return isValidMessage(consumerProperties, expectedMessages.toArray(new Message<?>[0]));
     }
 
     /**
@@ -140,7 +108,6 @@ public class SolaceSpringCloudStreamAssertions {
      * @see #isValidMessage(ExtendedConsumerProperties, List)
      */
     public static ThrowingConsumer<Message<?>> isValidMessage(
-            Class<?> channelType,
             ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
             Message<?>... expectedMessages) {
         // content-type header may be a String or MimeType
@@ -150,47 +117,12 @@ public class SolaceSpringCloudStreamAssertions {
                         .get(MessageHeaders.CONTENT_TYPE))
                 .map(convertToMimeType)
                 .orElse(null);
-
-        if (!AbstractSubscribableChannel.class.isAssignableFrom(channelType) &&
-                !PollableSource.class.isAssignableFrom(channelType)) {
-            throw new IllegalArgumentException("Invalid channel type: " + channelType);
-        }
         return message -> {
-            if (consumerProperties.isBatchMode()) {
-                if (consumerProperties.getExtension().isTransacted() &&
-                        AbstractSubscribableChannel.class.isAssignableFrom(channelType)) {
-                    assertThat(message.getHeaders())
-                            .doesNotContainKey(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK);
-                } else {
-                    assertThat(message.getHeaders())
-                            .containsKey(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK);
-                }
-                assertThat(message.getHeaders())
-                        .containsKey(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT)
-                        .extractingByKey(SolaceBinderHeaders.BATCHED_HEADERS)
-                        .isNotNull()
-                        .isInstanceOf(List.class)
-                        .asList()
-                        .hasSize(expectedMessages.length)
-                        .allSatisfy(msgHeaders -> assertThat(msgHeaders)
-                                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                                .doesNotContainKey(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK)
-                                .doesNotContainKey(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT)
-                                .hasEntrySatisfying(MessageHeaders.CONTENT_TYPE, contentType ->
-                                        assertThat(convertToMimeType.apply(contentType))
-                                                .isEqualTo(expectedContentType)));
-
-                assertThat(message.getPayload())
-                        .isInstanceOf(List.class)
-                        .asList()
-                        .containsExactly(Arrays.stream(expectedMessages).map(Message::getPayload).toArray());
-            } else {
-                assertThat(message.getPayload()).isEqualTo(expectedMessages[0].getPayload());
-                assertThat(StaticMessageHeaderAccessor.getContentType(message)).isEqualTo(expectedContentType);
-                assertThat(message.getHeaders())
-                        .containsKey(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK)
-                        .containsKey(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT);
-            }
+            assertThat(message.getPayload()).isEqualTo(expectedMessages[0].getPayload());
+            assertThat(StaticMessageHeaderAccessor.getContentType(message)).isEqualTo(expectedContentType);
+            assertThat(message.getHeaders())
+                    .containsKey(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK)
+                    .containsKey(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT);
         };
     }
 
@@ -226,7 +158,6 @@ public class SolaceSpringCloudStreamAssertions {
      * {@link org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[]) satisfies(ThrowingConsumer[])}.</p>
      *
      * @param consumerProperties     consumer properties
-     * @param pollableConsumer       true if consumer is a pollable consumer
      * @param expectRawMessageHeader true if the error message contains the raw XMLMessage
      * @param expectedMessages       the messages against which this message will be evaluated against.
      *                               Should have a size of exactly 1 if this consumer is not in batch mode.
@@ -244,25 +175,17 @@ public class SolaceSpringCloudStreamAssertions {
                     .asInstanceOf(InstanceOfAssertFactories.type(ErrorMessage.class))
                     .extracting(ErrorMessage::getOriginalMessage)
                     .isNotNull()
-                    .satisfies(isValidMessage(channelType, consumerProperties, expectedMessages))
+                    .satisfies(isValidMessage( consumerProperties, expectedMessages))
                     .extracting(Message::getHeaders)
                     .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
                     .hasEntrySatisfying(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT, deliveryAttempt ->
                             assertThat(deliveryAttempt)
                                     .asInstanceOf(InstanceOfAssertFactories.ATOMIC_INTEGER)
-                                    .hasValue(PollableSource.class.isAssignableFrom(channelType) ?
-                                            0 : consumerProperties.getMaxAttempts()));
+                                    .hasValue(consumerProperties.getMaxAttempts()));
 
             if (expectRawMessageHeader) {
-                if (consumerProperties.isBatchMode()) {
-                    assertThat((Object) StaticMessageHeaderAccessor.getSourceData(errorMessage))
-                            .isNotNull()
-                            .asList()
-                            .allSatisfy(m -> assertThat(m).isInstanceOf(XMLMessage.class));
-                } else {
-                    assertThat((Object) StaticMessageHeaderAccessor.getSourceData(errorMessage))
-                            .isInstanceOf(XMLMessage.class);
-                }
+                assertThat((Object) StaticMessageHeaderAccessor.getSourceData(errorMessage))
+                        .isInstanceOf(XMLMessage.class);
             } else {
                 assertThat(errorMessage.getHeaders())
                         .doesNotContainKey(IntegrationMessageHeaderAccessor.SOURCE_DATA);

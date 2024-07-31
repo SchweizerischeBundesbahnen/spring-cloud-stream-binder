@@ -7,8 +7,6 @@ import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil
 import com.solace.spring.cloud.stream.binder.util.*;
 import com.solace.spring.cloud.stream.binder.util.JCSMPSessionProducerManager.CloudStreamEventHandler;
 import com.solacesystems.jcsmp.*;
-import com.solacesystems.jcsmp.transaction.RollbackException;
-import com.solacesystems.jcsmp.transaction.TransactedSession;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.binder.BinderHeaders;
@@ -35,11 +33,10 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
     private final JCSMPSessionProducerManager producerManager;
     private final ExtendedProducerProperties<SolaceProducerProperties> properties;
     private final JCSMPStreamingPublishCorrelatingEventHandler producerEventHandler = new CloudStreamEventHandler();
+    private final LargeMessageSupport largeMessageSupport = new LargeMessageSupport();
     @Nullable
     private final SolaceMeterAccessor solaceMeterAccessor;
     private XMLMessageProducer producer;
-    @Nullable
-    private TransactedSession transactedSession;
     private final XMLMessageMapper xmlMessageMapper = new XMLMessageMapper();
     private boolean isRunning = false;
     @Setter
@@ -93,46 +90,19 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
         }
 
         List<XMLMessage> smfMessages;
-        List<Destination> dynamicDestinations;
-        if (message.getHeaders().containsKey(SolaceBinderHeaders.BATCHED_HEADERS)) {
-            log.debug("Detected header {}, handling as batched message (Message<List<?>>) <message handler ID: {}>",
-                    SolaceBinderHeaders.BATCHED_HEADERS, id);
-            smfMessages = xmlMessageMapper.mapBatchMessage(
-                    message,
-                    properties.getExtension().getHeaderExclusions(),
-                    properties.getExtension().isNonserializableHeaderConvertToString(),
-                    properties.getExtension().getDeliveryMode()
-            );
-            BatchProxyCorrelationKey batchProxyCorrelationKey = transactedSession == null ?
-                    new BatchProxyCorrelationKey(correlationKey, smfMessages.size()) : null;
-            smfMessages.forEach(smfMessage -> smfMessage.setCorrelationKey(
-                    Objects.requireNonNullElse(batchProxyCorrelationKey, correlationKey)));
+        Destination dynamicDestination;
+        XMLMessage smfMessageMapped = xmlMessageMapper.map(
+                message,
+                properties.getExtension().getHeaderExclusions(),
+                properties.getExtension().isNonserializableHeaderConvertToString(),
+                properties.getExtension().getDeliveryMode());
 
-            if (transactedSession == null) {
-                smfMessages.get(smfMessages.size() - 1).setAckImmediately(true);
-            }
-
-            // after successfully running xmlMessageMapper.mapBatchMessage(),
-            // SolaceBinderHeaders.BATCHED_HEADERS is verified to be well-formed
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> batchedHeaders = (List<Map<String, Object>>) message.getHeaders()
-                    .getOrDefault(SolaceBinderHeaders.BATCHED_HEADERS,
-                            Collections.nCopies(smfMessages.size(), Collections.emptyMap()));
-
-            dynamicDestinations = batchedHeaders.stream()
-                    .map(h -> getDynamicDestination(h, correlationKey))
-                    .toList();
+        smfMessageMapped.setCorrelationKey(correlationKey);
+        dynamicDestination = getDynamicDestination(message.getHeaders(), correlationKey);
+        if (message.getHeaders().containsKey(SolaceBinderHeaders.LARGE_MESSAGE_SUPPORT)) {
+            smfMessages = largeMessageSupport.split(smfMessageMapped);
         } else {
-            XMLMessage smfMessage = xmlMessageMapper.map(
-                    message,
-                    properties.getExtension().getHeaderExclusions(),
-                    properties.getExtension().isNonserializableHeaderConvertToString(),
-                    properties.getExtension().getDeliveryMode());
-
-            smfMessage.setCorrelationKey(correlationKey);
-            smfMessages = List.of(smfMessage);
-            dynamicDestinations = Collections.singletonList(getDynamicDestination(message.getHeaders(), correlationKey));
+            smfMessages = List.of(smfMessageMapped);
         }
 
         correlationKey.setRawMessages(smfMessages);
@@ -140,32 +110,13 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
         try {
             for (int i = 0; i < smfMessages.size(); i++) {
                 XMLMessage smfMessage = smfMessages.get(i);
-                Destination targetDestination = Objects.requireNonNullElse(dynamicDestinations.get(i), configDestination);
+                Destination targetDestination = Objects.requireNonNullElse(dynamicDestination, configDestination);
                 log.debug("Publishing message {} of {} to destination [ {}:{} ] <message handler ID: {}>",
                         i + 1, smfMessages.size(), targetDestination instanceof Topic ? "TOPIC" : "QUEUE",
                         targetDestination, id);
                 producer.send(smfMessage, targetDestination);
             }
-            if (transactedSession != null) {
-                log.debug("Committing transaction <message handler ID: {}>", id);
-                transactedSession.commit();
-                producerEventHandler.responseReceivedEx(correlationKey);
-            }
         } catch (JCSMPException e) {
-            if (transactedSession != null) {
-                try {
-                    if (!(e instanceof RollbackException)) {
-                        log.debug("Rolling back transaction <message handler ID: {}>", id);
-                        transactedSession.rollback();
-                    }
-                } catch (JCSMPException ex) {
-                    log.debug("Failed to rollback transaction", ex);
-                    e.addSuppressed(ex);
-                } finally {
-                    producerEventHandler.handleErrorEx(correlationKey, e, System.currentTimeMillis());
-                }
-            }
-
             throw handleMessagingException(correlationKey, "Unable to send message(s) to destination", e);
         } finally {
             if (solaceMeterAccessor != null) {
@@ -223,11 +174,6 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
             // flow producers don't support direct messaging
             if (DeliveryMode.DIRECT.equals(properties.getExtension().getDeliveryMode())) {
                 producer = defaultProducer;
-            } else if (properties.getExtension().isTransacted()) {
-                log.info("Creating transacted session  <message handler ID: {}>", id);
-                transactedSession = jcsmpSession.createTransactedSession();
-                producer = transactedSession.createProducer(SolaceProvisioningUtil.getProducerFlowProperties(jcsmpSession),
-                        producerEventHandler);
             } else {
                 producer = jcsmpSession.createProducer(SolaceProvisioningUtil.getProducerFlowProperties(jcsmpSession),
                         producerEventHandler);
@@ -254,10 +200,6 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
         if (producer != null && !DeliveryMode.DIRECT.equals(properties.getExtension().getDeliveryMode())) {
             log.info("Closing producer <message handler ID: {}>", id);
             producer.close();
-        }
-        if (transactedSession != null) {
-            log.info("Closing transacted session <message handler ID: {}>", id);
-            transactedSession.close();
         }
         producerManager.release(id);
     }

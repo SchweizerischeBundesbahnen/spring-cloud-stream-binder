@@ -3,27 +3,24 @@ package com.solace.spring.cloud.stream.binder.test.util;
 import com.solace.spring.cloud.stream.binder.SolaceMessageChannelBinder;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties;
-import com.solace.spring.cloud.stream.binder.provisioning.EndpointProvider;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceEndpointProvisioner;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil;
-import com.solace.spring.cloud.stream.binder.util.EndpointType;
 import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.ApiException;
 import com.solacesystems.jcsmp.*;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.springframework.cloud.stream.binder.*;
+import org.springframework.cloud.stream.binder.AbstractTestBinder;
+import org.springframework.cloud.stream.binder.Binding;
+import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
+import org.springframework.cloud.stream.binder.ExtendedProducerProperties;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.config.EnableIntegration;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.MessageHandler;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,15 +28,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Slf4j
 public class SolaceTestBinder
-        extends AbstractPollableConsumerTestBinder<SolaceMessageChannelBinder, ExtendedConsumerProperties<SolaceConsumerProperties>, ExtendedProducerProperties<SolaceProducerProperties>> {
+        extends AbstractTestBinder<SolaceMessageChannelBinder, ExtendedConsumerProperties<SolaceConsumerProperties>, ExtendedProducerProperties<SolaceProducerProperties>> {
 
     private final JCSMPSession jcsmpSession;
     private final SempV2Api sempV2Api;
+    @Getter
     private final AnnotationConfigApplicationContext applicationContext;
-    private final Map<String, EndpointType> endpoints = new HashMap<>();
+    private final Set<String> endpoints = new HashSet<>();
     private final Map<String, String> bindingNameToQueueName = new HashMap<>();
     private final Map<String, String> bindingNameToErrorQueueName = new HashMap<>();
-    private static final Log logger = LogFactory.getLog(SolaceTestBinder.class);
 
     public SolaceTestBinder(JCSMPSession jcsmpSession, JCSMPSessionEventHandler jcsmpSessionEventHandler, SempV2Api sempV2Api) {
         this.applicationContext = new AnnotationConfigApplicationContext(Config.class);
@@ -47,27 +44,13 @@ public class SolaceTestBinder
         this.sempV2Api = sempV2Api;
         SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, new SolaceEndpointProvisioner(jcsmpSession, jcsmpSessionEventHandler));
         binder.setApplicationContext(this.applicationContext);
-        this.setPollableConsumerBinder(binder);
-    }
-
-    public AnnotationConfigApplicationContext getApplicationContext() {
-        return applicationContext;
+        this.setBinder(binder);
     }
 
     @Override
     public Binding<MessageChannel> bindConsumer(String name, String group, MessageChannel moduleInputChannel, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         preBindCaptureConsumerResources(name, group, properties);
         Binding<MessageChannel> binding = super.bindConsumer(name, group, moduleInputChannel, properties);
-        captureConsumerResources(binding, group, properties.getExtension());
-        return binding;
-    }
-
-    @Override
-    public Binding<PollableSource<MessageHandler>> bindPollableConsumer(String name, String group,
-                                                                        PollableSource<MessageHandler> inboundBindTarget,
-                                                                        ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
-        preBindCaptureConsumerResources(name, group, properties);
-        Binding<PollableSource<MessageHandler>> binding = super.bindPollableConsumer(name, group, inboundBindTarget, properties);
         captureConsumerResources(binding, group, properties.getExtension());
         return binding;
     }
@@ -98,9 +81,9 @@ public class SolaceTestBinder
         SolaceProvisioningUtil.QueueNames queueNames = SolaceProvisioningUtil.getQueueNames(name, group, consumerProperties, false);
 
         // values set here may be overwritten after binding
-        endpoints.put(queueNames.getConsumerGroupQueueName(), consumerProperties.getExtension().getEndpointType());
+        endpoints.add(queueNames.getConsumerGroupQueueName());
         if (consumerProperties.getExtension().isAutoBindErrorQueue()) {
-            endpoints.put(queueNames.getErrorQueueName(), EndpointType.QUEUE);
+            endpoints.add(queueNames.getErrorQueueName());
         }
     }
 
@@ -108,18 +91,18 @@ public class SolaceTestBinder
         String endpointName = extractBindingDestination(binding);
         bindingNameToQueueName.put(binding.getBindingName(), endpointName);
         if (!SolaceProvisioningUtil.isAnonEndpoint(group, consumerProperties.getQualityOfService())) {
-            endpoints.put(endpointName, consumerProperties.getEndpointType());
+            endpoints.add(endpointName);
         }
         if (consumerProperties.isAutoBindErrorQueue()) {
             String errorQueueName = extractErrorQueueName(binding);
-            endpoints.put(errorQueueName, EndpointType.QUEUE);
+            endpoints.add(errorQueueName);
             bindingNameToErrorQueueName.put(binding.getBindingName(), errorQueueName);
         }
     }
 
     private void preBindCaptureProducerResources(String name, String group, ExtendedProducerProperties<SolaceProducerProperties> producerProperties) {
         String queueName = SolaceProvisioningUtil.getQueueName(name, group, producerProperties);
-        endpoints.put(queueName, EndpointType.QUEUE);
+        endpoints.add(queueName);
     }
 
     private String extractBindingDestination(Binding<?> binding) {
@@ -140,25 +123,22 @@ public class SolaceTestBinder
 
     @Override
     public void cleanup() {
-        for (Map.Entry<String, EndpointType> endpointEntry : endpoints.entrySet()) {
+        for (String endpointEntry : endpoints) {
             try {
                 log.info(String.format("De-provisioning endpoint %s", endpointEntry));
                 Endpoint endpoint;
                 try {
-                    endpoint = EndpointProvider.from(endpointEntry.getValue()).createInstance(endpointEntry.getKey());
+                    endpoint = JCSMPFactory.onlyInstance().createQueue(endpointEntry);
                 } catch (Exception e) {
                     //This is possible as we eagerly add endpoints to cleanup in preBindCaptureConsumerResources()
-                    log.info(String.format("Skipping de-provisioning as queue name is invalid; queue was never provisioned", endpointEntry));
+                    log.info("Skipping de-provisioning as queue name is invalid; queue was never provisioned {}", endpointEntry);
                     continue;
                 }
                 jcsmpSession.deprovision(endpoint, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
             } catch (JCSMPException | AccessDeniedException e) {
                 try {
                     String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
-                    switch (endpointEntry.getValue()) {
-                        case QUEUE -> sempV2Api.config().deleteMsgVpnQueue(vpnName, endpointEntry.getKey());
-                        case TOPIC_ENDPOINT -> sempV2Api.config().deleteMsgVpnTopicEndpoint(vpnName, endpointEntry.getKey());
-                    }
+                    sempV2Api.config().deleteMsgVpnQueue(vpnName, endpointEntry);
                 } catch (ApiException e1) {
                     RuntimeException toThrow = new RuntimeException(e);
                     toThrow.addSuppressed(e1);

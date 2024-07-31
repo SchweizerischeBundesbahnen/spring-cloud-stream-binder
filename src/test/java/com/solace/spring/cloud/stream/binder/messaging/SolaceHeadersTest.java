@@ -30,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Slf4j
 public class SolaceHeadersTest {
-    private static final Log logger = LogFactory.getLog(SolaceHeadersTest.class);
 
     @ParameterizedTest
     @ArgumentsSource(SolaceSpringHeaderArgumentsProvider.ClassesOnly.class)

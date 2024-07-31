@@ -59,10 +59,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @ExtendWith(SpringCloudStreamExtension.class)
 public class SolaceBinderCustomErrorMessageHandlerIT {
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}, maxAttempts={2}")
+    @CartesianTest(name = "[{index}] channelType={0}, maxAttempts={1}")
     public <T> void testConsumerOverrideErrorMessageHandler(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
+            @Values(classes = {DirectChannel.class}) Class<T> channelType,
             @Values(ints = {1, 3}) int maxAttempts,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
@@ -83,11 +82,9 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
         consumerProperties.populateBindingName(inputBindingName);
-        consumerProperties.setBatchMode(batchMode);
         consumerProperties.setMaxAttempts(maxAttempts);
 
-        List<Message<?>> messages = IntStream.range(0,
-                        batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1)
+        List<Message<?>> messages = IntStream.range(0, 1)
                 .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
                         .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
                         .build())
@@ -138,10 +135,9 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}, maxAttempts={2}")
+    @CartesianTest(name = "[{index}] channelType={0}, maxAttempts={1}")
     public <T> void testConsumerOverrideErrorMessageHandlerThrowException(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
+            @Values(classes = {DirectChannel.class}) Class<T> channelType,
             @Values(ints = {1, 3}) int maxAttempts,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
@@ -170,14 +166,12 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
         consumerProperties.populateBindingName(inputBindingName);
-        consumerProperties.setBatchMode(batchMode);
         consumerProperties.setMaxAttempts(maxAttempts);
         consumerProperties.getExtension().setAutoBindErrorQueue(true);
         Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, group0, moduleInputChannel, consumerProperties);
 
-        List<Message<?>> messages = IntStream.range(0,
-                        batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1)
+        List<Message<?>> messages = IntStream.range(0, 1)
                 .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
                         .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
                         .build())
@@ -214,10 +208,9 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
         consumerBinding.unbind();
     }
 
-    @CartesianTest(name = "[{index}] channelType={0}, batchMode={1}, maxAttempts={2}")
+    @CartesianTest(name = "[{index}] channelType={0}, maxAttempts={1}")
     public <T> void testConsumerOverrideErrorMessageHandlerThrowRequeueException(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @Values(booleans = {false, true}) boolean batchMode,
+            @Values(classes = {DirectChannel.class}) Class<T> channelType,
             @Values(ints = {1, 3}) int maxAttempts,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
@@ -246,14 +239,12 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
 
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
         consumerProperties.populateBindingName(inputBindingName);
-        consumerProperties.setBatchMode(batchMode);
         consumerProperties.setMaxAttempts(maxAttempts);
         consumerProperties.getExtension().setAutoBindErrorQueue(true);
         Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, group0, moduleInputChannel, consumerProperties);
 
-        List<Message<?>> messages = IntStream.range(0,
-                        batchMode ? consumerProperties.getExtension().getBatchMaxSize() : 1)
+        List<Message<?>> messages = IntStream.range(0, 1)
                 .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
                         .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
                         .build())
@@ -267,7 +258,7 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     log.info("Received message {}", StaticMessageHeaderAccessor.getId(msg));
-                    if (hasNestedBooleanHeader(SolaceHeaders.REDELIVERED, msg, consumerProperties.isBatchMode())) {
+                    if (hasNestedBooleanHeader(SolaceHeaders.REDELIVERED, msg)) {
                         callback.run();
                     } else {
                         callback.run();
@@ -375,10 +366,10 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
         producerBinding.unbind();
     }
 
-    private boolean hasNestedBooleanHeader(String header, Message<?> message, boolean batchMode) {
+    private boolean hasNestedBooleanHeader(String header, Message<?> message) {
         SoftAssertions softly = new SoftAssertions();
         softly.assertThat(message).satisfies(hasNestedHeader(header, Boolean.class,
-                batchMode, v -> assertThat(v).isNotNull().isTrue()));
+                v -> assertThat(v).isNotNull().isTrue()));
         return softly.wasSuccess();
     }
 }

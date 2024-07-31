@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.solace.spring.cloud.stream.binder.test.util.RetryableAssertions.retryAssert;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -54,7 +53,6 @@ import static org.junit.jupiter.api.Assertions.*;
 public class FlowReceiverContainerIT {
     private String vpnName;
     private final AtomicReference<FlowReceiverContainer> flowReceiverContainerReference = new AtomicReference<>();
-    private final AtomicReference<FlowReceiverContainer> transactedFlowReceiverContainerReference = new AtomicReference<>();
     private XMLMessageProducer producer;
 
 
@@ -86,39 +84,33 @@ public class FlowReceiverContainerIT {
                 .ifPresent(Consumer::close);
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testBind(@Values(booleans = {false, true}) boolean transacted,
-                         @Values(booleans = {false, true}) boolean isDurable,
-                         JCSMPSession jcsmpSession,
-                         Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testBind(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         assertNull(flowReceiverContainer.getFlowReceiverReference());
         UUID flowReferenceId = flowReceiverContainer.bind();
         assertNotNull(flowReferenceId);
 
-        if (transacted) {
-            Assertions.assertThat(flowReceiverContainer.getTransactedSession()).isNotNull();
-        } else {
-            Assertions.assertThat(flowReceiverContainer.getTransactedSession()).isNull();
-        }
         Assertions.assertThat(flowReceiverContainer.getFlowReceiverReference())
                 .satisfies(
                         r -> Assertions.assertThat(r.getId()).isEqualTo(flowReferenceId),
-                        r -> Assertions.assertThat(r.get().getEndpoint()).isEqualTo(queue),
-                        r -> Assertions.assertThat(r.getTransactedSession())
-                                .isEqualTo(flowReceiverContainer.getTransactedSession()));
+                        r -> Assertions.assertThat(r.get().getEndpoint()).isEqualTo(queue)
+                );
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testBindABoundFlow(@Values(booleans = {false, true}) boolean transacted,
-                                   @Values(booleans = {false, true}) boolean isDurable,
-                                   JCSMPSession jcsmpSession,
-                                   Queue durableQueue,
-                                   SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testBindABoundFlow(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         UUID flowReferenceId = flowReceiverContainer.bind();
         assertEquals(flowReferenceId, flowReceiverContainer.bind());
@@ -135,25 +127,18 @@ public class FlowReceiverContainerIT {
         assertThat(txFlows, hasSize(1));
         assertEquals(jcsmpSession.getProperty(JCSMPProperties.CLIENT_NAME), txFlows.get(0).getClientName());
 
-        if (transacted) {
-            Assertions.assertThat(getTransactedSessions(sempV2Api, jcsmpSession))
-                    .singleElement()
-                    .extracting(MonitorMsgVpnClientTransactedSession::getSessionName)
-                    .isEqualTo(txFlows.get(0).getSessionName());
-        } else {
-            Assertions.assertThat(getTransactedSessions(sempV2Api, jcsmpSession)).isEmpty();
-        }
+        Assertions.assertThat(getTransactedSessions(sempV2Api, jcsmpSession)).isEmpty();
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
+    @CartesianTest(name = "[{index}] isDurable={0}")
     public void testBindAnUnboundFlow(
-            @Values(booleans = {false, true}) boolean transacted,
+
             @Values(booleans = {false, true}) boolean isDurable,
             JCSMPSession jcsmpSession,
             Queue durableQueue,
             SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         UUID flowReferenceId = flowReceiverContainer.bind();
         flowReceiverContainer.unbind();
@@ -170,16 +155,16 @@ public class FlowReceiverContainerIT {
                 .isEqualTo(jcsmpSession.getProperty(JCSMPProperties.CLIENT_NAME));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
+    @CartesianTest(name = "[{index}] isDurable={0}")
     public void testBindWhileReceiving(
-            @Values(booleans = {false, true}) boolean transacted,
+
             @Values(booleans = {false, true}) boolean isDurable,
             JCSMPSession jcsmpSession,
             Queue durableQueue,
             SempV2Api sempV2Api,
             @ExecSvc(poolSize = 1) ExecutorService executorService) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         UUID flowReferenceId = flowReceiverContainer.bind();
         Future<MessageContainer> receiveFuture = executorService.submit((Callable<MessageContainer>) flowReceiverContainer::receive);
@@ -197,15 +182,15 @@ public class FlowReceiverContainerIT {
         assertNotNull(receiveFuture.get(1, TimeUnit.MINUTES));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
+    @CartesianTest(name = "[{index}] isDurable={0}")
     public void testConcurrentBind(
-            @Values(booleans = {false, true}) boolean transacted,
+
             @Values(booleans = {false, true}) boolean isDurable,
             JCSMPSession jcsmpSession,
             Queue durableQueue,
             SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         CyclicBarrier barrier = new CyclicBarrier(30);
         ExecutorService executorService = Executors.newFixedThreadPool(barrier.getParties());
@@ -246,31 +231,30 @@ public class FlowReceiverContainerIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testUnbind(@Values(booleans = {false, true}) boolean transacted,
-                           @Values(booleans = {false, true}) boolean isDurable,
-                           JCSMPSession jcsmpSession,
-                           Queue durableQueue,
-                           SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testUnbind(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         flowReceiverContainer.unbind();
         assertNull(flowReceiverContainer.getFlowReceiverReference());
-        assertNull(flowReceiverContainer.getTransactedSession());
         assertThat(getTxFlows(sempV2Api, queue, 1), hasSize(0));
         assertThat(getTransactedSessions(sempV2Api, jcsmpSession), hasSize(0));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testUnbindANonBoundFlow(@Values(booleans = {false, true}) boolean transacted,
-                                        @Values(booleans = {false, true}) boolean isDurable,
-                                        JCSMPSession jcsmpSession,
-                                        Queue durableQueue,
-                                        SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testUnbindANonBoundFlow(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.unbind();
         if (isDurable) {
@@ -282,14 +266,14 @@ public class FlowReceiverContainerIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testUnbindAnUnboundFlow(@Values(booleans = {false, true}) boolean transacted,
-                                        @Values(booleans = {false, true}) boolean isDurable,
-                                        JCSMPSession jcsmpSession,
-                                        Queue durableQueue,
-                                        SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testUnbindAnUnboundFlow(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         flowReceiverContainer.unbind();
@@ -304,14 +288,14 @@ public class FlowReceiverContainerIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testUnbindWhileReceiving(@Values(booleans = {false, true}) boolean transacted,
-                                         @Values(booleans = {false, true}) boolean isDurable,
-                                         JCSMPSession jcsmpSession,
-                                         Queue durableQueue,
-                                         SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testUnbindWhileReceiving(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -324,7 +308,6 @@ public class FlowReceiverContainerIT {
 
             flowReceiverContainer.unbind();
             assertNull(flowReceiverContainer.getFlowReceiverReference());
-            assertNull(flowReceiverContainer.getTransactedSession());
             assertThat(getTxFlows(sempV2Api, queue, 1), hasSize(0));
             assertThat(getTransactedSessions(sempV2Api, jcsmpSession), hasSize(0));
 
@@ -337,13 +320,13 @@ public class FlowReceiverContainerIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testUnbindWithUnacknowledgedMessage(@Values(booleans = {false, true}) boolean transacted,
-                                                    @Values(booleans = {false, true}) boolean isDurable,
-                                                    JCSMPSession jcsmpSession,
-                                                    Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testUnbindWithUnacknowledgedMessage(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
 
@@ -359,14 +342,14 @@ public class FlowReceiverContainerIT {
         assertTrue(receivedMsgs.stream().allMatch(MessageContainer::isStale));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testConcurrentUnbind(@Values(booleans = {false, true}) boolean transacted,
-                                     @Values(booleans = {false, true}) boolean isDurable,
-                                     JCSMPSession jcsmpSession,
-                                     Queue durableQueue,
-                                     SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testConcurrentUnbind(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
 
@@ -403,15 +386,15 @@ public class FlowReceiverContainerIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testPauseResume(@Values(booleans = {false, true}) boolean transacted,
-                                @Values(booleans = {false, true}) boolean isDurable,
-                                JCSMPSession jcsmpSession,
-                                Queue durableQueue,
-                                SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testPauseResume(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         int defaultWindowSize = (int) jcsmpSession.getProperty(JCSMPProperties.SUB_ACK_WINDOW_SIZE);
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         assertThat(getTxFlows(sempV2Api, queue, 2), hasSize(0));
         flowReceiverContainer.bind();
@@ -426,16 +409,16 @@ public class FlowReceiverContainerIT {
         assertEquals(defaultWindowSize, getTxFlows(sempV2Api, queue, 1).get(0).getWindowSize());
     }
 
-    @CartesianTest(name = "[{index}] testResuming={0} transacted={1} isDurable={2}")
+    @CartesianTest(name = "[{index}] testResuming={0} isDurable={1}")
     public void testPauseResumeANonBoundFlow(
             @Values(booleans = {false, true}) boolean testResuming,
-            @Values(booleans = {false, true}) boolean transacted,
+
             @Values(booleans = {false, true}) boolean isDurable,
             JCSMPSession jcsmpSession,
             Queue durableQueue,
             SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         if (testResuming) {
             flowReceiverContainer.pause();
@@ -454,16 +437,15 @@ public class FlowReceiverContainerIT {
         assertEquals(0, getTxFlows(sempV2Api, queue, 1).size());
     }
 
-    @CartesianTest(name = "[{index}] testResuming={0} transacted={1} isDurable={2}")
+    @CartesianTest(name = "[{index}] testResuming={0} isDurable={1}")
     public void testPauseResumeAnUnboundFlow(
             @Values(booleans = {false, true}) boolean testResuming,
-            @Values(booleans = {false, true}) boolean transacted,
             @Values(booleans = {false, true}) boolean isDurable,
             JCSMPSession jcsmpSession,
             Queue durableQueue,
             SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         flowReceiverContainer.unbind();
@@ -484,16 +466,16 @@ public class FlowReceiverContainerIT {
         assertEquals(0, getTxFlows(sempV2Api, queue, 1).size());
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
+    @CartesianTest(name = "[{index}] isDurable={0}")
     public void testPauseWhileResuming(
-            @Values(booleans = {false, true}) boolean transacted,
+
             @Values(booleans = {false, true}) boolean isDurable,
             JCSMPSession jcsmpSession,
             Queue durableQueue,
             SempV2Api sempV2Api,
             @ExecSvc ExecutorService executorService) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         flowReceiverContainer.pause();
@@ -537,16 +519,16 @@ public class FlowReceiverContainerIT {
         assertEquals(0, txFlows.get(0).getWindowSize());
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
+    @CartesianTest(name = "[{index}] isDurable={0}")
     public void testResumeWhilePausing(
-            @Values(booleans = {false, true}) boolean transacted,
+
             @Values(booleans = {false, true}) boolean isDurable,
             JCSMPSession jcsmpSession,
             Queue durableQueue,
             SempV2Api sempV2Api,
             @ExecSvc ExecutorService executorService) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         assertFalse(flowReceiverContainer.isPaused());
@@ -589,14 +571,14 @@ public class FlowReceiverContainerIT {
         assertEquals(defaultWindowSize, txFlows.get(0).getWindowSize());
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceive(@Values(booleans = {false, true}) boolean transacted,
-                            @Values(booleans = {false, true}) boolean isDurable,
-                            JCSMPSession jcsmpSession,
-                            Queue durableQueue,
-                            SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceive(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
 
@@ -607,49 +589,40 @@ public class FlowReceiverContainerIT {
         assertNotNull(messageReceived);
         assertThat(messageReceived.getMessage(), instanceOf(TextMessage.class));
         assertEquals(flowReferenceId1, messageReceived.getFlowReceiverReferenceId());
-        if (transacted) {
-            Assertions.assertThat(getTransactedSessions(sempV2Api, jcsmpSession))
-                    .singleElement()
-                    .satisfies(
-                            s -> Assertions.assertThat(s.getPendingConsumedMsgCount()).isEqualTo(1),
-                            s -> Assertions.assertThat(s.getConsumedMsgCount()).isEqualTo(0),
-                            s -> Assertions.assertThat(s.getSuccessCount()).isEqualTo(0),
-                            s -> Assertions.assertThat(s.getFailureCount()).isEqualTo(0));
-        }
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceiveOnANonBoundFlow(@Values(booleans = {false, true}) boolean transacted,
-                                           @Values(booleans = {false, true}) boolean isDurable,
-                                           JCSMPSession jcsmpSession,
-                                           Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceiveOnANonBoundFlow(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         UnboundFlowReceiverContainerException exception = assertThrows(UnboundFlowReceiverContainerException.class,
                 flowReceiverContainer::receive);
         assertThat(exception.getMessage(), containsString("is not bound"));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceiveNoWait(@Values(booleans = {false, true}) boolean transacted,
-                                  @Values(booleans = {false, true}) boolean isDurable,
-                                  JCSMPSession jcsmpSession,
-                                  Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceiveNoWait(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         assertNull(flowReceiverContainer.receive(0));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceiveWithTimeout(@Values(booleans = {false, true}) boolean transacted,
-                                       @Values(booleans = {false, true}) boolean isDurable,
-                                       JCSMPSession jcsmpSession,
-                                       Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceiveWithTimeout(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
 
@@ -663,49 +636,49 @@ public class FlowReceiverContainerIT {
         assertEquals(flowReferenceId, messageReceived.getFlowReceiverReferenceId());
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceiveElapsedTimeout(@Values(booleans = {false, true}) boolean transacted,
-                                          @Values(booleans = {false, true}) boolean isDurable,
-                                          JCSMPSession jcsmpSession,
-                                          Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceiveElapsedTimeout(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         assertNull(flowReceiverContainer.receive(1));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceiveNegativeTimeout(@Values(booleans = {false, true}) boolean transacted,
-                                           @Values(booleans = {false, true}) boolean isDurable,
-                                           JCSMPSession jcsmpSession,
-                                           Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceiveNegativeTimeout(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         assertNull(flowReceiverContainer.receive(-1));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceiveZeroTimeout(@Values(booleans = {false, true}) boolean transacted,
-                                       @Values(booleans = {false, true}) boolean isDurable,
-                                       JCSMPSession jcsmpSession,
-                                       Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceiveZeroTimeout(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         assertNull(flowReceiverContainer.receive(0));
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceiveInterrupt(@Values(booleans = {false, true}) boolean transacted,
-                                     @Values(booleans = {false, true}) boolean isDurable,
-                                     JCSMPSession jcsmpSession,
-                                     Queue durableQueue) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceiveInterrupt(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
         ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -723,15 +696,13 @@ public class FlowReceiverContainerIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] transacted={0}")
-    public void testReceiveInterruptedByFlowReconnect(@Values(booleans = {false, true}) boolean transacted,
-                                                      JCSMPSession jcsmpSession,
-                                                      Queue queue,
-                                                      SempV2Api sempV2Api) throws Exception {
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
-
+    @Test
+    public void testReceiveInterruptedByFlowReconnect(
+            JCSMPSession jcsmpSession,
+            Queue queue,
+            SempV2Api sempV2Api) throws Exception {
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
         flowReceiverContainer.bind();
-
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         try {
             Future<MessageContainer> receiveFuture = executorService.submit((Callable<MessageContainer>) flowReceiverContainer::receive);
@@ -765,14 +736,14 @@ public class FlowReceiverContainerIT {
         }
     }
 
-    @CartesianTest(name = "[{index}] transacted={0} isDurable={1}")
-    public void testReceiveInterruptedBySessionReconnect(@Values(booleans = {false, true}) boolean transacted,
-                                                         @Values(booleans = {false, true}) boolean isDurable,
-                                                         JCSMPSession jcsmpSession,
-                                                         Queue durableQueue,
-                                                         SempV2Api sempV2Api) throws Exception {
+    @CartesianTest(name = "[{index}] isDurable={0}")
+    public void testReceiveInterruptedBySessionReconnect(
+            @Values(booleans = {false, true}) boolean isDurable,
+            JCSMPSession jcsmpSession,
+            Queue durableQueue,
+            SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, transacted);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
 
@@ -803,7 +774,7 @@ public class FlowReceiverContainerIT {
     @ValueSource(booleans = {false, true})
     public void testAcknowledgeNull(boolean isDurable, JCSMPSession jcsmpSession, Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, false);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.acknowledge(null);
     }
@@ -812,7 +783,7 @@ public class FlowReceiverContainerIT {
     @ValueSource(booleans = {false, true})
     public void testAcknowledgeAfterUnbind(boolean isDurable, JCSMPSession jcsmpSession, Queue durableQueue) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, false);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         flowReceiverContainer.bind();
 
@@ -828,7 +799,7 @@ public class FlowReceiverContainerIT {
 
     @Test
     public void testAcknowledgeAfterFlowReconnect(JCSMPSession jcsmpSession, Queue queue, SempV2Api sempV2Api) throws Exception {
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, false);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
 
@@ -876,7 +847,7 @@ public class FlowReceiverContainerIT {
     public void testAcknowledgeAfterSessionReconnect(boolean isDurable, JCSMPSession jcsmpSession, Queue durableQueue,
                                                      SempV2Api sempV2Api) throws Exception {
         Queue queue = isDurable ? durableQueue : jcsmpSession.createTemporaryQueue();
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue, false);
+        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, queue);
 
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
 
@@ -910,53 +881,12 @@ public class FlowReceiverContainerIT {
         assertEquals((Long) 1L, txFlows.get(0).getRedeliveredMsgCount());
     }
 
-    @Test
-    void testAcknowledgeTransacted(JCSMPSession jcsmpSession, Queue durableQueue) throws Exception {
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, durableQueue, true);
-        flowReceiverContainer.bind();
-
-        TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        producer.send(message, durableQueue);
-        MessageContainer messageContainer = flowReceiverContainer.receive();
-        assertThatThrownBy(() -> flowReceiverContainer.acknowledge(messageContainer))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessage("Transactions do not support message settlements");
-    }
-
-    @Test
-    void testRejectTransacted(JCSMPSession jcsmpSession, Queue durableQueue) throws Exception {
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, durableQueue, true);
-        flowReceiverContainer.bind();
-        TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        producer.send(message, durableQueue);
-        MessageContainer messageContainer = flowReceiverContainer.receive();
-        assertThatThrownBy(() -> flowReceiverContainer.reject(messageContainer))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessage("Transactions do not support message settlements");
-    }
-
-    @Test
-    void testRequeueTransacted(JCSMPSession jcsmpSession, Queue durableQueue) throws Exception {
-        FlowReceiverContainer flowReceiverContainer = createFlowReceiverContainer(jcsmpSession, durableQueue, true);
-        flowReceiverContainer.bind();
-        TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        producer.send(message, durableQueue);
-        MessageContainer messageContainer = flowReceiverContainer.receive();
-        assertThatThrownBy(() -> flowReceiverContainer.requeue(messageContainer))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessage("Transactions do not support message settlements");
-    }
-
     private FlowReceiverContainer createFlowReceiverContainer(JCSMPSession jcsmpSession,
-                                                              Queue queue,
-                                                              boolean transacted) {
-        AtomicReference<FlowReceiverContainer> ref = transacted ?
-                transactedFlowReceiverContainerReference :
-                flowReceiverContainerReference;
+                                                              Queue queue) {
+        AtomicReference<FlowReceiverContainer> ref = flowReceiverContainerReference;
         if (ref.compareAndSet(null, Mockito.spy(new FlowReceiverContainer(
                 jcsmpSession,
                 JCSMPFactory.onlyInstance().createQueue(queue.getName()),
-                transacted,
                 new EndpointProperties(),
                 new ConsumerFlowProperties())))) {
             log.info("Created new FlowReceiverContainer {}", ref.get().getId());

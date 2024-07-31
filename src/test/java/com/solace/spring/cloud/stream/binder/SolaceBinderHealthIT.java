@@ -16,7 +16,6 @@ import com.solace.spring.cloud.stream.binder.test.spring.ConsumerInfrastructureU
 import com.solace.spring.cloud.stream.binder.test.spring.SpringCloudStreamContext;
 import com.solace.spring.cloud.stream.binder.test.util.SolaceSpringCloudStreamAssertions;
 import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
-import com.solace.spring.cloud.stream.binder.util.EndpointType;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
@@ -34,7 +33,6 @@ import org.springframework.boot.actuate.health.Status;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
-import org.springframework.cloud.stream.binder.PollableSource;
 import org.springframework.cloud.stream.config.BindingProperties;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.support.MessageBuilder;
@@ -59,15 +57,10 @@ public class SolaceBinderHealthIT {
 
     @CartesianTest(name = "[{index}] channelType={0}, autoStart={1} concurrency={2}")
     public <T> void testConsumerFlowHealthProvisioning(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
-            @CartesianTest.Enum(EndpointType.class) EndpointType endpointType,
+            @Values(classes = {DirectChannel.class}) Class<T> channelType,
             @Values(booleans = {true, false}) boolean autoStart,
             @Values(ints = {1, 3}) int concurrency,
             SpringCloudStreamContext context) throws Exception {
-        if (concurrency > 1 && (channelType.equals(PollableSource.class) ||
-                EndpointType.TOPIC_ENDPOINT.equals(endpointType))) {
-            return;
-        }
 
         SolaceTestBinder binder = context.getBinder();
 
@@ -85,7 +78,6 @@ public class SolaceBinderHealthIT {
         consumerProperties.populateBindingName(RandomStringUtils.randomAlphanumeric(10));
         consumerProperties.setAutoStartup(autoStart);
         consumerProperties.setConcurrency(concurrency);
-        consumerProperties.getExtension().setEndpointType(endpointType);
 
         Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
@@ -135,14 +127,11 @@ public class SolaceBinderHealthIT {
 
     @CartesianTest(name = "[{index}] channelType={0}, concurrency={1} healthStatus={2}")
     public <T> void testConsumerFlowHealthUnhealthy(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
+            @Values(classes = {DirectChannel.class}) Class<T> channelType,
             @Values(ints = {1, 3}) int concurrency,
             @Values(strings = {"DOWN", "RECONNECTING"}) String healthStatus,
             SempV2Api sempV2Api,
             SpringCloudStreamContext context) throws Exception {
-        if (concurrency > 1 && channelType.equals(PollableSource.class)) {
-            return;
-        }
 
         SolaceTestBinder binder = context.getBinder();
 
@@ -200,7 +189,7 @@ public class SolaceBinderHealthIT {
 
     @CartesianTest(name = "[{index}] channelType={0}")
     public <T> void testConsumerFlowHealthNack(
-            @Values(classes = {DirectChannel.class, PollableSource.class}) Class<T> channelType,
+            @Values(classes = {DirectChannel.class}) Class<T> channelType,
             SpringCloudStreamContext context,
             TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = context.getBinder();

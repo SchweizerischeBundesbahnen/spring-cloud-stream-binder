@@ -2,6 +2,8 @@ package com.solace.spring.cloud.stream.binder;
 
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
 import com.solace.spring.cloud.stream.binder.inbound.*;
+import com.solace.spring.cloud.stream.binder.inbound.topic.JCSMPInboundTopicMessageMultiplexer;
+import com.solace.spring.cloud.stream.binder.inbound.topic.JCSMPInboundTopicMessageProducer;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.outbound.JCSMPOutboundMessageHandler;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
@@ -104,12 +106,8 @@ public class SolaceMessageChannelBinder
         if (properties.getExtension() != null && properties.getExtension().getQualityOfService() == QualityOfService.AT_MOST_ONCE) {
             return createTopicMessageProducer(destination, group, properties);
         }
-        if (!properties.isBatchMode() && properties.getExtension().isTransacted()) {
-            throw new IllegalArgumentException("Non-batched, transacted consumers are not supported");
-        }
-
-        if (properties.getExtension().isTransacted() && properties.getExtension().isAutoBindErrorQueue()) {
-            throw new IllegalArgumentException("transacted consumers do not support error queues");
+        if (properties.isBatchMode()) {
+            throw new IllegalArgumentException("Batched consumers are not supported");
         }
         return createQueueMessageProducer(destination, group, properties);
     }
@@ -154,7 +152,7 @@ public class SolaceMessageChannelBinder
 
     protected MessageProducer createTopicMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         JCSMPInboundTopicMessageProducer topicMessageProducer = this.jcsmpInboundTopicMessageMultiplexer.createTopicMessageProducer(destination, group, properties);
-        AbstractMessageChannelBinder.ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, null, properties);
+        AbstractMessageChannelBinder.ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, group, properties);
 
         topicMessageProducer.setErrorChannel(errorInfra.getErrorChannel());
         topicMessageProducer.setErrorMessageStrategy(errorMessageStrategy);
@@ -166,55 +164,12 @@ public class SolaceMessageChannelBinder
     protected PolledConsumerResources createPolledConsumerResources(String name, String group,
                                                                     ConsumerDestination destination,
                                                                     ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties) {
-        if (!consumerProperties.isBatchMode() && consumerProperties.getExtension().isTransacted()) {
-            throw new IllegalArgumentException("Non-batched, transacted consumers are not supported");
-        }
-        if (consumerProperties.getExtension().isTransacted() && consumerProperties.getExtension().isAutoBindErrorQueue()) {
-            throw new IllegalArgumentException("transacted consumers do not support error queues");
-        }
-        if (consumerProperties.getConcurrency() > 1) {
-            log.warn("Polled consumers do not support concurrency > 1, it will be ignored...");
-        }
-        if (consumerProperties.isBatchMode()) {
-            log.error("BatchMode is deprecated and should not be used.");
-        }
-
-        SolaceConsumerDestination solaceDestination = (SolaceConsumerDestination) destination;
-
-        EndpointProperties endpointProperties = getConsumerEndpointProperties(consumerProperties);
-        JCSMPMessageSource messageSource = new JCSMPMessageSource(solaceDestination,
-                jcsmpSession,
-                consumerProperties.isBatchMode() ? new BatchCollector(consumerProperties.getExtension()) : null,
-                consumerProperties,
-                endpointProperties,
-                solaceMeterAccessor);
-
-        if (solaceBinderHealthAccessor != null) {
-            messageSource.setSolaceBinderHealthAccessor(solaceBinderHealthAccessor);
-        }
-
-        messageSource.setRemoteStopFlag(consumersRemoteStopFlag::get);
-        messageSource.setPostStart(getConsumerPostStart(solaceDestination, consumerProperties));
-
-        if (consumerProperties.getExtension().isAutoBindErrorQueue()) {
-            messageSource.setErrorQueueInfrastructure(new ErrorQueueInfrastructure(sessionProducerManager,
-                    errorHandlerProducerKey,
-                    solaceDestination.getErrorQueueName(),
-                    consumerProperties.getExtension()));
-        }
-
-        ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, group, consumerProperties, true);
-        return new PolledConsumerResources(messageSource, errorInfra);
+        throw new UnsupportedOperationException("PolledConsumerResources are not supported");
     }
 
     @Override
     protected void postProcessPollableSource(DefaultPollableMessageSource bindingTarget) {
-        bindingTarget.setAttributesProvider((accessor, message) -> {
-            Object sourceData = StaticMessageHeaderAccessor.getSourceData(message);
-            if (sourceData == null || sourceData instanceof XMLMessage || sourceData instanceof List) {
-                accessor.setAttribute(SolaceMessageHeaderErrorMessageStrategy.ATTR_SOLACE_RAW_MESSAGE, sourceData);
-            }
-        });
+        throw new UnsupportedOperationException("PolledConsumerResources are not supported");
     }
 
     @Override
@@ -226,12 +181,7 @@ public class SolaceMessageChannelBinder
     @Override
     protected MessageHandler getPolledConsumerErrorMessageHandler(ConsumerDestination destination, String group,
                                                                   ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties) {
-        final MessageHandler handler = getErrorMessageHandler(destination, group, consumerProperties);
-        if (handler != null) {
-            return handler;
-        } else {
-            return super.getPolledConsumerErrorMessageHandler(destination, group, consumerProperties);
-        }
+        throw new UnsupportedOperationException("PolledConsumerResources are not supported");
     }
 
     @Override

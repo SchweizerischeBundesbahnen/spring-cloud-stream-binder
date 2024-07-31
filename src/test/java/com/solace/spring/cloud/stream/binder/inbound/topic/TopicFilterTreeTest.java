@@ -1,5 +1,6 @@
-package com.solace.spring.cloud.stream.binder.inbound;
+package com.solace.spring.cloud.stream.binder.inbound.topic;
 
+import com.solace.spring.cloud.stream.binder.inbound.topic.TopicFilterTree;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;

@@ -21,11 +21,9 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.cloud.stream.binder.ExtendedProducerProperties;
-import org.springframework.cloud.stream.binder.PollableSource;
 import org.springframework.cloud.stream.config.BindingProperties;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.messaging.MessageChannel;
-import org.springframework.messaging.MessageHandler;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import java.util.*;
@@ -98,34 +96,6 @@ public class SolaceBinderSubscriptionsIT {
         assertActualSubscriptionsAreCorrect(context, sempV2Api, queueName, addDestinationAsSubscriptionToQueue);
 
         producerBinding.unbind();
-    }
-
-    @CartesianTest
-    public void testPolledConsumerWITHAddDestinationAsSubscriptionToDurableQueue(
-            @Values(booleans = {false, true}) boolean addDestinationAsSubscriptionToQueue,
-            SpringCloudStreamContext context,
-            SempV2Api sempV2Api) throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-
-        PollableSource<MessageHandler> moduleInputChannel = context.createBindableMessageSource("input", new BindingProperties());
-
-        String group0 = RandomStringUtils.randomAlphanumeric(10);
-
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        assertThat(consumerProperties.getExtension().isAddDestinationAsSubscriptionToQueue()).isTrue();
-
-        consumerProperties.getExtension().setAddDestinationAsSubscriptionToQueue(addDestinationAsSubscriptionToQueue);
-        consumerProperties.getExtension().setQueueAdditionalSubscriptions(ADDITIONAL_SUBSCRIPTIONS);
-
-        Binding<PollableSource<MessageHandler>> consumerBinding = binder.bindPollableConsumer(DESTINATION, group0,
-                moduleInputChannel, consumerProperties);
-
-        //Retrieve subscriptions from broker and validate they are correct
-        String queueName = binder.getConsumerQueueName(consumerBinding);
-        assertActualSubscriptionsAreCorrect(context, sempV2Api, queueName,
-                addDestinationAsSubscriptionToQueue);
-
-        consumerBinding.unbind();
     }
 
     @CartesianTest

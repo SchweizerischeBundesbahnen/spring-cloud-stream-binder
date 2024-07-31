@@ -2,17 +2,13 @@ package com.solace.spring.cloud.stream.binder.test.spring;
 
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
-import com.solacesystems.jcsmp.JCSMPTransportException;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
-import org.springframework.cloud.stream.binder.PollableSource;
 import org.springframework.cloud.stream.config.BindingProperties;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHandler;
-import org.springframework.messaging.MessagingException;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
@@ -20,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-import static com.solace.spring.cloud.stream.binder.test.util.RetryableAssertions.retryAssert;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -44,10 +39,6 @@ public class ConsumerInfrastructureUtil<T> {
             @SuppressWarnings("unchecked")
             T channel = (T) context.createBindableChannel(channelName, bindingProperties);
             return channel;
-        } else if (type.equals(PollableSource.class)) {
-            @SuppressWarnings("unchecked")
-            T channel = (T) context.createBindableMessageSource(channelName, bindingProperties);
-            return channel;
         } else {
             throw new UnsupportedOperationException("type not supported: " + type);
         }
@@ -59,11 +50,6 @@ public class ConsumerInfrastructureUtil<T> {
             @SuppressWarnings("unchecked")
             Binding<T> binding = (Binding<T>) binder.bindConsumer(destination, group, (DirectChannel) channel,
                     consumerProperties);
-            return binding;
-        } else if (type.equals(PollableSource.class)) {
-            @SuppressWarnings("unchecked")
-            Binding<T> binding = (Binding<T>) binder.bindPollableConsumer(destination, group,
-                    (PollableSource<MessageHandler>) channel, consumerProperties);
             return binding;
         } else {
             throw new UnsupportedOperationException("type not supported: " + type);
@@ -81,18 +67,6 @@ public class ConsumerInfrastructureUtil<T> {
                           Consumer<Message<?>> messageHandler) {
         if (type.equals(DirectChannel.class)) {
             ((DirectChannel) inputChannel).subscribe(messageHandler::accept);
-        } else if (type.equals(PollableSource.class)) {
-            @SuppressWarnings("unchecked")
-            PollableSource<MessageHandler> pollableSource = (PollableSource<MessageHandler>) inputChannel;
-            executorService.scheduleAtFixedRate(() -> {
-                try {
-                    if (!pollableSource.poll(messageHandler::accept)) {
-                        Thread.sleep(1000);
-                    }
-                } catch (Throwable t) {
-                    log.error("exception received while polling for messages", t);
-                }
-            }, 0, 1, TimeUnit.MILLISECONDS);
         } else {
             throw new UnsupportedOperationException("type not supported: " + type);
         }
@@ -119,35 +93,6 @@ public class ConsumerInfrastructureUtil<T> {
             }
             assertThat(latch.await(3, TimeUnit.MINUTES)).isTrue();
             ((DirectChannel) inputChannel).unsubscribe(handler);
-        } else if (type.equals(PollableSource.class)) {
-            if (sendMessagesFn != null) {
-                sendMessagesFn.run();
-            }
-
-            @SuppressWarnings("unchecked")
-            PollableSource<MessageHandler> pollableSource = (PollableSource<MessageHandler>) inputChannel;
-            final CountDownLatch latch = new CountDownLatch(numMessagesToReceive);
-            // PollableSource.poll(...) only returns true for successful message handling.
-            // Meaning: latch.getCount() < actual-#-of-iterations < numMessagesToReceive
-            for (int i = 0; latch.getCount() > 0 && i < numMessagesToReceive; i++) {
-                log.info("Polling for messages. {} remaining", latch.getCount());
-                retryAssert(() -> {
-                    try {
-                        assertThat(pollableSource.poll(msg -> messageHandler.accept(msg, latch::countDown)))
-                                .isTrue();
-                    } catch (MessagingException e) {
-                        if (e.getCause() instanceof JCSMPTransportException &&
-                                e.getCause().getMessage().contains("was closed while in receive")) {
-                            log.info(String.format("Absorbing %s", JCSMPTransportException.class));
-                        } else if (ExceptionUtils.getRootCause(e) instanceof ExpectedMessageHandlerException) {
-                            log.info("Received expected exception", ExceptionUtils.getRootCause(e));
-                        } else {
-                            throw e;
-                        }
-                    }
-                });
-            }
-            assertThat(latch.await(3, TimeUnit.MINUTES)).isTrue();
         } else {
             throw new UnsupportedOperationException("type not supported: " + type);
         }

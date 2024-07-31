@@ -4,7 +4,6 @@ import com.solace.spring.boot.autoconfigure.SolaceJavaAutoConfiguration;
 import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties;
 import com.solace.spring.cloud.stream.binder.test.junit.extension.SpringCloudStreamExtension;
 import com.solace.spring.cloud.stream.binder.test.spring.MessageGenerator;
-import com.solace.spring.cloud.stream.binder.test.spring.MessageGenerator.BatchingConfig;
 import com.solace.spring.cloud.stream.binder.test.spring.SpringCloudStreamContext;
 import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
@@ -43,15 +42,14 @@ import static org.junit.jupiter.api.Assertions.fail;
 @ExtendWith(SpringCloudStreamExtension.class)
 public class SolaceBinderDynamicMessagingIT {
 
-    @CartesianTest(name = "[{index}] batched={0}")
-    public void testTargetDestination(@Values(booleans = {false, true}) boolean batched,
-                                      SpringCloudStreamContext context,
+    @Test
+    public void testTargetDestination(SpringCloudStreamContext context,
                                       SoftAssertions softly,
                                       TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = context.getBinder();
 
         ExtendedProducerProperties<SolaceProducerProperties> producerProperties = context.createProducerProperties(testInfo);
-        producerProperties.setUseNativeEncoding(batched);
+        producerProperties.setUseNativeEncoding(false);
         BindingProperties producerBindingProperties = new BindingProperties();
         producerBindingProperties.setProducer(producerProperties);
         DirectChannel moduleOutputChannel = context.createBindableChannel("output", producerBindingProperties);
@@ -69,14 +67,13 @@ public class SolaceBinderDynamicMessagingIT {
         Binding<MessageChannel> consumerBinding1 = binder.bindConsumer(
                 destination1, group0, moduleInputChannel1, context.createConsumerProperties());
 
-        BatchingConfig batchingConfig = new BatchingConfig().setEnabled(batched);
         Message<?> message = MessageGenerator.generateMessage(
                 i -> RandomStringUtils.randomAlphanumeric(100).getBytes(),
                 i -> Map.ofEntries(
                         Map.entry(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE),
                         Map.entry(BinderHeaders.TARGET_DESTINATION, i % 2 == 0 ?
                                 destination1 : RandomStringUtils.randomAlphanumeric(100))
-                ), batchingConfig).build();
+                )).build();
 
         context.binderBindUnbindLatency();
 
@@ -88,7 +85,7 @@ public class SolaceBinderDynamicMessagingIT {
         final CountDownLatch latch0 = new CountDownLatch(1);
         moduleInputChannel0.subscribe(msgHandlerFactory.apply(latch0));
 
-        final CountDownLatch latch1 = new CountDownLatch(batched ? batchingConfig.getNumberOfMessages() / 2 : 1);
+        final CountDownLatch latch1 = new CountDownLatch(1);
         moduleInputChannel1.subscribe(msgHandlerFactory.apply(latch1));
 
         moduleOutputChannel.send(message);
@@ -103,17 +100,14 @@ public class SolaceBinderDynamicMessagingIT {
         consumerBinding1.unbind();
     }
 
-    @CartesianTest(name = "[{index}] batched={0} value=\"{1}\"")
+    @CartesianTest(name = "[{index}] value=\"{0}\"")
     public void testTargetDestinationIgnored(
-            @Values(booleans = {false, true}) boolean batched,
             @Values(strings = {"NULL", "", " "}) String value,
             SpringCloudStreamContext context,
             TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = context.getBinder();
 
-
         ExtendedProducerProperties<SolaceProducerProperties> producerProperties = context.createProducerProperties(testInfo);
-
 
         producerProperties.setUseNativeEncoding(true);
         BindingProperties producerBindingProperties = new BindingProperties();
@@ -136,7 +130,6 @@ public class SolaceBinderDynamicMessagingIT {
 
                 context.createConsumerProperties());
 
-        BatchingConfig batchingConfig = new BatchingConfig().setEnabled(batched);
         Message<?> message = MessageGenerator.generateMessage(
                         i -> RandomStringUtils.randomAlphanumeric(100).getBytes(),
                         i -> {
@@ -145,13 +138,12 @@ public class SolaceBinderDynamicMessagingIT {
                             headers.put(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE);
                             headers.put(BinderHeaders.TARGET_DESTINATION, value.equals("NULL") ? null : value);
                             return headers;
-                        },
-                        batchingConfig)
+                        })
                 .build();
 
         context.binderBindUnbindLatency();
 
-        final CountDownLatch latch = new CountDownLatch(batched ? batchingConfig.getNumberOfMessages() : 1);
+        final CountDownLatch latch = new CountDownLatch(1);
         moduleInputChannel.subscribe(m -> {
             assertThat(m.getHeaders()).doesNotContainKey(BinderHeaders.TARGET_DESTINATION);
             latch.countDown();
@@ -189,7 +181,6 @@ public class SolaceBinderDynamicMessagingIT {
             assertThat(e).getCause().isInstanceOf(IllegalArgumentException.class);
             assertThat(e).getCause().hasMessageContaining(BinderHeaders.TARGET_DESTINATION);
         }
-
         producerBinding.unbind();
     }
 }

@@ -16,8 +16,11 @@ public class SolaceBinderHeaderMeta<T> implements HeaderMeta<T> {
             {SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, new SolaceBinderHeaderMeta<>(String.class, false, false, Scope.WIRE)},
             {SolaceBinderHeaders.CONFIRM_CORRELATION, new SolaceBinderHeaderMeta<>(CorrelationData.class, false, true, Scope.LOCAL)},
             {SolaceBinderHeaders.NULL_PAYLOAD, new SolaceBinderHeaderMeta<>(Boolean.class, true, false, Scope.LOCAL)},
-            {SolaceBinderHeaders.BATCHED_HEADERS, new SolaceBinderHeaderMeta<>(List.class, true, true, Scope.LOCAL)},
-            {SolaceBinderHeaders.TARGET_DESTINATION_TYPE, new SolaceBinderHeaderMeta<>(String.class, false, true, Scope.LOCAL)}
+            {SolaceBinderHeaders.TARGET_DESTINATION_TYPE, new SolaceBinderHeaderMeta<>(String.class, false, true, Scope.LOCAL)},
+            {SolaceBinderHeaders.LARGE_MESSAGE_SUPPORT, new SolaceBinderHeaderMeta<>(Boolean.class, false, true, Scope.LOCAL)},
+            {SolaceBinderHeaders.CHUNK_ID, new SolaceBinderHeaderMeta<>(Long.class, false, false, Scope.LOCAL)},
+            {SolaceBinderHeaders.CHUNK_COUNT, new SolaceBinderHeaderMeta<>(Integer.class, false, false, Scope.LOCAL)},
+            {SolaceBinderHeaders.CHUNK_INDEX, new SolaceBinderHeaderMeta<>(Integer.class, false, false, Scope.LOCAL)}
     }).collect(Collectors.toMap(d -> (String) d[0], d -> (SolaceBinderHeaderMeta<?>) d[1]));
 
     private final Class<T> type;

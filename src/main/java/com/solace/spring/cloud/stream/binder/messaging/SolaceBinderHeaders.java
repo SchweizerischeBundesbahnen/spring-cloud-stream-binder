@@ -32,6 +32,38 @@ public final class SolaceBinderHeaders {
     public static final String PARTITION_KEY = PREFIX + "partitionKey";
 
     /**
+     * <p><b>Acceptable Value Type:</b> {@link Boolean}</p>
+     * <br>
+     * <p>When <b>true</b> large messages are split in 4MB chunks and reassembled in the consumer.</p>
+     * <p>The Queue needs to be partitioned to support this feature</p>
+     */
+    public static final String LARGE_MESSAGE_SUPPORT = PREFIX + "largeMessageSupport";
+
+    /**
+     * <p><b>Acceptable Value Type:</b> {@link Long}</p>
+     * <p><b>Access:</b> Internal Binder Use Only</p>
+     * <br>
+     * <p>Then id (should be more or less unique) of the array of chunks.</p>
+     */
+    public static final String CHUNK_ID = PREFIX + "chunkId";
+
+    /**
+     * <p><b>Acceptable Value Type:</b> {@link Integer}</p>
+     * <p><b>Access:</b> Internal Binder Use Only</p>
+     * <br>
+     * <p>Then index of the current message in the array of chunks. Zero-Based.</p>
+     */
+    public static final String CHUNK_INDEX = PREFIX + "chunkIndex";
+
+    /**
+     * <p><b>Acceptable Value Type:</b> {@link Integer}</p>
+     * <p><b>Access:</b> Internal Binder Use Only</p>
+     * <br>
+     * <p>Then length of the array of chunks.</p>
+     */
+    public static final String CHUNK_COUNT = PREFIX + "chunkCount";
+
+    /**
      * <p><b>Acceptable Value Type:</b> {@link Integer}</p>
      * <p><b>Access:</b> Read</p>
      * <p><b>Default Value: </b>{@code 1}</p>
@@ -82,15 +114,6 @@ public final class SolaceBinderHeaders {
      * <p>Present and true to indicate when the PubSub+ message payload was null.</p>
      */
     public static final String NULL_PAYLOAD = PREFIX + "nullPayload";
-
-    /**
-     * <p><b>Acceptable Value Type:</b> {@code List<Map<String, Object>>}</p>
-     * <p><b>Access:</b> Read</p>
-     * <br>
-     * <p>Only applicable when {@code batchMode} is {@code true}. The consolidated list of message headers for a
-     * batch of messages where the headers for each payload element is in this list’s corresponding index.</p>
-     */
-    public static final String BATCHED_HEADERS = PREFIX + "batchedHeaders";
 
     /**
      * <p><b>Acceptable Value Type:</b> String</p>

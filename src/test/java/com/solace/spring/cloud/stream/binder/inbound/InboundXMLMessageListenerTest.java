@@ -31,7 +31,7 @@ public class InboundXMLMessageListenerTest {
 
         BasicInboundXMLMessageListener inboundXMLMessageListener = new BasicInboundXMLMessageListener(
                 flowReceiverContainer, consumerDestination, null, null, null, null, null, null,
-                null, null, false);
+                null, false);
 
         inboundXMLMessageListener.run();
 

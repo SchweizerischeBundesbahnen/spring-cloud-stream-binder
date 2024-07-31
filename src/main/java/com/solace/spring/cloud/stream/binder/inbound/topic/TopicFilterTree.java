@@ -1,4 +1,4 @@
-package com.solace.spring.cloud.stream.binder.inbound;
+package com.solace.spring.cloud.stream.binder.inbound.topic;
 
 import lombok.Data;
 

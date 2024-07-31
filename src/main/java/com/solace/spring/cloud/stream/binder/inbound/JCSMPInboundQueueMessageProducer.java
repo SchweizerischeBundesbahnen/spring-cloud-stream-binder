@@ -4,10 +4,8 @@ import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
 import com.solace.spring.cloud.stream.binder.inbound.acknowledge.JCSMPAcknowledgementCallbackFactory;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
-import com.solace.spring.cloud.stream.binder.provisioning.EndpointProvider;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestination;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil;
-import com.solace.spring.cloud.stream.binder.util.EndpointType;
 import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
 import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
 import com.solace.spring.cloud.stream.binder.util.SolaceMessageConversionException;
@@ -87,12 +85,11 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     @Override
     protected void doStart() {
         final String endpointName = consumerDestination.getName();
-        log.info(String.format("Creating %s consumer flows for %s %s <inbound adapter %s>",
-                consumerProperties.getExtension().getEndpointType(),
-                consumerProperties.getConcurrency(), endpointName, id));
+        log.info("Creating {} consumer flows for {} <inbound adapter {}>",
+                consumerProperties.getConcurrency(), endpointName, id);
 
         if (isRunning()) {
-            log.warn(String.format("Nothing to do. Inbound message channel adapter %s is already running", id));
+            log.warn("Nothing to do. Inbound message channel adapter {} is already running", id);
             return;
         }
 
@@ -111,50 +108,24 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         }
 
         if (executorService != null && !executorService.isTerminated()) {
-            log.warn(String.format("Unexpectedly found running executor service while starting inbound adapter %s, " +
-                    "closing it...", id));
+            log.warn("Unexpectedly found running executor service while starting inbound adapter {}, closing it...", id);
             stopAllConsumers();
         }
 
-        EndpointType endpointType = consumerProperties.getExtension().getEndpointType();
-        EndpointProvider<?> endpointProvider = EndpointProvider.from(endpointType);
-
-        if (endpointProvider == null) {
-            String msg = String.format("Consumer not supported for destination type %s <inbound adapter %s>",
-                    consumerProperties.getExtension().getEndpointType(), id);
-            log.warn(msg);
-            throw new MessagingException(msg);
-        }
-
-        Endpoint endpoint = null;
-        try {
-            // JCSMP applies naming rules for queues not for topic endpoints.
-            // this code is to prevent queue endpoints get bad names and temp topic endpoints stay temporary
-            endpoint = (EndpointType.TOPIC_ENDPOINT.equals(endpointType) && consumerDestination.isTemporary()) ?
-                    endpointProvider.createTemporaryEndpoint(endpointName, jcsmpSession)
-                    : endpointProvider.createInstance(endpointName);
-        } catch (JCSMPException e) {
-            // consumer binding will fail later, just logging
-            log.warn(String.format("Inbound adapter %s can't create temporary endpoint %s on a broker", id, endpoint), e);
-        }
-
+        Endpoint endpoint = JCSMPFactory.onlyInstance().createQueue(endpointName);
         ConsumerFlowProperties consumerFlowProperties = SolaceProvisioningUtil.getConsumerFlowProperties(
                 consumerDestination.getBindingDestinationName(), consumerProperties);
 
         for (int i = 0, numToCreate = consumerProperties.getConcurrency() - flowReceivers.size(); i < numToCreate; i++) {
-            log.info(String.format("Creating consumer %s of %s for inbound adapter %s",
-                    i + 1, consumerProperties.getConcurrency(), id));
+            log.info("Creating consumer {} of {} for inbound adapter {}", i + 1, consumerProperties.getConcurrency(), id);
             FlowReceiverContainer flowReceiverContainer = new FlowReceiverContainer(
                     jcsmpSession,
                     endpoint,
-                    consumerProperties.getExtension().isTransacted(),
                     endpointProperties,
                     consumerFlowProperties);
 
             if (paused.get()) {
-                log.info(String.format(
-                        "Inbound adapter %s is paused, pausing newly created flow receiver container %s",
-                        id, flowReceiverContainer.getId()));
+                log.info("Inbound adapter {} is paused, pausing newly created flow receiver container {}", id, flowReceiverContainer.getId());
                 flowReceiverContainer.pause();
             }
             flowReceivers.add(flowReceiverContainer);
@@ -278,7 +249,6 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                     flowReceiverContainer,
                     consumerDestination,
                     consumerProperties,
-                    consumerProperties.isBatchMode() ? new BatchCollector(consumerProperties.getExtension()) : null,
                     this::sendMessage,
                     ackCallbackFactory,
                     retryTemplate,
@@ -292,7 +262,6 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                     flowReceiverContainer,
                     consumerDestination,
                     consumerProperties,
-                    consumerProperties.isBatchMode() ? new BatchCollector(consumerProperties.getExtension()) : null,
                     this::sendMessage,
                     ackCallbackFactory,
                     this::sendErrorMessageIfNecessary,

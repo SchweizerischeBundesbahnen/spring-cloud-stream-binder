@@ -24,6 +24,10 @@ public class SimpleContainerProvider implements PubSubPlusExtension.ContainerPro
         jcsmpProperties.setProperty(JCSMPProperties.HOST, container.getOrigin(PubSubPlusContainer.Port.SMF));
         jcsmpProperties.setProperty(JCSMPProperties.USERNAME, "default");
         jcsmpProperties.setProperty(JCSMPProperties.VPN_NAME, "default");
+        jcsmpProperties.setIntegerProperty(JCSMPProperties.SUB_ACK_WINDOW_SIZE, 255);
+        jcsmpProperties.setIntegerProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE, 255);
+        jcsmpProperties.setIntegerProperty(JCSMPProperties.SUB_ACK_TIME, 1500);
+        jcsmpProperties.setIntegerProperty(JCSMPProperties.PUB_ACK_TIME, 60000);
         return jcsmpProperties;
     }
 
