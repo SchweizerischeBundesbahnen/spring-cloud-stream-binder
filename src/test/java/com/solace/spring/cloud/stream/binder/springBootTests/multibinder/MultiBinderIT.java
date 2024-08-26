@@ -1,4 +1,4 @@
-package com.solace.spring.cloud.stream.binder.springBootTests;
+package com.solace.spring.cloud.stream.binder.springBootTests.multibinder;
 
 import com.solace.spring.cloud.stream.binder.config.JCSMPSessionConfiguration;
 import com.solace.test.integration.testcontainer.PubSubPlusContainer;
@@ -17,6 +17,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -94,11 +95,13 @@ public class MultiBinderIT {
         producer.send(JCSMPFactory.onlyInstance().createBytesXMLMessage(),
                 JCSMPFactory.onlyInstance().createQueue(QUEUE_NAME_PREFIX + QUEUE_NAME_1));
 
-        mvc.perform(get("/actuator/metrics"))
-                .andExpectAll(
-                        jsonPath("names", Matchers.hasItem("solace.message.size.payload")),
-                        jsonPath("names", Matchers.hasItem("solace.message.size.total"))
-                );
+        await().until(() -> {
+                    mvc.perform(get("/actuator/metrics"))
+                            .andExpectAll(
+                                    jsonPath("names", Matchers.hasItem("solace.message.size.payload")),
+                                    jsonPath("names", Matchers.hasItem("solace.message.size.total")));
+                    return true;
+                }
+        );
     }
-
 }

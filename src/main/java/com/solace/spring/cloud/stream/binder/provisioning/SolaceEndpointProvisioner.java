@@ -221,12 +221,6 @@ public class SolaceEndpointProvisioner
     }
 
     public void addSubscriptionToQueue(Queue queue, String topicName, SolaceCommonProperties properties, boolean isDestinationSubscription) {
-        if (!isDestinationSubscription && queue.isDurable() && !properties.isAddDestinationAsSubscriptionToQueue()) {
-            log.debug("Provision subscriptions to durable queues was disabled, queue {} will not be subscribed to topic {}",
-                    queue.getName(), topicName);
-            return;
-        }
-
         if (isDestinationSubscription && !properties.isAddDestinationAsSubscriptionToQueue()) {
             log.debug("Adding destination as subscription was disabled, queue {} will not be subscribed to topic {}",
                     queue.getName(), topicName);

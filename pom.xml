@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.2</version>
+        <version>3.3.3</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>ch.sbb</groupId>
@@ -58,7 +58,7 @@
         <dependency>
             <groupId>com.solace.spring.boot</groupId>
             <artifactId>solace-java-spring-boot-autoconfigure</artifactId>
-            <version>5.0.0</version>
+            <version>5.1.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.cloud</groupId>
@@ -207,6 +207,11 @@
                     <groupId>io.gsonfire</groupId>
                     <artifactId>gson-fire</artifactId>
                     <version>1.9.0</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-oauth2-client</artifactId>
+                    <scope>test</scope>
                 </dependency>
             </dependencies>
             <build>

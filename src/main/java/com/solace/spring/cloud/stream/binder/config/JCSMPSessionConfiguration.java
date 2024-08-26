@@ -9,6 +9,7 @@ import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.impl.JCSMPBasicSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -21,31 +22,35 @@ import static com.solacesystems.jcsmp.XMLMessage.Outcome.*;
 @Slf4j
 @RequiredArgsConstructor
 @Configuration
-@Import(SolaceHealthIndicatorsConfiguration.class)
+@Import({SolaceHealthIndicatorsConfiguration.class, OAuth2ClientAutoConfiguration.class})
 public class JCSMPSessionConfiguration {
     private final static Map<String, SessionCacheEntry> SESSION_CACHE = new HashMap<>();
+    private final JCSMPProperties jcsmpProperties;
+    private final Optional<SolaceBinderHealthContributor> sessionHealthIndicator;
+    private final Optional<SolaceSessionEventHandler> solaceSessionEventHandler;
+    private final Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider;
 
     @Bean
-    JCSMPSessionEventHandler jcsmpSessionEventHandler(JCSMPProperties jcsmpProperties, Optional<SolaceBinderHealthContributor> sessionHealthIndicator, Optional<SolaceSessionEventHandler> solaceSessionEventHandler) {
-        return ensureSessionCache(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler).jcsmpSessionEventHandler();
+    JCSMPSessionEventHandler jcsmpSessionEventHandler() {
+        return ensureSessionCache().jcsmpSessionEventHandler();
     }
 
     @Bean
-    JCSMPSession jcsmpSession(JCSMPProperties jcsmpProperties, Optional<SolaceBinderHealthContributor> sessionHealthIndicator, Optional<SolaceSessionEventHandler> solaceSessionEventHandler) {
-        return ensureSessionCache(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler).jcsmpSession();
+    JCSMPSession jcsmpSession() {
+        return ensureSessionCache().jcsmpSession();
     }
 
     @Bean
-    Context jcsmpContext(JCSMPProperties jcsmpProperties, Optional<SolaceBinderHealthContributor> sessionHealthIndicator, Optional<SolaceSessionEventHandler> solaceSessionEventHandler) {
-        return ensureSessionCache(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler).context();
+    Context jcsmpContext() {
+        return ensureSessionCache().context();
     }
 
     @Bean
-    SolaceEndpointProvisioner jcsmpProvisioningProvider(JCSMPProperties jcsmpProperties, Optional<SolaceBinderHealthContributor> sessionHealthIndicator, Optional<SolaceSessionEventHandler> solaceSessionEventHandler) {
-        return ensureSessionCache(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler).solaceEndpointProvisioner();
+    SolaceEndpointProvisioner jcsmpProvisioningProvider() {
+        return ensureSessionCache().solaceEndpointProvisioner();
     }
 
-    private SessionCacheEntry ensureSessionCache(JCSMPProperties jcsmpProperties, Optional<SolaceBinderHealthContributor> sessionHealthIndicator, Optional<SolaceSessionEventHandler> solaceSessionEventHandler) {
+    private SessionCacheEntry ensureSessionCache() {
         try {
             ByteArrayOutputStream os = new ByteArrayOutputStream();
             Properties properties = jcsmpProperties.toProperties();
@@ -53,13 +58,16 @@ public class JCSMPSessionConfiguration {
             properties.storeToXML(os, "cached");
             os.close();
             String configAsString = os.toString();
-            return SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler));
+            return SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider));
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
     }
 
-    private static SessionCacheEntry createSession(JCSMPProperties jcsmpProperties, Optional<SolaceBinderHealthContributor> sessionHealthIndicator, Optional<SolaceSessionEventHandler> solaceSessionEventHandler) {
+    private static SessionCacheEntry createSession(JCSMPProperties jcsmpProperties,
+                                                   Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
+                                                   Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
+                                                   Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider) {
         JCSMPProperties properties = (JCSMPProperties) jcsmpProperties.clone();
         properties.setProperty(JCSMPProperties.CLIENT_INFO_PROVIDER, new SolaceBinderClientInfoProvider());
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);
@@ -68,8 +76,9 @@ public class JCSMPSessionConfiguration {
         JCSMPSession jcsmpSession;
         Context context = null;
         try {
-            context = JCSMPFactory.onlyInstance().createContext(new ContextProperties());
-            jcsmpSession = JCSMPFactory.onlyInstance().createSession(properties, context, jcsmpSessionEventHandler);
+            SpringJCSMPFactory springJCSMPFactory = new SpringJCSMPFactory(properties, solaceSessionOAuth2TokenProvider.orElse(null));
+            context = springJCSMPFactory.createContext(new ContextProperties());
+            jcsmpSession = springJCSMPFactory.createSession(context, jcsmpSessionEventHandler);
             log.info(String.format("Connecting JCSMP session %s", jcsmpSession.getSessionName()));
             jcsmpSession.connect();
             // after setting the session health indicator status to UP,

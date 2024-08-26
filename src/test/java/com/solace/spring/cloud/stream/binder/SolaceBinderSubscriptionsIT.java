@@ -132,9 +132,7 @@ public class SolaceBinderSubscriptionsIT {
                                                             boolean addDestinationAsSubscriptionToQueue)
             throws ApiException {
         String msgVpnName = (String) context.getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
-        Set<String> expectedSubscriptions = getExpectedQueueSubscriptions(
-                sempV2Api.monitor().getMsgVpnQueue(msgVpnName, queueName, null).getData().isDurable(),
-                addDestinationAsSubscriptionToQueue);
+        Set<String> expectedSubscriptions = getExpectedQueueSubscriptions(addDestinationAsSubscriptionToQueue);
         List<MonitorMsgVpnQueueSubscription> actualSubscriptions =
                 sempV2Api.monitor().getMsgVpnQueueSubscriptions(msgVpnName, queueName, null, null, null, null).getData();
 
@@ -145,17 +143,14 @@ public class SolaceBinderSubscriptionsIT {
         assertEquals(expectedSubscriptions.size(), actualSubscriptions.size(), "Some subscriptions are missing");
     }
 
-    private static Set<String> getExpectedQueueSubscriptions(boolean isDurableQueue,
-                                                             boolean addDestinationAsSubscriptionToQueue) {
+    private static Set<String> getExpectedQueueSubscriptions(boolean addDestinationAsSubscriptionToQueue) {
         if (addDestinationAsSubscriptionToQueue) {
             Set<String> expectedSubscriptions = new HashSet<>();
             expectedSubscriptions.add(DESTINATION);
             expectedSubscriptions.addAll(Arrays.asList(ADDITIONAL_SUBSCRIPTIONS));
             return expectedSubscriptions;
-        } else if (!isDurableQueue) {
-            return new HashSet<>(Arrays.asList(ADDITIONAL_SUBSCRIPTIONS));
         } else {
-            return Collections.emptySet();
+            return new HashSet<>(Arrays.asList(ADDITIONAL_SUBSCRIPTIONS));
         }
     }
 }
