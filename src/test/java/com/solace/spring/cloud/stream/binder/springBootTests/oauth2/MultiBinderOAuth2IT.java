@@ -4,6 +4,7 @@ import com.solace.it.util.semp.config.BrokerConfiguratorBuilder;
 import com.solace.it.util.semp.config.BrokerConfiguratorBuilder.BrokerConfigurator;
 import com.solace.it.util.semp.monitor.BrokerMonitorBuilder;
 import com.solace.it.util.semp.monitor.BrokerMonitorBuilder.BrokerMonitor;
+import com.solace.spring.cloud.stream.binder.config.JCSMPSessionConfiguration;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.action.ApiException;
 import com.solace.test.integration.semp.v2.action.model.ActionMsgVpnClientDisconnect;
@@ -13,9 +14,11 @@ import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnClient;
 import org.assertj.core.util.Files;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -39,7 +42,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@Isolated
+@SpringBootTest
+@EnableAutoConfiguration(exclude = JCSMPSessionConfiguration.class)
 @AutoConfigureMockMvc
 @ActiveProfiles("multibinderOAuth2")
 @DirtiesContext //Ensures all listeners are stopped

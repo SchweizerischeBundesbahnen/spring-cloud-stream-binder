@@ -1,15 +1,13 @@
 package com.solace.spring.cloud.stream.binder.util;
 
-import com.solacesystems.jcsmp.SessionEvent;
-import com.solacesystems.jcsmp.SessionEventArgs;
-import com.solacesystems.jcsmp.SessionEventHandler;
+import com.solacesystems.jcsmp.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class JCSMPSessionEventHandler implements SessionEventHandler {
+public class JCSMPSessionEventHandler implements SolaceOAuth2SessionEventHandler {
     private final List<SessionEventHandler> sessionEventHandlers = new ArrayList<>();
     private final List<Runnable> afterReconnectTasks = new ArrayList<>();
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -47,6 +45,15 @@ public class JCSMPSessionEventHandler implements SessionEventHandler {
             synchronized (afterReconnectTasks) {
                 afterReconnectTasks.forEach(executorService::submit);
             }
+        }
+    }
+
+    @Override
+    public void setJcsmpSession(JCSMPSession jcsmpSession) {
+        synchronized (sessionEventHandlers) {
+            sessionEventHandlers.stream()
+                    .filter(sessionEventHandler -> sessionEventHandler instanceof SolaceOAuth2SessionEventHandler)
+                    .forEach(sessionEventHandler -> ((SolaceOAuth2SessionEventHandler) sessionEventHandler).setJcsmpSession(jcsmpSession));
         }
     }
 }
