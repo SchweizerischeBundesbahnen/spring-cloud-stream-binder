@@ -58,7 +58,7 @@ Check out the difference between this fork and the original solace spring cloud 
 ## Documentation
 
 Read [API.adoc](API.adoc) for a description of the properties and API.
-All Changes are documented in the [Changelog](Changelog.md).
+All Changes are documented in the [Changelog](CHANGELOG.md).
 
 ## Contributing
 
