@@ -9,6 +9,7 @@ import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
 import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
 import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
+import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solace.spring.cloud.stream.binder.util.SolaceMessageConversionException;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.XMLMessage.Outcome;
@@ -45,6 +46,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     private final String id = UUID.randomUUID().toString();
     private final SolaceConsumerDestination consumerDestination;
     private final JCSMPSession jcsmpSession;
+    private final JCSMPSessionEventHandler jcsmpSessionEventHandler;
     private final ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties;
     private final EndpointProperties endpointProperties;
     private final Optional<SolaceMeterAccessor> solaceMeterAccessor;
@@ -70,6 +72,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
 
     public JCSMPInboundQueueMessageProducer(SolaceConsumerDestination consumerDestination,
                                             JCSMPSession jcsmpSession,
+                                            JCSMPSessionEventHandler jcsmpSessionEventHandler,
                                             ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
                                             @Nullable EndpointProperties endpointProperties,
                                             Optional<SolaceMeterAccessor> solaceMeterAccessor,
@@ -77,6 +80,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                                             Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
         this.consumerDestination = consumerDestination;
         this.jcsmpSession = jcsmpSession;
+        this.jcsmpSessionEventHandler = jcsmpSessionEventHandler;
         this.consumerProperties = consumerProperties;
         this.endpointProperties = endpointProperties;
         this.solaceMeterAccessor = solaceMeterAccessor;
@@ -165,6 +169,12 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 });
         executorService.shutdown(); // All tasks have been submitted
 
+        runPostStart(endpoint);
+        // add subscriptions to queues after reconnect because they might have been lost on the broker depending on the reconnection time
+        this.jcsmpSessionEventHandler.addAfterReconnectTask(() -> runPostStart(endpoint));
+    }
+
+    private void runPostStart(Endpoint endpoint) {
         if (postStart != null) {
             postStart.accept(endpoint);
         }

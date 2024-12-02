@@ -2,10 +2,12 @@ package com.solace.spring.cloud.stream.binder.config;
 
 import com.solace.spring.cloud.stream.binder.SolaceMessageChannelBinder;
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
+import com.solace.spring.cloud.stream.binder.health.handlers.SolaceSessionEventHandler;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceExtendedBindingProperties;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceEndpointProvisioner;
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
+import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solacesystems.jcsmp.Context;
 import com.solacesystems.jcsmp.JCSMPSession;
 import lombok.RequiredArgsConstructor;
@@ -27,12 +29,14 @@ public class SolaceMessageChannelBinderConfiguration {
 
     @Bean
     SolaceMessageChannelBinder solaceMessageChannelBinder(SolaceEndpointProvisioner solaceEndpointProvisioner,
+                                                          JCSMPSessionEventHandler jcsmpSessionEventHandler,
                                                           Optional<SolaceMeterAccessor> solaceMeterAccessor,
                                                           Optional<TracingProxy> tracingProxy,
                                                           Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
         SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession,
                 context,
                 solaceEndpointProvisioner,
+                jcsmpSessionEventHandler,
                 solaceMeterAccessor,
                 tracingProxy,
                 solaceBinderHealthAccessor);
