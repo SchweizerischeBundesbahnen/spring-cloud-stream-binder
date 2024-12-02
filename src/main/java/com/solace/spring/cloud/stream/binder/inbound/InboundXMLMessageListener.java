@@ -144,7 +144,7 @@ abstract class InboundXMLMessageListener implements Runnable {
         try {
             Supplier<Message<?>> createMessageSupplier = () -> createOneMessage(bytesXMLMessage, acknowledgmentCallback);
             Consumer<Message<?>> sendToCustomerConsumer = m -> sendOneToConsumer(m, bytesXMLMessage);
-            if (tracingProxy.isPresent()) {
+            if (tracingProxy.isPresent() && bytesXMLMessage.getProperties() != null) {
                 SDTMap tracingHeader = bytesXMLMessage.getProperties().getMap(TracingProxy.TRACING_HEADER_KEY);
                 if (tracingHeader != null) {
                     sendToCustomerConsumer = tracingProxy.get().wrapInTracingContext(tracingHeader, sendToCustomerConsumer);
