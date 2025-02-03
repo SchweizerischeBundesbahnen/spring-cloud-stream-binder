@@ -1,4 +1,3 @@
 com.solace.spring.cloud.stream.binder.config.autoconfigure.ExtendedBindingHandlerMappingsProviderConfiguration
 com.solace.spring.cloud.stream.binder.config.autoconfigure.SolaceMeterConfiguration
 com.solace.spring.cloud.stream.binder.config.autoconfigure.SolaceTracerConfiguration
-com.solace.spring.cloud.stream.binder.config.autoconfigure.JCSMPSessionConfiguration
