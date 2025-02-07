@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Configuration;
 @ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
 @ConditionalOnEnabledHealthIndicator("binders")
 @EnableConfigurationProperties({SolaceSessionHealthProperties.class})
-@ConditionalOnProperty(name = "solace.java.host")
 public class SolaceHealthIndicatorsConfiguration {
 
     @Bean

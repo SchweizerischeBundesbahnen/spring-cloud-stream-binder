@@ -6,7 +6,6 @@ import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestinat
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
 import com.solace.spring.cloud.stream.binder.util.XMLMessageMapper;
 import com.solacesystems.jcsmp.BytesXMLMessage;
-import com.solacesystems.jcsmp.SDTMap;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -71,11 +70,8 @@ public class JCSMPInboundTopicMessageProducer extends MessageProducerSupport imp
                     message = xmlMessageMapper.map(msg, noop, consumerProperties.getExtension());
                 }
                 Consumer<Message<?>> sendToCustomerConsumer = this::sendMessage;
-                if (tracingProxy.isPresent()) {
-                    SDTMap tracingHeader = msg.getProperties().getMap(TracingProxy.TRACING_HEADER_KEY);
-                    if (tracingHeader != null) {
-                        sendToCustomerConsumer = tracingProxy.get().wrapInTracingContext(tracingHeader, sendToCustomerConsumer);
-                    }
+                if (tracingProxy.isPresent() && msg.getProperties() != null && tracingProxy.get().hasTracingHeader(msg.getProperties())) {
+                    sendToCustomerConsumer = tracingProxy.get().wrapInTracingContext(msg.getProperties(), sendToCustomerConsumer);
                 }
                 sendToCustomerConsumer.accept(message);
                 solaceMeterAccessor.ifPresent(meterAccessor -> meterAccessor.recordMessage(consumerProperties.getBindingName(), msg));

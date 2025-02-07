@@ -9,13 +9,14 @@ import com.solace.spring.cloud.stream.binder.provisioning.SolaceEndpointProvisio
 import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.impl.JCSMPBasicSession;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Lazy;
 
 import java.io.ByteArrayOutputStream;
 import java.util.*;
@@ -26,11 +27,16 @@ import static com.solacesystems.jcsmp.XMLMessage.Outcome.*;
 @RequiredArgsConstructor
 @Configuration
 @Import(SolaceHealthIndicatorsConfiguration.class)
-@ConditionalOnProperty(name = "solace.java.host")
 public class JCSMPSessionConfiguration {
     private final static Map<String, SessionCacheEntry> SESSION_CACHE = new HashMap<>();
 
+    @PreDestroy
+    public void destroy() {
+        SESSION_CACHE.clear();
+    }
+
     @Bean
+    @Lazy
     public JCSMPSessionEventHandler jcsmpSessionEventHandler(JCSMPProperties jcsmpProperties,
                                                              Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
                                                              Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
@@ -39,6 +45,7 @@ public class JCSMPSessionConfiguration {
     }
 
     @Bean
+    @Lazy
     public JCSMPSession jcsmpSession(JCSMPProperties jcsmpProperties,
                                      Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
                                      Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
@@ -47,6 +54,7 @@ public class JCSMPSessionConfiguration {
     }
 
     @Bean
+    @Lazy
     public Context jcsmpContext(JCSMPProperties jcsmpProperties,
                                 Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
                                 Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
@@ -55,6 +63,7 @@ public class JCSMPSessionConfiguration {
     }
 
     @Bean
+    @Lazy
     public SolaceEndpointProvisioner jcsmpProvisioningProvider(JCSMPProperties jcsmpProperties,
                                                                Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
                                                                Optional<SolaceSessionEventHandler> solaceSessionEventHandler,

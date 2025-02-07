@@ -1,8 +1,6 @@
 package com.solace.spring.cloud.stream.binder.tracing;
 
-import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.SDTMap;
-import com.solacesystems.jcsmp.XMLMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.Message;
 
@@ -15,14 +13,19 @@ import java.util.function.Consumer;
  */
 @RequiredArgsConstructor
 public class TracingProxy {
-    public static final String TRACING_HEADER_KEY = "TRACING_HEADER_KEY";
+    public static final String TRACE_PARENT = "traceparent";
+    public static final String TRACE_STATE = "tracestate";
     private final TracingImpl tracingImpl;
 
-    public SDTMap getTracingHeader() {
-        return tracingImpl.getTracingHeader();
+    public boolean hasTracingHeader(SDTMap headerMap) {
+        return headerMap.containsKey(TRACE_PARENT);
     }
 
-    public Consumer<Message<?>> wrapInTracingContext(SDTMap tracingHeader, Consumer<Message<?>> messageConsumer) {
-        return this.tracingImpl.wrapInTracingContext(tracingHeader, messageConsumer);
+    public void injectTracingHeader(SDTMap headerMap) {
+        tracingImpl.injectTracingHeader(headerMap);
+    }
+
+    public Consumer<Message<?>> wrapInTracingContext(SDTMap headerMap, Consumer<Message<?>> messageConsumer) {
+        return this.tracingImpl.wrapInTracingContext(headerMap, messageConsumer);
     }
 }

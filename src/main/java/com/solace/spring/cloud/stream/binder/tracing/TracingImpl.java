@@ -1,6 +1,5 @@
 package com.solace.spring.cloud.stream.binder.tracing;
 
-import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.SDTMap;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
@@ -17,14 +16,13 @@ public class TracingImpl {
     private final Tracer tracer;
     private final Propagator propagator;
 
-    public SDTMap getTracingHeader() {
-        Span span = tracer.currentSpan();
-        if (span != null) {
-            SDTMap tracingHeader = JCSMPFactory.onlyInstance().createMap();
-            propagator.inject(span.context(), tracingHeader, this::putString);
-            return tracingHeader;
+    public void injectTracingHeader(SDTMap headerMap) {
+        if (tracer != null && headerMap != null) {
+            Span span = tracer.currentSpan();
+            if (span != null) {
+                propagator.inject(span.context(), headerMap, this::putString);
+            }
         }
-        return null;
     }
 
 
@@ -42,7 +40,7 @@ public class TracingImpl {
 
     @SneakyThrows
     private void putString(@Nullable SDTMap map, String key, String value) {
-        if (map != null) {
+        if (map != null && (TracingProxy.TRACE_PARENT.equals(key) || TracingProxy.TRACE_STATE.equals(key))) {
             map.putString(key, value);
         }
     }

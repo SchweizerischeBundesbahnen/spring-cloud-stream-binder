@@ -100,12 +100,7 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
                 properties.getExtension().getHeaderExclusions(),
                 properties.getExtension().isNonserializableHeaderConvertToString(),
                 properties.getExtension().getDeliveryMode());
-        if (tracing.isPresent()) {
-            SDTMap tracingHeader = tracing.get().getTracingHeader();
-            if (tracingHeader != null) {
-                smfMessageMapped.getProperties().putMap(TracingProxy.TRACING_HEADER_KEY, tracingHeader);
-            }
-        }
+        tracing.ifPresent(tracingProxy -> tracingProxy.injectTracingHeader(smfMessageMapped.getProperties()));
 
         smfMessageMapped.setCorrelationKey(correlationKey);
         dynamicDestination = getDynamicDestination(message.getHeaders(), correlationKey);

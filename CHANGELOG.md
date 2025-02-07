@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [5.0.5] - 2024-12-02
+## [5.0.6] - 2025-02-07
+### Fixed
+- micrometer trace header on specified header field "traceparent"
+- support @EnableTestBinder - do not load JCSMPSession if not needed
+- support @DirtiesContext - clean JCSMPSession cache on destroy
+
+## [5.0.5] - 2025-01-28
 ### Updated
 - spring boot to 3.4.2
 - spring cloud to 2024.0.0
