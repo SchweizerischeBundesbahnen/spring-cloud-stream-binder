@@ -1,11 +1,9 @@
 package com.solace.spring.cloud.stream.binder.inbound;
 
-import com.solace.spring.cloud.stream.binder.inbound.acknowledge.JCSMPAcknowledgementCallbackFactory;
 import com.solace.spring.cloud.stream.binder.inbound.acknowledge.SolaceAckUtil;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
 import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;

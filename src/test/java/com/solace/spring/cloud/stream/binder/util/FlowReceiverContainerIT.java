@@ -1,7 +1,6 @@
 package com.solace.spring.cloud.stream.binder.util;
 
 import com.solace.spring.boot.autoconfigure.SolaceJavaAutoConfiguration;
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer.FlowReceiverReference;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension;
 import com.solace.test.integration.junit.jupiter.extension.ExecutorServiceExtension.ExecSvc;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;

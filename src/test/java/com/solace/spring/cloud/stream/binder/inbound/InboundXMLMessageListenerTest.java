@@ -1,6 +1,5 @@
 package com.solace.spring.cloud.stream.binder.inbound;
 
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
 import com.solace.spring.cloud.stream.binder.util.UnboundFlowReceiverContainerException;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.StaleSessionException;

@@ -225,8 +225,8 @@ public class SolaceBinderHealthIT {
         log.info("Injecting Mockito spy into flow health indicator: {}", flowHealthId);
         FlowHealthIndicator flowHealthIndicator = Mockito.spy(flowsHealthContributor
                 .getContributor(flowHealthId));
-        flowsHealthContributor.removeFlowContributor(flowHealthId);
-        flowsHealthContributor.addFlowContributor(flowHealthId, flowHealthIndicator);
+        flowsHealthContributor.removeFlowHealthIndicator(flowHealthId);
+        flowsHealthContributor.addFlowHealthIndicator(flowHealthId, flowHealthIndicator);
 
         log.info("Injecting Mockito spy into flows health indicator for binding: {}", consumerProperties.getBindingName());
         flowsHealthContributor = Mockito.spy(flowsHealthContributor);
@@ -251,7 +251,7 @@ public class SolaceBinderHealthIT {
                 .down(Mockito.any());
         Mockito.verify(flowsHealthContributor, Mockito.never()
                         .description("Message NACK should not have caused flow health indicator to be removed"))
-                .removeFlowContributor(Mockito.any());
+                .removeFlowHealthIndicator(Mockito.any());
         Mockito.verify(bindingsHealthContributor, Mockito.never()
                         .description("Message NACK should not have caused health component to be removed"))
                 .removeBindingContributor(Mockito.any());

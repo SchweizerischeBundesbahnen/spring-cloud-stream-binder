@@ -9,8 +9,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 
+@Getter
 public class BindingHealthContributor implements CompositeHealthContributor {
-    @Getter
     private final FlowsHealthContributor flowsHealthContributor;
     private static final String FLOWS = "flows";
 

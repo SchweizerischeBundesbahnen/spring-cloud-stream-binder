@@ -7,7 +7,6 @@ import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHea
 import com.solace.spring.cloud.stream.binder.health.indicators.FlowHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solace.spring.cloud.stream.binder.properties.SolaceSessionHealthProperties;
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
@@ -39,7 +38,7 @@ public class SolaceBinderHealthAccessorTest {
         if (bindingHealthContributorExists) {
             FlowsHealthContributor flowsHealthContributor = new FlowsHealthContributor();
             if (flowHealthExists) {
-                flowsHealthContributor.addFlowContributor("flow-" + concurrencyIdx, new FlowHealthIndicator());
+                flowsHealthContributor.addFlowHealthIndicator("flow-" + concurrencyIdx, new FlowHealthIndicator());
             }
             healthContributor.getSolaceBindingsHealthContributor()
                     .addBindingContributor(bindingName, new BindingHealthContributor(flowsHealthContributor));
@@ -77,7 +76,7 @@ public class SolaceBinderHealthAccessorTest {
         if (bindingHealthContributorExists) {
             FlowsHealthContributor flowsHealthContributor = new FlowsHealthContributor();
             if (flowHealthExists) {
-                flowsHealthContributor.addFlowContributor("flow-" + concurrencyIdx, new FlowHealthIndicator());
+                flowsHealthContributor.addFlowHealthIndicator("flow-" + concurrencyIdx, new FlowHealthIndicator());
             }
             healthContributor.getSolaceBindingsHealthContributor()
                     .addBindingContributor(bindingName, new BindingHealthContributor(flowsHealthContributor));

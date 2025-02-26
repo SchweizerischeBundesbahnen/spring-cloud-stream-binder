@@ -1,14 +1,12 @@
 package com.solace.spring.cloud.stream.binder.inbound;
 
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
-import com.solace.spring.cloud.stream.binder.inbound.acknowledge.JCSMPAcknowledgementCallbackFactory;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestination;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil;
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
 import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
 import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solace.spring.cloud.stream.binder.util.SolaceMessageConversionException;
 import com.solacesystems.jcsmp.*;
