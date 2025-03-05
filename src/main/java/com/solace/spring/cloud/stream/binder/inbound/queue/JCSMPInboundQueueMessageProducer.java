@@ -7,6 +7,7 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestination;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil;
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
+import com.solace.spring.cloud.stream.binder.util.LargeMessageSupport;
 import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
 import com.solace.spring.cloud.stream.binder.util.XMLMessageMapper;
 import com.solacesystems.jcsmp.*;
@@ -54,6 +55,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     private final SolaceFlowEventHandler solaceFlowEventHandler = new SolaceFlowEventHandler();
     private final FlowXMLMessageListener flowXMLMessageListener = new FlowXMLMessageListener();
     private final AtomicReference<FlowReceiver> flowReceiver = new AtomicReference<>();
+    private final LargeMessageSupport largeMessageSupport = new LargeMessageSupport();
 
     private Consumer<Message<?>> wrapInReplyTemplate(Consumer<Message<?>> sendToCustomerConsumer){
         if (retryTemplate.isEmpty()){
@@ -95,6 +97,11 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     }
 
     public void onReceiveConcurrent(BytesXMLMessage bytesXMLMessage) {
+        LargeMessageSupport.MessageContext messageContext = largeMessageSupport.assemble(bytesXMLMessage, acknowledgmentCallback);
+        // we got an incomplete large message and wait for more chunks
+        if (messageContext == null) {
+            return;
+        }
         try {
             Message<?> message = mapMessageToSpring(bytesXMLMessage);
             if (message == null) {
