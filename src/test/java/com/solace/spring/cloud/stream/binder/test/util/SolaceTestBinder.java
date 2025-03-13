@@ -45,7 +45,7 @@ public class SolaceTestBinder
         this.jcsmpSession = jcsmpSession;
         this.sempV2Api = sempV2Api;
         this.context = context;
-        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, context, new SolaceEndpointProvisioner(jcsmpSession), new JCSMPSessionEventHandler(), Optional.empty(), Optional.empty(), Optional.empty());
+        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, context, new SolaceEndpointProvisioner(jcsmpSession), Optional.empty(), Optional.empty(), Optional.empty());
         binder.setApplicationContext(this.applicationContext);
         this.setBinder(binder);
     }
@@ -55,7 +55,7 @@ public class SolaceTestBinder
         this.jcsmpSession = original.jcsmpSession;
         this.sempV2Api = original.sempV2Api;
         this.context = original.context;
-        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, this.context, new SolaceEndpointProvisioner(jcsmpSession), new JCSMPSessionEventHandler(), Optional.empty(), Optional.of(tracingProxy), Optional.empty());
+        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, this.context, new SolaceEndpointProvisioner(jcsmpSession), Optional.empty(), Optional.of(tracingProxy), Optional.empty());
         binder.setApplicationContext(this.applicationContext);
         this.setBinder(binder);
     }

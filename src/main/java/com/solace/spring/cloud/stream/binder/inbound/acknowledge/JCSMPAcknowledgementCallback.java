@@ -1,65 +1,53 @@
 package com.solace.spring.cloud.stream.binder.inbound.acknowledge;
 
 import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
-import com.solace.spring.cloud.stream.binder.util.FlowReceiverContainer;
-import com.solace.spring.cloud.stream.binder.util.MessageContainer;
 import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
+import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.XMLMessage;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.integration.acks.AcknowledgmentCallback;
-import org.springframework.lang.Nullable;
+
+import java.util.Optional;
 
 @Slf4j
-class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
-    private final MessageContainer messageContainer;
-    private final FlowReceiverContainer flowReceiverContainer;
-    private final ErrorQueueInfrastructure errorQueueInfrastructure;
+@RequiredArgsConstructor
+public class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
+    private final BytesXMLMessage message;
+    private final Optional<ErrorQueueInfrastructure> errorQueueInfrastructure;
     private boolean acknowledged = false;
     private boolean autoAckEnabled = true;
 
-
-    JCSMPAcknowledgementCallback(MessageContainer messageContainer,
-                                 FlowReceiverContainer flowReceiverContainer,
-                                 @Nullable ErrorQueueInfrastructure errorQueueInfrastructure) {
-        this.messageContainer = messageContainer;
-        this.flowReceiverContainer = flowReceiverContainer;
-        this.errorQueueInfrastructure = errorQueueInfrastructure;
-    }
-
     @Override
     public void acknowledge(Status status) {
-        // messageContainer.isAcknowledged() might be async set which is why we also need a local ack variable
-        if (acknowledged || messageContainer.isAcknowledged()) {
+        if (acknowledged) {
             log.debug("{} {} is already acknowledged", XMLMessage.class.getSimpleName(),
-                    messageContainer.getMessage().getMessageId());
+                    message.getMessageId());
             return;
         }
-
         try {
             switch (status) {
                 case ACCEPT:
-                    flowReceiverContainer.acknowledge(messageContainer);
+                    message.ackMessage();
                     break;
                 case REJECT:
                     if (republishToErrorQueue()) {
                         break;
                     } else {
-                        flowReceiverContainer.reject(messageContainer);
+                        message.settle(XMLMessage.Outcome.REJECTED);
                     }
                     break;
                 case REQUEUE:
-                    log.debug("{} {}: Will be re-queued onto queue {}",
-                            XMLMessage.class.getSimpleName(), messageContainer.getMessage().getMessageId(),
-                            flowReceiverContainer.getEndpointName());
-                    flowReceiverContainer.requeue(messageContainer);
+                    log.debug("{} {}: Will be re-queued",
+                            XMLMessage.class.getSimpleName(), message.getMessageId());
+                    message.settle(XMLMessage.Outcome.FAILED);
             }
         } catch (SolaceAcknowledgmentException e) {
             throw e;
         } catch (Exception e) {
             throw new SolaceAcknowledgmentException(String.format("Failed to acknowledge XMLMessage %s",
-                    messageContainer.getMessage().getMessageId()), e);
+                    message.getMessageId()), e);
         }
-
         acknowledged = true;
     }
 
@@ -70,27 +58,27 @@ class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
      * defined.
      */
     boolean republishToErrorQueue() {
-        if (errorQueueInfrastructure == null) {
+        if (errorQueueInfrastructure.isEmpty()) {
             return false;
         }
 
         log.debug("{} {}: Will be republished onto error queue {}",
-                XMLMessage.class.getSimpleName(), messageContainer.getMessage().getMessageId(),
-                errorQueueInfrastructure.getErrorQueueName());
+                XMLMessage.class.getSimpleName(), message.getMessageId(),
+                errorQueueInfrastructure.get().getErrorQueueName());
 
         try {
-            errorQueueInfrastructure.createCorrelationKey(messageContainer, flowReceiverContainer).handleError();
+            errorQueueInfrastructure.get().createCorrelationKey(message).handleError();
         } catch (Exception e) {
             throw new SolaceAcknowledgmentException(
                     String.format("Failed to send XMLMessage %s to error queue",
-                            messageContainer.getMessage().getMessageId()), e);
+                            message.getMessageId()), e);
         }
         return true;
     }
 
     @Override
     public boolean isAcknowledged() {
-        return acknowledged || messageContainer.isAcknowledged();
+        return acknowledged;
     }
 
     @Override
@@ -103,11 +91,11 @@ class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
         return autoAckEnabled;
     }
 
-    MessageContainer getMessageContainer() {
-        return messageContainer;
+    BytesXMLMessage getMessage() {
+        return message;
     }
 
     boolean isErrorQueueEnabled() {
-        return errorQueueInfrastructure != null;
+        return errorQueueInfrastructure.isPresent();
     }
 }

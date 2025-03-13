@@ -1,5 +1,6 @@
 package com.solace.spring.cloud.stream.binder.health.indicators;
 
+import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import com.solacesystems.jcsmp.FlowEventArgs;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
@@ -11,17 +12,17 @@ import org.springframework.boot.actuate.health.Status;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class FlowHealthIndicatorTest {
+class SolaceHealthIndicatorTest {
 
     @Test
     public void testInitialHealth() {
-        assertThat(new FlowHealthIndicator().health()).isNotNull();
+        assertThat(new SolaceHealthIndicator().health()).isNotNull();
     }
 
     @Test
     public void testUp(SoftAssertions softly) {
-        FlowHealthIndicator healthIndicator = new FlowHealthIndicator();
-        healthIndicator.up();
+        SolaceHealthIndicator healthIndicator = new SolaceHealthIndicator();
+        healthIndicator.healthUp();
         Health health = healthIndicator.health();
         softly.assertThat(health.getStatus()).isEqualTo(Status.UP);
         softly.assertThat(health.getDetails()).isEmpty();
@@ -29,8 +30,8 @@ class FlowHealthIndicatorTest {
 
     @Test
     public void testDown(SoftAssertions softly) {
-        FlowHealthIndicator healthIndicator = new FlowHealthIndicator();
-        healthIndicator.down(null);
+        SolaceHealthIndicator healthIndicator = new SolaceHealthIndicator();
+        healthIndicator.healthDown(null);
         Health health = healthIndicator.health();
         softly.assertThat(health.getStatus()).isEqualTo(Status.DOWN);
         softly.assertThat(health.getDetails()).isEmpty();
@@ -38,8 +39,8 @@ class FlowHealthIndicatorTest {
 
     @Test
     public void testReconnecting(SoftAssertions softly) {
-        FlowHealthIndicator healthIndicator = new FlowHealthIndicator();
-        healthIndicator.reconnecting(null);
+        SolaceHealthIndicator healthIndicator = new SolaceHealthIndicator();
+        healthIndicator.healthReconnecting(null);
         Health health = healthIndicator.health();
         softly.assertThat(health.getStatus()).isEqualTo(new Status("RECONNECTING"));
         softly.assertThat(health.getDetails()).isEmpty();
@@ -51,18 +52,18 @@ class FlowHealthIndicatorTest {
                             @CartesianTest.Values(ints = {-1, 0, 1}) int responseCode,
                             @CartesianTest.Values(strings = {"", "some-info"}) String info,
                             SoftAssertions softly) {
-        FlowHealthIndicator healthIndicator = new FlowHealthIndicator();
+        SolaceHealthIndicator healthIndicator = new SolaceHealthIndicator();
         Exception healthException = withException ? new Exception("test") : null;
         FlowEventArgs flowEventArgs = new FlowEventArgs(null, info, healthException, responseCode);
         switch (status) {
             case "DOWN":
-                healthIndicator.down(flowEventArgs);
+                healthIndicator.healthDown(flowEventArgs);
                 break;
             case "RECONNECTING":
-                healthIndicator.reconnecting(flowEventArgs);
+                healthIndicator.healthReconnecting(flowEventArgs);
                 break;
             case "UP":
-                healthIndicator.up();
+                healthIndicator.healthUp();
                 break;
             default:
                 throw new IllegalArgumentException("Test error: No handling for status=" + status);
@@ -100,17 +101,17 @@ class FlowHealthIndicatorTest {
     @ParameterizedTest(name = "[{index}] status={0}")
     @ValueSource(strings = {"DOWN", "RECONNECTING", "UP"})
     public void testWithoutDetails(String status, SoftAssertions softly) {
-        FlowHealthIndicator healthIndicator = new FlowHealthIndicator();
+        SolaceHealthIndicator healthIndicator = new SolaceHealthIndicator();
         FlowEventArgs flowEventArgs = new FlowEventArgs(null, "some-info", new RuntimeException("test"), 1);
         switch (status) {
             case "DOWN":
-                healthIndicator.down(flowEventArgs);
+                healthIndicator.healthDown(flowEventArgs);
                 break;
             case "RECONNECTING":
-                healthIndicator.reconnecting(flowEventArgs);
+                healthIndicator.healthReconnecting(flowEventArgs);
                 break;
             case "UP":
-                healthIndicator.up();
+                healthIndicator.healthUp();
                 break;
             default:
                 throw new IllegalArgumentException("Test error: No handling for status=" + status);

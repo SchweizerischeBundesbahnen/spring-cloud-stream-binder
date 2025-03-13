@@ -13,15 +13,14 @@ import com.solace.spring.cloud.stream.binder.test.util.ThrowingFunction;
 import com.solace.spring.cloud.stream.binder.util.DestinationType;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
-import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnTopicEndpoint;
 import com.solace.test.integration.semp.v2.monitor.ApiException;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueue;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueMsg;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueTxFlow;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueTxFlowResponse;
-import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.*;
+import com.solacesystems.jcsmp.Queue;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.assertj.core.api.SoftAssertions;
@@ -30,6 +29,7 @@ import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
@@ -72,6 +72,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
+@Isolated
 public class SolaceBinderProvisioningLifecycleIT {
 
     @Test
@@ -556,13 +557,14 @@ public class SolaceBinderProvisioningLifecycleIT {
                 .map(String::valueOf)
                 .collect(Collectors.toList());
 
-        assertThat(txFlowsIds).hasSize(consumerConcurrency).allSatisfy(flowId -> retryAssert(() ->
+        // only one flow, concurrency is handled internal
+        assertThat(txFlowsIds).hasSize(1).allSatisfy(flowId -> retryAssert(() ->
                 assertThat(sempV2Api.monitor()
                         .getMsgVpnQueueTxFlow(msgVpnName, queue0, flowId, null)
                         .getData()
                         .getAckedMsgCount())
                         .as("Expected all flows to receive exactly %s messages", numMsgsPerFlow)
-                        .isEqualTo(numMsgsPerFlow)));
+                        .isEqualTo(numMsgsPerFlow * consumerConcurrency)));
 
         retryAssert(() -> assertThat(txFlowsIds.stream()
                 .map((ThrowingFunction<String, MonitorMsgVpnQueueTxFlowResponse>)
@@ -645,69 +647,8 @@ public class SolaceBinderProvisioningLifecycleIT {
             fail("Expected consumer provisioning to fail");
         } catch (BinderException e) {
             assertThat(e).hasCauseInstanceOf(MessagingException.class);
-            assertThat(e.getCause().getMessage()).containsIgnoringCase("concurrency must be greater than 0");
-        }
-    }
-
-    @Test
-    public void testFailConsumerWithConcurrencyGreaterThanMax(JCSMPSession jcsmpSession,
-                                                              SempV2Api sempV2Api,
-                                                              SpringCloudStreamContext context,
-                                                              SoftAssertions softly) throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(50);
-        String group0 = RandomStringUtils.randomAlphanumeric(10);
-
-        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
-
-        int concurrency = 2;
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        consumerProperties.setConcurrency(concurrency);
-        consumerProperties.getExtension().setProvisionDurableQueue(false);
-
-        String queue0 = SolaceProvisioningUtil
-                .getQueueNames(destination0, group0, consumerProperties, false)
-                .getConsumerGroupQueueName();
-
-        String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
-
-        Queue queue = JCSMPFactory.onlyInstance().createQueue(queue0);
-        try {
-            long maxBindCount = 1;
-            log.info(String.format("Pre-provisioning queue %s with maxBindCount=%s", queue0, maxBindCount));
-            jcsmpSession.provision(queue, new EndpointProperties(), JCSMPSession.WAIT_FOR_CONFIRM);
-            sempV2Api.config()
-                    .updateMsgVpnQueue(new ConfigMsgVpnQueue().maxBindCount(maxBindCount), vpnName, queue0, null, null);
-
-            try {
-                Binding<MessageChannel> consumerBinding = binder.bindConsumer(
-                        destination0, group0, moduleInputChannel, consumerProperties);
-                consumerBinding.unbind();
-                fail("Expected consumer provisioning to fail");
-            } catch (BinderException e) {
-                softly.assertThat(e).hasCauseInstanceOf(MessagingException.class);
-                softly.assertThat(e.getCause().getMessage()).containsIgnoringCase("failed to get message consumer");
-                softly.assertThat(e.getCause()).hasCauseInstanceOf(JCSMPErrorResponseException.class);
-                softly.assertThat(((JCSMPErrorResponseException) e.getCause().getCause()).getSubcodeEx())
-                        .isEqualTo(JCSMPErrorResponseSubcodeEx.MAX_CLIENTS_FOR_QUEUE);
-            }
-
-            softly.assertThat(sempV2Api.monitor()
-                            .getMsgVpnQueue(vpnName, queue0, null)
-                            .getData()
-                            .getBindSuccessCount())
-                    .as("%s > %s means that there should have been at least one successful bind",
-                            concurrency, maxBindCount)
-                    .isGreaterThan(0);
-            softly.assertThat(sempV2Api.monitor()
-                            .getMsgVpnQueueTxFlows(vpnName, queue0, Integer.MAX_VALUE, null, null, null)
-                            .getData()
-                            .size())
-                    .as("all consumer flows should have been closed if one of them failed to start")
-                    .isEqualTo(0);
-        } finally {
-            jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            assertThat(e.getCause()).hasCauseInstanceOf(MessagingException.class);
+            assertThat(e.getCause().getCause().getMessage()).containsIgnoringCase("concurrency must be greater than 0");
         }
     }
 

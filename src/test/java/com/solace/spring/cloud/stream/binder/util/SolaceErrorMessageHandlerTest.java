@@ -142,7 +142,7 @@ public class SolaceErrorMessageHandlerTest {
         Mockito.verify(acknowledgementCallback1).acknowledge(Status.REQUEUE);
         Mockito.verify(acknowledgementCallback2, Mockito.times(ackCallbackHeaderProvider.equals("all:different") ? 1 : 0))
                 .acknowledge(Status.REQUEUE);
-        Mockito.verify(acknowledgementCallback3, Mockito.times(ackCallbackHeaderProvider.equals("all:different") ? 1 : 0))
+        Mockito.verify(acknowledgementCallback3, Mockito.times(0)) // ack callback on message are priorized
                 .acknowledge(Status.REQUEUE);
     }
 

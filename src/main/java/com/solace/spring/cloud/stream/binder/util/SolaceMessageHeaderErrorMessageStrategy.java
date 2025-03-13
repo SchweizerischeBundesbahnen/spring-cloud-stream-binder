@@ -22,13 +22,28 @@ public class SolaceMessageHeaderErrorMessageStrategy implements ErrorMessageStra
             inputMessage = null;
         } else {
             inputMessage = attributeAccessor.getAttribute(ErrorMessageUtils.INPUT_MESSAGE_CONTEXT_KEY);
-            Object sourceData = attributeAccessor.getAttribute(ATTR_SOLACE_RAW_MESSAGE);
-            if (sourceData != null) {
-                headers.put(IntegrationMessageHeaderAccessor.SOURCE_DATA, sourceData);
+            if (inputMessage instanceof Message<?> msg) {
+                Object sourceData = msg.getHeaders().get(IntegrationMessageHeaderAccessor.SOURCE_DATA);
+                if (sourceData != null) {
+                    headers.put(IntegrationMessageHeaderAccessor.SOURCE_DATA, sourceData);
+                }
+                Object ackCallback = msg.getHeaders().get(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK);
+                if (ackCallback != null) {
+                    headers.put(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK, ackCallback);
+                }
             }
-            Object ackCallback = attributeAccessor.getAttribute(ATTR_SOLACE_ACKNOWLEDGMENT_CALLBACK);
-            if (ackCallback != null) {
-                headers.put(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK, ackCallback);
+            //Fallback to the solace internal headers
+            if (headers.get(IntegrationMessageHeaderAccessor.SOURCE_DATA) == null) {
+                Object sourceData = attributeAccessor.getAttribute(ATTR_SOLACE_RAW_MESSAGE);
+                if (sourceData != null) {
+                    headers.put(IntegrationMessageHeaderAccessor.SOURCE_DATA, sourceData);
+                }
+            }
+            if (headers.get(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK) == null) {
+                Object ackCallback = attributeAccessor.getAttribute(ATTR_SOLACE_ACKNOWLEDGMENT_CALLBACK);
+                if (ackCallback != null) {
+                    headers.put(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK, ackCallback);
+                }
             }
         }
         return inputMessage instanceof Message ? new ErrorMessage(throwable, headers, (Message<?>) inputMessage) :

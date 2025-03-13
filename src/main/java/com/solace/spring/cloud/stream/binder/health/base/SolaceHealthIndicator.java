@@ -28,17 +28,17 @@ public class SolaceHealthIndicator implements HealthIndicator {
         }
     }
 
-    protected void healthUp() {
+    public void healthUp() {
         health = Health.up().build();
         logDebugStatus(String.valueOf(Status.UP));
     }
 
-    protected <T> void healthReconnecting(@Nullable T eventArgs) {
+    public <T> void healthReconnecting(@Nullable T eventArgs) {
         health = addEventDetails(Health.status(STATUS_RECONNECTING), eventArgs).build();
         logDebugStatus(STATUS_RECONNECTING);
     }
 
-    protected <T> void healthDown(@Nullable T eventArgs) {
+    public <T> void healthDown(@Nullable T eventArgs) {
         health = addEventDetails(Health.down(), eventArgs).build();
         logDebugStatus(String.valueOf(Status.DOWN));
     }
