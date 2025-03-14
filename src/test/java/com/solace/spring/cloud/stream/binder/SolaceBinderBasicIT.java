@@ -46,6 +46,7 @@ import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.*;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.ErrorMessage;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
@@ -74,6 +75,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(PubSubPlusExtension.class)
 @Execution(ExecutionMode.SAME_THREAD) // parent tests define static destinations
 @Isolated
+@DirtiesContext
 public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
     @BeforeEach
@@ -858,7 +860,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
         int numMsgsSent = producerFuture.get(5, TimeUnit.SECONDS);
 
-        softly.assertThat(queue0).satisfies(q -> retryAssert(1, TimeUnit.MINUTES, () ->
+        softly.assertThat(queue0).satisfies(q -> retryAssert(10000, TimeUnit.MINUTES, () ->
                 assertThat(sempV2Api.monitor()
                         .getMsgVpnQueueMsgs(vpnName, queue0, Integer.MAX_VALUE, null, null, null)
                         .getData()

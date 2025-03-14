@@ -38,7 +38,9 @@ public class SolaceFlowEventHandler implements FlowEventHandler {
             log.debug("({}): Received Solace Flow event [{}].", source, flowEventArgs);
         }
         if (source instanceof FlowHandle flowHandle) {
-            log.info("FlowEvent bindingName:{} bindingId:{} flowId:{} event:{}", bindingId, bindingName, flowHandle.getFlowId(), flowEventArgs.getEvent());
+            // 0x1FFFFF = 2097151 = 000111111111111111111111 remove everything above 21 bit since solace somehow add a bit there
+            long flowId = flowHandle.getFlowId() & 0x1FFFFF;
+            log.info("FlowEvent bindingName:{} bindingId:{} flowId:{} event:{}", bindingId, bindingName, flowId, flowEventArgs.getEvent());
         }
         if (flowEventArgs.getEvent() != null) {
             switch (flowEventArgs.getEvent()) {

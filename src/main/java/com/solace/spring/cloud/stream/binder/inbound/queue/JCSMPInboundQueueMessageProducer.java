@@ -193,11 +193,16 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 consumerDestination.getBindingDestinationName(),
                 this::onReceiveConcurrent,
                 maxProcessingTimeMs);
+        log.error("Before create");
         this.flowReceiver.set(jcsmpSession.createFlow(flowXMLMessageListener, consumerFlowProperties, endpointProperties, solaceFlowEventHandler));
+        log.error("After create");
         if (!paused.get()) {
+            log.error("Before start");
             this.flowReceiver.get().start();
+            log.error("After start");
         }
         postStart.accept(flowReceiver.get().getEndpoint());
+        log.error("After postStart");
     }
 
     private void checkPropertiesAndBroker() {
@@ -239,6 +244,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 .setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
         consumerFlowProperties.setStartState(!paused.get());
         consumerFlowProperties.addRequiredSettlementOutcomes(XMLMessage.Outcome.ACCEPTED, XMLMessage.Outcome.FAILED, XMLMessage.Outcome.REJECTED);
+        consumerFlowProperties.setActiveFlowIndication(true);
         return consumerFlowProperties;
     }
 
