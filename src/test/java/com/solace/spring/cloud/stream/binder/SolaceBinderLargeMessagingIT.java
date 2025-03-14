@@ -28,6 +28,7 @@ import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
@@ -45,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(SpringCloudStreamExtension.class)
 @Execution(ExecutionMode.SAME_THREAD)
 @Isolated
+@DirtiesContext
 public class SolaceBinderLargeMessagingIT {
 
     @Test

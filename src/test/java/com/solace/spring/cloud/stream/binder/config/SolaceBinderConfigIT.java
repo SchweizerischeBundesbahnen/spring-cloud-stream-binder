@@ -20,6 +20,7 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import java.util.Optional;
@@ -32,6 +33,7 @@ import java.util.regex.Pattern;
  * These are <b>NOT</b> tests regarding {@link SolaceMessageChannelBinder}.
  */
 @Isolated
+@DirtiesContext
 @Execution(ExecutionMode.SAME_THREAD)
 @SpringJUnitConfig(classes = SolaceJavaAutoConfiguration.class, initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)

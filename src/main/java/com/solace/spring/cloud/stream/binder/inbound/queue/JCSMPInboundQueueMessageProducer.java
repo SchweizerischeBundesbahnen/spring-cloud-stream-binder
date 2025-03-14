@@ -239,6 +239,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 .setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
         consumerFlowProperties.setStartState(!paused.get());
         consumerFlowProperties.addRequiredSettlementOutcomes(XMLMessage.Outcome.ACCEPTED, XMLMessage.Outcome.FAILED, XMLMessage.Outcome.REJECTED);
+        consumerFlowProperties.setActiveFlowIndication(true);
         return consumerFlowProperties;
     }
 

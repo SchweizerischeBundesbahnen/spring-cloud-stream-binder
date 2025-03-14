@@ -14,7 +14,6 @@ import com.solace.spring.cloud.stream.binder.util.DestinationType;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnTopicEndpoint;
-import com.solace.test.integration.semp.v2.monitor.ApiException;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueue;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueMsg;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueTxFlow;
@@ -45,6 +44,7 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.MessagingException;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
@@ -73,6 +73,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
 @Isolated
+@DirtiesContext
 public class SolaceBinderProvisioningLifecycleIT {
 
     @Test
@@ -228,35 +229,6 @@ public class SolaceBinderProvisioningLifecycleIT {
     }
 
     @Test
-    public void testFailConsumerProvisioningOnDisablingProvisionDurableQueue(SpringCloudStreamContext context)
-            throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(50);
-        String group0 = RandomStringUtils.randomAlphanumeric(10);
-
-        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
-
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        assertThat(consumerProperties.getExtension().isProvisionDurableQueue()).isTrue();
-        consumerProperties.getExtension().setProvisionDurableQueue(false);
-
-        try {
-            Binding<MessageChannel> consumerBinding = binder.bindConsumer(
-                    destination0, group0, moduleInputChannel, consumerProperties);
-            consumerBinding.unbind();
-            fail("Expected consumer provisioning to fail due to missing queue");
-        } catch (ProvisioningException e) {
-            int expectedSubcodeEx = JCSMPErrorResponseSubcodeEx.UNKNOWN_QUEUE_NAME;
-            assertThat(e).hasCauseInstanceOf(JCSMPErrorResponseException.class);
-            assertThat(((JCSMPErrorResponseException) e.getCause()).getSubcodeEx()).isEqualTo(expectedSubcodeEx);
-            log.info(String.format("Successfully threw a %s exception with cause %s, subcode: %s",
-                    ProvisioningException.class.getSimpleName(), JCSMPErrorResponseException.class.getSimpleName(),
-                    JCSMPErrorResponseSubcodeEx.getSubcodeAsString(expectedSubcodeEx)));
-        }
-    }
-
-    @Test
     public void testFailProducerProvisioningOnDisablingProvisionDurableQueue(SpringCloudStreamContext context,
                                                                              TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = context.getBinder();
@@ -316,36 +288,6 @@ public class SolaceBinderProvisioningLifecycleIT {
         } finally {
             if (consumerBinding != null) consumerBinding.unbind();
             jcsmpSession.deprovision(errorQueue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
-        }
-    }
-
-    @Test
-    public void testFailConsumerProvisioningOnDisablingProvisionErrorQueue(SpringCloudStreamContext context)
-            throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(50);
-        String group0 = RandomStringUtils.randomAlphanumeric(10);
-
-        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
-
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        assertThat(consumerProperties.getExtension().isProvisionErrorQueue()).isTrue();
-        consumerProperties.getExtension().setProvisionErrorQueue(false);
-        consumerProperties.getExtension().setAutoBindErrorQueue(true);
-
-        try {
-            Binding<MessageChannel> consumerBinding = binder.bindConsumer(
-                    destination0, group0, moduleInputChannel, consumerProperties);
-            consumerBinding.unbind();
-            fail("Expected consumer provisioning to fail due to missing error queue");
-        } catch (ProvisioningException e) {
-            int expectedSubcodeEx = JCSMPErrorResponseSubcodeEx.UNKNOWN_QUEUE_NAME;
-            assertThat(e).hasCauseInstanceOf(JCSMPErrorResponseException.class);
-            assertThat(((JCSMPErrorResponseException) e.getCause()).getSubcodeEx()).isEqualTo(expectedSubcodeEx);
-            log.info(String.format("Successfully threw a %s exception with cause %s, subcode: %s",
-                    ProvisioningException.class.getSimpleName(), JCSMPErrorResponseException.class.getSimpleName(),
-                    JCSMPErrorResponseSubcodeEx.getSubcodeAsString(expectedSubcodeEx)));
         }
     }
 
@@ -1656,32 +1598,6 @@ public class SolaceBinderProvisioningLifecycleIT {
         }
     }
 
-    @Test
-    public void testQueueProvisioningDisabledWithProducerDestinationTypeSetToQueue(JCSMPSession jcsmpSession, SpringCloudStreamContext context, SempV2Api sempV2Api,
-                                                                                   TestInfo testInfo) throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-        String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
-
-        DirectChannel moduleOutputChannel = context.createBindableChannel("output", new BindingProperties());
-
-        String destination = RandomStringUtils.randomAlphanumeric(20);
-
-        ExtendedProducerProperties<SolaceProducerProperties> producerProperties = context.createProducerProperties(testInfo);
-        producerProperties.getExtension().setDestinationType(DestinationType.QUEUE);
-        producerProperties.getExtension().setProvisionDurableQueue(false);
-
-        Binding<MessageChannel> producerBinding = null;
-        try {
-            Exception provisioningException = assertThrows(ProvisioningException.class, () -> binder.bindProducer(destination, moduleOutputChannel, producerProperties));
-            assertThat(provisioningException)
-                    .hasMessageContaining(
-                            String.format("Failed to connect test consumer flow to queue %s. Provisioning is disabled, queue was not provisioned nor was its configuration validated.", destination));
-            ApiException apiException = assertThrows(ApiException.class, () -> sempV2Api.monitor().getMsgVpnQueue(vpnName, destination, null));
-            assertThat(apiException.getCode()).isEqualTo(400);
-        } finally {
-            if (producerBinding != null) producerBinding.unbind();
-        }
-    }
 
     @Test
     public void testProducerDestinationTypeSetToQueueWithRequiredGroups(SpringCloudStreamContext context, TestInfo testInfo) throws Exception {
