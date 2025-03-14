@@ -437,9 +437,9 @@
                                         --add-opens java.base/java.net=ALL-UNNAMED
                                     </argLine>
                                     <properties>
-<!--                                        <configurationParameters>-->
-<!--                                            junit.jupiter.execution.parallel.enabled=true-->
-<!--                                        </configurationParameters>-->
+                                        <configurationParameters>
+                                            junit.jupiter.execution.parallel.enabled=true
+                                        </configurationParameters>
                                     </properties>
                                 </configuration>
                             </execution>
