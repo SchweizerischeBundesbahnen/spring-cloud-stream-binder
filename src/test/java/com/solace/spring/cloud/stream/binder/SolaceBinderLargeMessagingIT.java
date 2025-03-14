@@ -45,7 +45,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
 @Execution(ExecutionMode.SAME_THREAD)
-@Isolated
 @DirtiesContext
 public class SolaceBinderLargeMessagingIT {
 

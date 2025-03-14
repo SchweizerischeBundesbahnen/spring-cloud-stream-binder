@@ -72,7 +72,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
-@Isolated
 @DirtiesContext
 public class SolaceBinderProvisioningLifecycleIT {
 
