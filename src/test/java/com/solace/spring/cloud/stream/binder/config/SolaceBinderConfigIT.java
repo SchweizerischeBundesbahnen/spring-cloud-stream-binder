@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
  * <p>
  * These are <b>NOT</b> tests regarding {@link SolaceMessageChannelBinder}.
  */
+@Isolated
 @DirtiesContext
 @Execution(ExecutionMode.SAME_THREAD)
 @SpringJUnitConfig(classes = SolaceJavaAutoConfiguration.class, initializers = ConfigDataApplicationContextInitializer.class)

@@ -57,6 +57,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(SpringCloudStreamExtension.class)
 @Slf4j
 @AutoConfigureObservability
+@Isolated
 @DirtiesContext
 public class SolaceBinderTracingIT {
     @Autowired

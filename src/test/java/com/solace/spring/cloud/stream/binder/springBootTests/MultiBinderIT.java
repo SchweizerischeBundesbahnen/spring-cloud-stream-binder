@@ -5,6 +5,7 @@ import com.solacesystems.jcsmp.*;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Note: not using the PubSubPlusExtension as it appears to trigger after Spring Boot Application is started.
  * Left as an exercise to convert to it if possible. This would prevent a second broker from being started.
  */
+@Isolated
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("multibinder")

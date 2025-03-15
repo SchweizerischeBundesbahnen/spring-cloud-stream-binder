@@ -74,6 +74,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(PubSubPlusExtension.class)
 @Execution(ExecutionMode.SAME_THREAD) // parent tests define static destinations
+@Isolated
 @DirtiesContext
 public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
