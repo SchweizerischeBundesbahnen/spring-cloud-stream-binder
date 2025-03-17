@@ -21,8 +21,8 @@ import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
 import com.solace.test.integration.semp.v2.monitor.ApiException;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueue;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueTxFlow;
-import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.*;
+import com.solacesystems.jcsmp.Queue;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.assertj.core.api.InstanceOfAssertFactories;
@@ -31,6 +31,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
@@ -42,9 +43,10 @@ import org.springframework.integration.StaticMessageHeaderAccessor;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.context.IntegrationContextUtils;
 import org.springframework.integration.support.MessageBuilder;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.*;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.support.ErrorMessage;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
@@ -57,8 +59,8 @@ import java.util.stream.IntStream;
 
 import static com.solace.spring.cloud.stream.binder.test.util.RetryableAssertions.retryAssert;
 import static com.solace.spring.cloud.stream.binder.test.util.SolaceSpringCloudStreamAssertions.*;
-import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -72,6 +74,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(ExecutorServiceExtension.class)
 @ExtendWith(PubSubPlusExtension.class)
 @Execution(ExecutionMode.SAME_THREAD) // parent tests define static destinations
+@Isolated
+@DirtiesContext
 public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
     @BeforeEach
@@ -810,13 +814,10 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         final Set<String> uniquePayloadsReceived = new HashSet<>();
         consumerInfrastructureUtil.subscribe(moduleInputChannel, executor, message1 -> {
             @SuppressWarnings("unchecked")
-            List<byte[]> payloads = consumerProperties.isBatchMode() ? (List<byte[]>) message1.getPayload() :
-                    Collections.singletonList((byte[]) message1.getPayload());
-            for (byte[] payload : payloads) {
-                numMsgsConsumed.incrementAndGet();
-                log.trace(String.format("Received message %s", new String(payload)));
-                uniquePayloadsReceived.add(new String(payload));
-            }
+            byte[] payload = (byte[]) message1.getPayload();
+            numMsgsConsumed.incrementAndGet();
+            log.trace(String.format("Received message %s", new String(payload)));
+            uniquePayloadsReceived.add(new String(payload));
         });
 
         AtomicBoolean producerStop = new AtomicBoolean(false);
@@ -1084,9 +1085,8 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         consumerBinding.pause();
         consumerBinding.stop();
         assertThat(getQueueTxFlows(sempV2Api, vpnName, queueName, 1)).hasSize(0);
-        consumerBinding.resume();
-        assertThat(getQueueTxFlows(sempV2Api, vpnName, queueName, 1)).hasSize(0);
         consumerBinding.start();
+        consumerBinding.resume();
         assertEquals(defaultWindowSize, getQueueTxFlows(sempV2Api, vpnName, queueName, 1).get(0).getWindowSize());
 
         consumerBinding.unbind();
@@ -1111,9 +1111,9 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
         consumerBinding.stop();
         assertThat(getQueueTxFlows(sempV2Api, vpnName, queueName, 1)).hasSize(0);
-        consumerBinding.pause(); //Has no effect
-        consumerBinding.resume(); //Has no effect
+        consumerBinding.pause();
         consumerBinding.start();
+        consumerBinding.resume();
         assertEquals(defaultWindowSize, getQueueTxFlows(sempV2Api, vpnName, queueName, 1).get(0).getWindowSize());
 
         consumerBinding.unbind();

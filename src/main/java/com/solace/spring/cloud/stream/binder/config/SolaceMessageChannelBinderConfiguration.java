@@ -29,14 +29,12 @@ public class SolaceMessageChannelBinderConfiguration {
 
     @Bean
     SolaceMessageChannelBinder solaceMessageChannelBinder(SolaceEndpointProvisioner solaceEndpointProvisioner,
-                                                          JCSMPSessionEventHandler jcsmpSessionEventHandler,
                                                           Optional<SolaceMeterAccessor> solaceMeterAccessor,
                                                           Optional<TracingProxy> tracingProxy,
                                                           Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
         SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession,
                 context,
                 solaceEndpointProvisioner,
-                jcsmpSessionEventHandler,
                 solaceMeterAccessor,
                 tracingProxy,
                 solaceBinderHealthAccessor);

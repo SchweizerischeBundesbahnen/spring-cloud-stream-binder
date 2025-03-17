@@ -244,11 +244,9 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
         Binding<T> consumerBinding = consumerInfrastructureUtil.createBinding(binder,
                 destination0, group0, moduleInputChannel, consumerProperties);
 
-        List<Message<?>> messages = IntStream.range(0, 1)
-                .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
-                        .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
-                        .build())
-                .collect(Collectors.toList());
+        List<Message<?>> messages = List.of(MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
+                .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
+                .build());
 
         context.binderBindUnbindLatency();
 

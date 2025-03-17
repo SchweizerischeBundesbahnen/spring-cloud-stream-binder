@@ -21,8 +21,8 @@ public class ErrorQueueInfrastructure {
         this.consumerProperties = consumerProperties;
     }
 
-    public void send(MessageContainer messageContainer, ErrorQueueRepublishCorrelationKey key) throws JCSMPException {
-        XMLMessage xmlMessage = xmlMessageMapper.mapError(messageContainer.getMessage(), consumerProperties);
+    public void send(BytesXMLMessage message, ErrorQueueRepublishCorrelationKey key) throws JCSMPException {
+        XMLMessage xmlMessage = xmlMessageMapper.mapError(message, consumerProperties);
         xmlMessage.setCorrelationKey(key);
         Queue queue = JCSMPFactory.onlyInstance().createQueue(errorQueueName);
         XMLMessageProducer producer;
@@ -38,9 +38,8 @@ public class ErrorQueueInfrastructure {
         producer.send(xmlMessage, queue);
     }
 
-    public ErrorQueueRepublishCorrelationKey createCorrelationKey(MessageContainer messageContainer,
-                                                                  FlowReceiverContainer flowReceiverContainer) {
-        return new ErrorQueueRepublishCorrelationKey(this, messageContainer, flowReceiverContainer);
+    public ErrorQueueRepublishCorrelationKey createCorrelationKey(BytesXMLMessage message) {
+        return new ErrorQueueRepublishCorrelationKey(this, message);
     }
 
     public String getErrorQueueName() {

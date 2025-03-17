@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <include resource="org/springframework/boot/logging/logback/base.xml"/>
-    <logger name="CONSOLE" level="OFF"/>
+    <logger name="CONSOLE" level="DEBUG"/>
+    <logger name="com.solacesystems.jcsmp" level="DEBUG"/>
     <logger name="com.solace.spring.cloud.stream.binder" level="OFF"/>
     <logger name="com.solace.spring.cloud.stream.binder.inbound.BatchCollector" level="OFF"/>
     <logger name="com.solace.spring.cloud.stream.binder.inbound.acknowledge" level="OFF"/>

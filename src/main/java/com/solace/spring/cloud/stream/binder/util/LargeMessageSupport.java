@@ -92,7 +92,7 @@ public class LargeMessageSupport {
             if (chunkArray[chunkIndex] == null) {
                 chunkArray[chunkIndex] = new MessageContextBytes((BytesMessage) smfMessage, acknowledgmentCallback, Instant.now());
             } else {
-                log.warn("Duplicate chunk id:{} index:{} of {} received, drop it", chunkId, chunkIndex, chunkCount);
+                log.warn("Duplicate chunk id={} index={} of {} received, drop it", chunkId, chunkIndex, chunkCount);
                 return null;
             }
             int length = 0;

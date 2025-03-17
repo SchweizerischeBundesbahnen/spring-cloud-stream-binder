@@ -2,11 +2,9 @@ package com.solace.spring.cloud.stream.binder.properties;
 
 import com.solace.spring.cloud.stream.binder.util.QualityOfService;
 import com.solacesystems.jcsmp.EndpointProperties;
-import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.util.Assert;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -103,6 +101,10 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * Indicated if messages should be consumed using a queue or directly via topic.
      */
     private QualityOfService qualityOfService = QualityOfService.AT_LEAST_ONCE;
+    /**
+     * Time in milliseconds till a long running consumer is logged as warning, defaults to 1000 ms.
+     */
+    private long maxProcessingTimeMs = 1000;
     // ------------------------
 
     /**

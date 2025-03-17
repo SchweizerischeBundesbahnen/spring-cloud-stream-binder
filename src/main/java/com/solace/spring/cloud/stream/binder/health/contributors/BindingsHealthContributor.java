@@ -1,5 +1,6 @@
 package com.solace.spring.cloud.stream.binder.health.contributors;
 
+import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import org.springframework.boot.actuate.health.CompositeHealthContributor;
 import org.springframework.boot.actuate.health.HealthContributor;
 import org.springframework.boot.actuate.health.NamedContributor;
@@ -9,10 +10,10 @@ import java.util.Iterator;
 import java.util.Map;
 
 public class BindingsHealthContributor implements CompositeHealthContributor {
-    private final Map<String, BindingHealthContributor> bindingHealthContributor = new HashMap<>();
+    private final Map<String, SolaceHealthIndicator> bindingHealthContributor = new HashMap<>();
 
-    public void addBindingContributor(String bindingName, BindingHealthContributor bindingHealthContributor) {
-        this.bindingHealthContributor.put(bindingName, bindingHealthContributor);
+    public void addBindingContributor(String bindingName, SolaceHealthIndicator bindingHealthIndicator) {
+        this.bindingHealthContributor.put(bindingName, bindingHealthIndicator);
     }
 
     public void removeBindingContributor(String bindingName) {
@@ -20,7 +21,7 @@ public class BindingsHealthContributor implements CompositeHealthContributor {
     }
 
     @Override
-    public BindingHealthContributor getContributor(String bindingName) {
+    public SolaceHealthIndicator getContributor(String bindingName) {
         return bindingHealthContributor.get(bindingName);
     }
 

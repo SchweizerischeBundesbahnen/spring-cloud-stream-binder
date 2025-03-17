@@ -348,12 +348,9 @@ public class XMLMessageMapper {
         }
     }
 
-    public void resetIgnoredProperties(String flowReceiverId) {
+    public void resetIgnoredProperties() {
         if (ignoredHeaderProperties.isEmpty()) {
             return;
-        }
-        if (log.isDebugEnabled()) {
-            log.debug(String.format("Clearing ignored properties %s on flow receiver container %s", ignoredHeaderProperties, flowReceiverId));
         }
         ignoredHeaderProperties.clear();
     }

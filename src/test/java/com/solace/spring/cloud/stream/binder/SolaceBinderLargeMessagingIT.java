@@ -15,6 +15,7 @@ import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.BinderHeaders;
@@ -27,6 +28,7 @@ import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
@@ -42,6 +44,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringJUnitConfig(classes = SolaceJavaAutoConfiguration.class, initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
+@Execution(ExecutionMode.SAME_THREAD)
+@Isolated
+@DirtiesContext
 public class SolaceBinderLargeMessagingIT {
 
     @Test

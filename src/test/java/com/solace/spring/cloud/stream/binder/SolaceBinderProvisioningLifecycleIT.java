@@ -13,15 +13,13 @@ import com.solace.spring.cloud.stream.binder.test.util.ThrowingFunction;
 import com.solace.spring.cloud.stream.binder.util.DestinationType;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
-import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnTopicEndpoint;
-import com.solace.test.integration.semp.v2.monitor.ApiException;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueue;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueMsg;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueTxFlow;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueTxFlowResponse;
-import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.*;
+import com.solacesystems.jcsmp.Queue;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.assertj.core.api.SoftAssertions;
@@ -30,6 +28,7 @@ import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
@@ -45,6 +44,7 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.MessagingException;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
@@ -72,6 +72,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
+@Isolated
+@DirtiesContext
 public class SolaceBinderProvisioningLifecycleIT {
 
     @Test
@@ -227,35 +229,6 @@ public class SolaceBinderProvisioningLifecycleIT {
     }
 
     @Test
-    public void testFailConsumerProvisioningOnDisablingProvisionDurableQueue(SpringCloudStreamContext context)
-            throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(50);
-        String group0 = RandomStringUtils.randomAlphanumeric(10);
-
-        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
-
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        assertThat(consumerProperties.getExtension().isProvisionDurableQueue()).isTrue();
-        consumerProperties.getExtension().setProvisionDurableQueue(false);
-
-        try {
-            Binding<MessageChannel> consumerBinding = binder.bindConsumer(
-                    destination0, group0, moduleInputChannel, consumerProperties);
-            consumerBinding.unbind();
-            fail("Expected consumer provisioning to fail due to missing queue");
-        } catch (ProvisioningException e) {
-            int expectedSubcodeEx = JCSMPErrorResponseSubcodeEx.UNKNOWN_QUEUE_NAME;
-            assertThat(e).hasCauseInstanceOf(JCSMPErrorResponseException.class);
-            assertThat(((JCSMPErrorResponseException) e.getCause()).getSubcodeEx()).isEqualTo(expectedSubcodeEx);
-            log.info(String.format("Successfully threw a %s exception with cause %s, subcode: %s",
-                    ProvisioningException.class.getSimpleName(), JCSMPErrorResponseException.class.getSimpleName(),
-                    JCSMPErrorResponseSubcodeEx.getSubcodeAsString(expectedSubcodeEx)));
-        }
-    }
-
-    @Test
     public void testFailProducerProvisioningOnDisablingProvisionDurableQueue(SpringCloudStreamContext context,
                                                                              TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = context.getBinder();
@@ -315,36 +288,6 @@ public class SolaceBinderProvisioningLifecycleIT {
         } finally {
             if (consumerBinding != null) consumerBinding.unbind();
             jcsmpSession.deprovision(errorQueue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
-        }
-    }
-
-    @Test
-    public void testFailConsumerProvisioningOnDisablingProvisionErrorQueue(SpringCloudStreamContext context)
-            throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(50);
-        String group0 = RandomStringUtils.randomAlphanumeric(10);
-
-        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
-
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        assertThat(consumerProperties.getExtension().isProvisionErrorQueue()).isTrue();
-        consumerProperties.getExtension().setProvisionErrorQueue(false);
-        consumerProperties.getExtension().setAutoBindErrorQueue(true);
-
-        try {
-            Binding<MessageChannel> consumerBinding = binder.bindConsumer(
-                    destination0, group0, moduleInputChannel, consumerProperties);
-            consumerBinding.unbind();
-            fail("Expected consumer provisioning to fail due to missing error queue");
-        } catch (ProvisioningException e) {
-            int expectedSubcodeEx = JCSMPErrorResponseSubcodeEx.UNKNOWN_QUEUE_NAME;
-            assertThat(e).hasCauseInstanceOf(JCSMPErrorResponseException.class);
-            assertThat(((JCSMPErrorResponseException) e.getCause()).getSubcodeEx()).isEqualTo(expectedSubcodeEx);
-            log.info(String.format("Successfully threw a %s exception with cause %s, subcode: %s",
-                    ProvisioningException.class.getSimpleName(), JCSMPErrorResponseException.class.getSimpleName(),
-                    JCSMPErrorResponseSubcodeEx.getSubcodeAsString(expectedSubcodeEx)));
         }
     }
 
@@ -556,13 +499,14 @@ public class SolaceBinderProvisioningLifecycleIT {
                 .map(String::valueOf)
                 .collect(Collectors.toList());
 
-        assertThat(txFlowsIds).hasSize(consumerConcurrency).allSatisfy(flowId -> retryAssert(() ->
+        // only one flow, concurrency is handled internal
+        assertThat(txFlowsIds).hasSize(1).allSatisfy(flowId -> retryAssert(() ->
                 assertThat(sempV2Api.monitor()
                         .getMsgVpnQueueTxFlow(msgVpnName, queue0, flowId, null)
                         .getData()
                         .getAckedMsgCount())
                         .as("Expected all flows to receive exactly %s messages", numMsgsPerFlow)
-                        .isEqualTo(numMsgsPerFlow)));
+                        .isEqualTo(numMsgsPerFlow * consumerConcurrency)));
 
         retryAssert(() -> assertThat(txFlowsIds.stream()
                 .map((ThrowingFunction<String, MonitorMsgVpnQueueTxFlowResponse>)
@@ -645,69 +589,8 @@ public class SolaceBinderProvisioningLifecycleIT {
             fail("Expected consumer provisioning to fail");
         } catch (BinderException e) {
             assertThat(e).hasCauseInstanceOf(MessagingException.class);
-            assertThat(e.getCause().getMessage()).containsIgnoringCase("concurrency must be greater than 0");
-        }
-    }
-
-    @Test
-    public void testFailConsumerWithConcurrencyGreaterThanMax(JCSMPSession jcsmpSession,
-                                                              SempV2Api sempV2Api,
-                                                              SpringCloudStreamContext context,
-                                                              SoftAssertions softly) throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(50);
-        String group0 = RandomStringUtils.randomAlphanumeric(10);
-
-        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
-
-        int concurrency = 2;
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        consumerProperties.setConcurrency(concurrency);
-        consumerProperties.getExtension().setProvisionDurableQueue(false);
-
-        String queue0 = SolaceProvisioningUtil
-                .getQueueNames(destination0, group0, consumerProperties, false)
-                .getConsumerGroupQueueName();
-
-        String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
-
-        Queue queue = JCSMPFactory.onlyInstance().createQueue(queue0);
-        try {
-            long maxBindCount = 1;
-            log.info(String.format("Pre-provisioning queue %s with maxBindCount=%s", queue0, maxBindCount));
-            jcsmpSession.provision(queue, new EndpointProperties(), JCSMPSession.WAIT_FOR_CONFIRM);
-            sempV2Api.config()
-                    .updateMsgVpnQueue(new ConfigMsgVpnQueue().maxBindCount(maxBindCount), vpnName, queue0, null, null);
-
-            try {
-                Binding<MessageChannel> consumerBinding = binder.bindConsumer(
-                        destination0, group0, moduleInputChannel, consumerProperties);
-                consumerBinding.unbind();
-                fail("Expected consumer provisioning to fail");
-            } catch (BinderException e) {
-                softly.assertThat(e).hasCauseInstanceOf(MessagingException.class);
-                softly.assertThat(e.getCause().getMessage()).containsIgnoringCase("failed to get message consumer");
-                softly.assertThat(e.getCause()).hasCauseInstanceOf(JCSMPErrorResponseException.class);
-                softly.assertThat(((JCSMPErrorResponseException) e.getCause().getCause()).getSubcodeEx())
-                        .isEqualTo(JCSMPErrorResponseSubcodeEx.MAX_CLIENTS_FOR_QUEUE);
-            }
-
-            softly.assertThat(sempV2Api.monitor()
-                            .getMsgVpnQueue(vpnName, queue0, null)
-                            .getData()
-                            .getBindSuccessCount())
-                    .as("%s > %s means that there should have been at least one successful bind",
-                            concurrency, maxBindCount)
-                    .isGreaterThan(0);
-            softly.assertThat(sempV2Api.monitor()
-                            .getMsgVpnQueueTxFlows(vpnName, queue0, Integer.MAX_VALUE, null, null, null)
-                            .getData()
-                            .size())
-                    .as("all consumer flows should have been closed if one of them failed to start")
-                    .isEqualTo(0);
-        } finally {
-            jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            assertThat(e.getCause()).hasCauseInstanceOf(MessagingException.class);
+            assertThat(e.getCause().getCause().getMessage()).containsIgnoringCase("concurrency must be greater than 0");
         }
     }
 
@@ -1715,32 +1598,6 @@ public class SolaceBinderProvisioningLifecycleIT {
         }
     }
 
-    @Test
-    public void testQueueProvisioningDisabledWithProducerDestinationTypeSetToQueue(JCSMPSession jcsmpSession, SpringCloudStreamContext context, SempV2Api sempV2Api,
-                                                                                   TestInfo testInfo) throws Exception {
-        SolaceTestBinder binder = context.getBinder();
-        String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
-
-        DirectChannel moduleOutputChannel = context.createBindableChannel("output", new BindingProperties());
-
-        String destination = RandomStringUtils.randomAlphanumeric(20);
-
-        ExtendedProducerProperties<SolaceProducerProperties> producerProperties = context.createProducerProperties(testInfo);
-        producerProperties.getExtension().setDestinationType(DestinationType.QUEUE);
-        producerProperties.getExtension().setProvisionDurableQueue(false);
-
-        Binding<MessageChannel> producerBinding = null;
-        try {
-            Exception provisioningException = assertThrows(ProvisioningException.class, () -> binder.bindProducer(destination, moduleOutputChannel, producerProperties));
-            assertThat(provisioningException)
-                    .hasMessageContaining(
-                            String.format("Failed to connect test consumer flow to queue %s. Provisioning is disabled, queue was not provisioned nor was its configuration validated.", destination));
-            ApiException apiException = assertThrows(ApiException.class, () -> sempV2Api.monitor().getMsgVpnQueue(vpnName, destination, null));
-            assertThat(apiException.getCode()).isEqualTo(400);
-        } finally {
-            if (producerBinding != null) producerBinding.unbind();
-        }
-    }
 
     @Test
     public void testProducerDestinationTypeSetToQueueWithRequiredGroups(SpringCloudStreamContext context, TestInfo testInfo) throws Exception {

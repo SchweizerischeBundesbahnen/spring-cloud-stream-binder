@@ -85,7 +85,10 @@ public class JCSMPInboundTopicMessageProducer extends MessageProducerSupport imp
         Set<String> topics = new HashSet<>();
         String prefix = "";
         if (!StringUtils.isEmpty(this.group)) {
-            prefix = "#share/" + this.group + "/";
+            if (this.group.contains("/")) {
+                log.warn("group contains invalid characters /, it will be replaced with -: {}", this.group);
+            }
+            prefix = "#share/" + this.group.replaceAll("/", "-") + "/";
         }
         topics.add(prefix + consumerDestination.getBindingDestinationName());
         if (!CollectionUtils.isEmpty(consumerDestination.getAdditionalSubscriptions())) {

@@ -1,7 +1,7 @@
 package com.solace.spring.cloud.stream.binder;
 
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
-import com.solace.spring.cloud.stream.binder.inbound.JCSMPInboundQueueMessageProducer;
+import com.solace.spring.cloud.stream.binder.inbound.queue.JCSMPInboundQueueMessageProducer;
 import com.solace.spring.cloud.stream.binder.inbound.topic.JCSMPInboundTopicMessageMultiplexer;
 import com.solace.spring.cloud.stream.binder.inbound.topic.JCSMPInboundTopicMessageProducer;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
@@ -25,10 +25,11 @@ import org.springframework.integration.core.MessageProducer;
 import org.springframework.integration.support.ErrorMessageStrategy;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
+import org.springframework.retry.RecoveryCallback;
+import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -43,8 +44,6 @@ public class SolaceMessageChannelBinder
     private final JCSMPInboundTopicMessageMultiplexer jcsmpInboundTopicMessageMultiplexer;
     private final Context jcsmpContext;
     private final JCSMPSessionProducerManager sessionProducerManager;
-    private final JCSMPSessionEventHandler jcsmpSessionEventHandler;
-    private final AtomicBoolean consumersRemoteStopFlag = new AtomicBoolean(false);
     private final String errorHandlerProducerKey = UUID.randomUUID().toString();
     private final Optional<SolaceMeterAccessor> solaceMeterAccessor;
     private final Optional<TracingProxy> tracingProxy;
@@ -57,14 +56,12 @@ public class SolaceMessageChannelBinder
     public SolaceMessageChannelBinder(JCSMPSession jcsmpSession,
                                       Context jcsmpContext,
                                       SolaceEndpointProvisioner solaceEndpointProvisioner,
-                                      JCSMPSessionEventHandler jcsmpSessionEventHandler,
                                       Optional<SolaceMeterAccessor> solaceMeterAccessor,
                                       Optional<TracingProxy> tracingProxy,
                                       Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
         super(new String[0], solaceEndpointProvisioner);
         this.jcsmpSession = jcsmpSession;
         this.jcsmpContext = jcsmpContext;
-        this.jcsmpSessionEventHandler = jcsmpSessionEventHandler;
         this.solaceMeterAccessor = solaceMeterAccessor;
         this.tracingProxy = tracingProxy;
         this.solaceBinderHealthAccessor = solaceBinderHealthAccessor;
@@ -85,7 +82,6 @@ public class SolaceMessageChannelBinder
         if (sessionProducerManager != null) {
             sessionProducerManager.release(errorHandlerProducerKey);
         }
-        consumersRemoteStopFlag.set(true);
         if (jcsmpSession != null) {
             jcsmpSession.closeSession();
         }
@@ -116,47 +112,60 @@ public class SolaceMessageChannelBinder
 
     @Override
     protected MessageProducer createConsumerEndpoint(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
-        if (properties.getExtension() != null && properties.getExtension().getQualityOfService() == QualityOfService.AT_MOST_ONCE) {
-            return createTopicMessageProducer(destination, group, properties);
-        }
         if (properties.isBatchMode()) {
             throw new IllegalArgumentException("Batched consumers are not supported");
+        }
+        if (properties.getExtension() != null && properties.getExtension().getQualityOfService() == QualityOfService.AT_MOST_ONCE) {
+            return createTopicMessageProducer(destination, group, properties);
         }
         return createQueueMessageProducer(destination, group, properties);
     }
 
-    protected MessageProducer createQueueMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
-        SolaceConsumerDestination solaceDestination = (SolaceConsumerDestination) destination;
+    protected MessageProducer createQueueMessageProducer(ConsumerDestination destination,
+                                                         String group,
+                                                         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties) {
 
-        JCSMPInboundQueueMessageProducer adapter = new JCSMPInboundQueueMessageProducer(
-                solaceDestination,
-                jcsmpSession,
-                jcsmpSessionEventHandler,
-                properties,
-                getConsumerEndpointProperties(properties),
-                solaceMeterAccessor,
-                tracingProxy,
-                solaceBinderHealthAccessor);
+        SolaceConsumerDestination consumerDestination = (SolaceConsumerDestination) destination;
+        EndpointProperties endpointProperties = getConsumerEndpointProperties(consumerProperties);
+        Optional<RetryTemplate> retryTemplate;
+        Optional<RecoveryCallback<?>> recoveryCallback;
+        Optional<ErrorQueueInfrastructure> errorQueueInfrastructure;
 
-        adapter.setRemoteStopFlag(consumersRemoteStopFlag);
-        adapter.setPostStart(getConsumerPostStart(solaceDestination, properties));
-
-        if (properties.getExtension().isAutoBindErrorQueue()) {
-            adapter.setErrorQueueInfrastructure(new ErrorQueueInfrastructure(
+        if (consumerProperties.getExtension().isAutoBindErrorQueue()) {
+            errorQueueInfrastructure = Optional.of(new ErrorQueueInfrastructure(
                     sessionProducerManager,
                     errorHandlerProducerKey,
-                    solaceDestination.getErrorQueueName(),
-                    properties.getExtension()));
+                    consumerDestination.getErrorQueueName(),
+                    consumerProperties.getExtension()));
+        } else {
+            errorQueueInfrastructure = Optional.empty();
         }
 
-        ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, group, properties);
-        if (properties.getMaxAttempts() > 1) {
-            adapter.setRetryTemplate(buildRetryTemplate(properties));
-            adapter.setRecoveryCallback(errorInfra.getRecoverer());
+        ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, group, consumerProperties);
+        if (consumerProperties.getMaxAttempts() > 1) {
+            retryTemplate = Optional.of(buildRetryTemplate(consumerProperties));
+            recoveryCallback = Optional.of(errorInfra.getRecoverer());
         } else {
+            retryTemplate = Optional.empty();
+            recoveryCallback = Optional.empty();
+        }
+
+        JCSMPInboundQueueMessageProducer adapter = new JCSMPInboundQueueMessageProducer(
+                consumerDestination,
+                jcsmpSession,
+                consumerProperties,
+                endpointProperties,
+                getConsumerPostStart(consumerDestination, consumerProperties),
+                solaceMeterAccessor,
+                tracingProxy,
+                solaceBinderHealthAccessor,
+                retryTemplate,
+                recoveryCallback,
+                errorQueueInfrastructure);
+
+        if (retryTemplate.isEmpty()){
             adapter.setErrorChannel(errorInfra.getErrorChannel());
         }
-
         adapter.setErrorMessageStrategy(errorMessageStrategy);
         return adapter;
 
