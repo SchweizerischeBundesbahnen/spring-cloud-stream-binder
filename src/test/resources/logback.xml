@@ -2,7 +2,7 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/base.xml"/>
     <logger name="CONSOLE" level="TRACE"/>
-<!--    <logger name="com.solacesystems.jcsmp" level="DEBUG"/>-->
+    <logger name="com.solacesystems.jcsmp" level="TRACE"/>
     <logger name="com.solace.spring.cloud.stream.binder" level="TRACE"/>
     <logger name="com.solace.spring.cloud.stream.binder.inbound.BatchCollector" level="TRACE"/>
     <logger name="com.solace.spring.cloud.stream.binder.inbound.acknowledge" level="TRACE"/>
