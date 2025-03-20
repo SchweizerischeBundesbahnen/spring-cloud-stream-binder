@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## [5.0.7] - 2025-03-21
+### Added
+- logging of flowId on consumer and producer
+
+### Changed
+- One flow per binding, multiple threads if concurrency is set, push from jcsmp library instead of polling
+- Updated Libraries
+
 ## [5.0.6] - 2025-02-07
 ### Fixed
 - micrometer trace header on specified header field "traceparent"
