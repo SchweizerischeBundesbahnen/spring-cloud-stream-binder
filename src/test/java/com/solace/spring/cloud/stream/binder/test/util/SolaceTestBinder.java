@@ -147,7 +147,7 @@ public class SolaceTestBinder
                     log.info("Skipping de-provisioning as queue name is invalid; queue was never provisioned {}", endpointEntry);
                     continue;
                 }
-                jcsmpSession.deprovision(endpoint, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+                jcsmpSession.deprovision(endpoint, JCSMPSession.WAIT_FOR_CONFIRM);
             } catch (JCSMPException | AccessDeniedException e) {
                 try {
                     String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);

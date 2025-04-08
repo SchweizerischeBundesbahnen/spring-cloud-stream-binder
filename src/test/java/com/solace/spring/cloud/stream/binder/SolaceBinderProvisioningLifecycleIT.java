@@ -131,7 +131,7 @@ public class SolaceBinderProvisioningLifecycleIT {
         } finally {
             if (producerBinding != null) producerBinding.unbind();
             if (consumerBinding != null) consumerBinding.unbind();
-            jcsmpSession.deprovision(endpoint, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(endpoint, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 
@@ -188,7 +188,7 @@ public class SolaceBinderProvisioningLifecycleIT {
         } finally {
             if (producerBinding != null) producerBinding.unbind();
             if (consumerBinding != null) consumerBinding.unbind();
-            jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(queue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 
@@ -317,7 +317,7 @@ public class SolaceBinderProvisioningLifecycleIT {
             context.binderBindUnbindLatency();
         } finally {
             if (consumerBinding != null) consumerBinding.unbind();
-            jcsmpSession.deprovision(errorQueue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(errorQueue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 
@@ -1487,7 +1487,7 @@ public class SolaceBinderProvisioningLifecycleIT {
             } finally {
                 if (producerBinding != null) producerBinding.unbind();
                 consumerBinding.unbind();
-                jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+                jcsmpSession.deprovision(queue, JCSMPSession.WAIT_FOR_CONFIRM);
             }
         }
     }
@@ -1557,7 +1557,7 @@ public class SolaceBinderProvisioningLifecycleIT {
         } finally {
             if (producerBinding != null) producerBinding.unbind();
             consumerBinding.unbind();
-            jcsmpSession.deprovision(errorQueue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(errorQueue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 
@@ -1654,7 +1654,7 @@ public class SolaceBinderProvisioningLifecycleIT {
             softly.assertThat(vpnQueue.getAccessType()).isEqualTo(MonitorMsgVpnQueue.AccessTypeEnum.NON_EXCLUSIVE);
         } finally {
             if (producerBinding != null) producerBinding.unbind();
-            jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(queue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 

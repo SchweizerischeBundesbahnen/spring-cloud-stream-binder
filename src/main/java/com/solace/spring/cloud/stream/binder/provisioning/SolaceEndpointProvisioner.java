@@ -4,7 +4,6 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceCommonProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties;
 import com.solace.spring.cloud.stream.binder.util.DestinationType;
-import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solacesystems.jcsmp.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -151,7 +150,11 @@ public class SolaceEndpointProvisioner
             if (isDurable) {
                 endpoint = JCSMPFactory.onlyInstance().createQueue(name);
                 if (doDurableProvisioning) {
-                    jcsmpSession.provision(endpoint, endpointProperties, JCSMPSession.FLAG_IGNORE_ALREADY_EXISTS);
+                    try {
+                        jcsmpSession.provision(endpoint, endpointProperties, JCSMPSession.WAIT_FOR_CONFIRM);
+                    } catch (JCSMPErrorResponseException e) {
+                        log.trace("Ignore failed provision of durable endpoint {}: {}", name, e.getMessage());
+                    }
                 } else {
                     log.debug("Provisioning is disabled, {} will not be provisioned nor will its configuration be validated",
                             name);
@@ -167,45 +170,7 @@ public class SolaceEndpointProvisioner
             throw new ProvisioningException(msg, e);
         }
 
-        if (isDurable && testFlowCxn) {
-            testFlowConnection(endpoint, endpointProperties, consumerFlowProperties, doDurableProvisioning);
-        } else {
-            log.trace("Skipping test consumer flow connection for {} {}", endpoint.getClass().getSimpleName(), name);
-        }
-
         return endpoint;
-    }
-
-    private void testFlowConnection(Endpoint endpoint,
-                                    EndpointProperties endpointProperties,
-                                    ConsumerFlowProperties consumerFlowProperties,
-                                    boolean wasDurableProvisioned) {
-        String endpointType = getEndpointTypeLabel(endpoint);
-
-        try {
-            log.info("Testing consumer flow connection to {} {} (will not start it)",
-                    endpointType, endpoint.getName());
-            final ConsumerFlowProperties testFlowProperties = consumerFlowProperties.setEndpoint(endpoint)
-                    .setStartState(false);
-            jcsmpSession.createFlow(null, testFlowProperties, endpointProperties).close();
-            log.info("Connected test consumer flow to {} {}, closing it",
-                    endpointType, endpoint.getName());
-        } catch (JCSMPException e) {
-            String msg = String.format("Failed to connect test consumer flow to %s %s",
-                    endpointType, endpoint.getName());
-
-            if (endpoint.isDurable() && !wasDurableProvisioned) {
-                msg += ". Provisioning is disabled, " + endpointType +
-                        " was not provisioned nor was its configuration validated.";
-            }
-
-            if (e instanceof InvalidOperationException && !endpoint.isDurable()) {
-                msg += ". If the Solace client is not capable of creating temporary " + endpointType +
-                        ", consider assigning this consumer to a group?";
-            }
-            log.warn(msg, e);
-            throw new ProvisioningException(msg, e);
-        }
     }
 
     private Queue provisionErrorQueue(String errorQueueName, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {

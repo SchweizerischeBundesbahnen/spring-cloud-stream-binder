@@ -358,7 +358,7 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
                     .build());
             assertThat(errorLatch.await(10, TimeUnit.SECONDS)).isTrue();
         } finally {
-            jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(queue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
 
         producerBinding.unbind();

@@ -472,7 +472,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
             log.info(String.format("Successfully threw a %s exception with cause %s",
                     ProvisioningException.class.getSimpleName(), PropertyMismatchException.class.getSimpleName()));
         } finally {
-            jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(queue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 
@@ -506,7 +506,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
             log.info(String.format("Successfully threw a %s exception with cause %s",
                     ProvisioningException.class.getSimpleName(), PropertyMismatchException.class.getSimpleName()));
         } finally {
-            jcsmpSession.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(queue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 
@@ -541,7 +541,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
             log.info(String.format("Successfully threw a %s exception with cause %s",
                     ProvisioningException.class.getSimpleName(), PropertyMismatchException.class.getSimpleName()));
         } finally {
-            jcsmpSession.deprovision(errorQueue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            jcsmpSession.deprovision(errorQueue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 

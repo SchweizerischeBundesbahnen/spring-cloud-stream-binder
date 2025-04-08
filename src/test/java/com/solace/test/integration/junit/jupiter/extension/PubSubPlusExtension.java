@@ -688,7 +688,7 @@ public class PubSubPlusExtension implements ParameterResolver {
         @Override
         public void close() throws Throwable {
             log.trace("Deprovisioning queue {}", queue.getName());
-            session.deprovision(queue, JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            session.deprovision(queue, JCSMPSession.WAIT_FOR_CONFIRM);
         }
     }
 }
