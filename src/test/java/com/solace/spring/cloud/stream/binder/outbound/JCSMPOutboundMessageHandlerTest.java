@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cloud.stream.binder.BinderHeaders;
 import org.springframework.cloud.stream.binder.ExtendedProducerProperties;
 import org.springframework.cloud.stream.provisioning.ProducerDestination;
+import org.springframework.integration.IntegrationMessageHeaderAccessor;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
@@ -41,6 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 
@@ -434,6 +436,30 @@ public class JCSMPOutboundMessageHandlerTest {
                 .satisfies(
                         p -> assertThat(p.getWindowSize()).isEqualTo(pubAckWindowSize),
                         p -> assertThat(p.getAckEventMode()).isEqualTo(ackEventMode));
+    }
+
+    @Test
+    public void testSourceDataNotThrowUnknownObject() {
+        TextMessage textMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+        Message<?> message = MessageGenerator.generateMessage(
+                        i -> RandomStringUtils.randomAlphanumeric(100),
+                        i -> Map.of(IntegrationMessageHeaderAccessor.SOURCE_DATA, textMessage)
+                )
+                .build();
+        messageHandler.start();
+        assertDoesNotThrow(() -> messageHandler.handleMessage(message));
+    }
+
+    @Test
+    public void testAcknowledgementNotThrowUnknownObject() {
+        TextMessage textMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+        Message<?> message = MessageGenerator.generateMessage(
+                        i -> RandomStringUtils.randomAlphanumeric(100),
+                        i -> Map.of(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK, textMessage)
+                )
+                .build();
+        messageHandler.start();
+        assertDoesNotThrow(() -> messageHandler.handleMessage(message));
     }
 
     private List<Object> getCorrelationKeys() throws JCSMPException {

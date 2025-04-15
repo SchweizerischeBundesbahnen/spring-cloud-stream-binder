@@ -238,6 +238,10 @@ public class XMLMessageMapper {
             if (excludedHeaders != null && excludedHeaders.contains(header.getKey())) {
                 continue;
             }
+            if (IntegrationMessageHeaderAccessor.SOURCE_DATA.equals(header.getKey()) ||
+                    IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK.equals(header.getKey())) {
+                continue;
+            }
 
             addSDTMapObject(metadata, serializedHeaders, header.getKey(), header.getValue(), convertNonSerializableHeadersToString);
         }
@@ -346,13 +350,6 @@ public class XMLMessageMapper {
                 throw e;
             }
         }
-    }
-
-    public void resetIgnoredProperties() {
-        if (ignoredHeaderProperties.isEmpty()) {
-            return;
-        }
-        ignoredHeaderProperties.clear();
     }
 
     enum Encoder {
