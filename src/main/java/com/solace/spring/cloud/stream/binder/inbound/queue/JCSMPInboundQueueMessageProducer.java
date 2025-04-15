@@ -188,6 +188,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         setupFlowEventHandler();
         ConsumerFlowProperties consumerFlowProperties = getConsumerFlowProperties(endpointName);
         long maxProcessingTimeMs = consumerProperties.getExtension().getMaxProcessingTimeMs();
+        this.solaceMeterAccessor.ifPresent(ma -> this.flowXMLMessageListener.setSolaceMeterAccessor(ma, consumerProperties.getBindingName()));
         this.flowXMLMessageListener.startReceiverThreads(
                 consumerProperties.getConcurrency(),
                 consumerDestination.getBindingDestinationName(),

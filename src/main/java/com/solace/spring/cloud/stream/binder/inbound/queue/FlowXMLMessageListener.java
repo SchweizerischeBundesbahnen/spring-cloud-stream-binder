@@ -1,5 +1,6 @@
 package com.solace.spring.cloud.stream.binder.inbound.queue;
 
+import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.XMLMessage;
@@ -13,6 +14,7 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -20,10 +22,17 @@ import java.util.function.Consumer;
 public class FlowXMLMessageListener implements XMLMessageListener {
     @SuppressWarnings("MismatchedReadAndWriteOfArray") // to keep the messageId's in memory and be able to analyze them in the stacktrace
     private final String[] messageIdRingBuffer = new String[128];
-    private int messageIdIndex = 0;
     private final BlockingQueue<BytesXMLMessage> messageQueue = new LinkedBlockingDeque<>();
     private final Set<MessageInProgress> activeMessages = new HashSet<>();
+    private final AtomicReference<SolaceMeterAccessor> solaceMeterAccessor = new AtomicReference<>();
+    private final AtomicReference<String> bindingName = new AtomicReference<>();
+    private int messageIdIndex = 0;
     private volatile boolean running = true;
+
+    public void setSolaceMeterAccessor(SolaceMeterAccessor solaceMeterAccessor, String bindingName) {
+        this.solaceMeterAccessor.set(solaceMeterAccessor);
+        this.bindingName.set(bindingName);
+    }
 
     public void startReceiverThreads(int count, String threadNamePrefix, Consumer<BytesXMLMessage> messageConsumer, long maxProcessingTimeMs) {
         if (maxProcessingTimeMs < 100) {
@@ -49,6 +58,10 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     private void watchdog(long maxProcessingTimeMs) {
         while (running) {
             try {
+                if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
+                    solaceMeterAccessor.get().recordQueueSize(this.bindingName.get(), messageQueue.size());
+                    solaceMeterAccessor.get().recordActiveMessages(this.bindingName.get(), activeMessages.size());
+                }
                 long currentTimeMillis = System.currentTimeMillis();
                 long sleepMillis = maxProcessingTimeMs / 2;
                 synchronized (activeMessages) {
