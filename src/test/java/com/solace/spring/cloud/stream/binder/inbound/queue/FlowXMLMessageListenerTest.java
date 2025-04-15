@@ -101,11 +101,11 @@ class FlowXMLMessageListenerTest {
         long sendTimeMs = (afterSend - start) / 1000000L;
         assertThat(sendTimeMs)
                 .as("sendTimeMs is not within the expected range")
-                .isBetween(1000L, 1500L);
+                .isBetween(0L, 500L);
 
         // Wait until 20 elements are in the results list
         assertThat(results).satisfies(r ->
-                await().atMost(1500, TimeUnit.MILLISECONDS).until(() -> r.size() == 20)
+                await().atMost(2500, TimeUnit.MILLISECONDS).until(() -> r.size() == 20)
         );
     }
 

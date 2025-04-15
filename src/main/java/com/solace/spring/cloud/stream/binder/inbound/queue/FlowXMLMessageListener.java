@@ -10,7 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -20,7 +21,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     @SuppressWarnings("MismatchedReadAndWriteOfArray") // to keep the messageId's in memory and be able to analyze them in the stacktrace
     private final String[] messageIdRingBuffer = new String[128];
     private int messageIdIndex = 0;
-    private final SynchronousQueue<BytesXMLMessage> messageSynchronousQueue = new SynchronousQueue<>();
+    private final BlockingQueue<BytesXMLMessage> messageQueue = new LinkedBlockingDeque<>();
     private final Set<MessageInProgress> activeMessages = new HashSet<>();
     private volatile boolean running = true;
 
@@ -77,7 +78,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     private void loop(String threadName, Consumer<BytesXMLMessage> messageConsumer) {
         while (running) {
             try {
-                BytesXMLMessage polled = messageSynchronousQueue.poll(1, TimeUnit.SECONDS);
+                BytesXMLMessage polled = messageQueue.poll(1, TimeUnit.SECONDS);
                 if (polled != null) {
                     MessageInProgress mip = new MessageInProgress(System.currentTimeMillis(), threadName, polled);
                     synchronized (activeMessages) {
@@ -99,7 +100,13 @@ public class FlowXMLMessageListener implements XMLMessageListener {
         log.debug("Received BytesXMLMessage:{}", bytesXMLMessage);
         keepMessageIdInMemoryForDebugPurposes(bytesXMLMessage);
         try {
-            messageSynchronousQueue.put(bytesXMLMessage);
+            int i = 0;
+            while (i++ < 100) {
+                // since the messageQueue is unbounded this should never happen and is here for paranoia and because the blocking put had strange behaviours
+                if (messageQueue.offer(bytesXMLMessage, 1, TimeUnit.SECONDS)) {
+                    return;
+                }
+            }
         } catch (InterruptedException e) {
             log.warn("unable to add message:{}", bytesXMLMessage);
             try {
