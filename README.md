@@ -25,6 +25,7 @@ Consult the table below to determine which version of the BOM you need to use:
 
 | Spring Cloud | Spring Cloud Stream Binder Solace | Spring Boot | sol-jcsmp |
 |--------------|-----------------------------------|-------------|-----------|
+| 2024.0.1     | 5.0.10                            | 3.4.4       | 10.27.1   |
 | 2024.0.1     | 5.0.8                             | 3.4.4       | 10.26.0   |
 | 2024.0.1     | 5.0.7                             | 3.4.3       | 10.25.2   |
 | 2024.0.0     | 5.0.6                             | 3.4.2       | 10.25.2   |

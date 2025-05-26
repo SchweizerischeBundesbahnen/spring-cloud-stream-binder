@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 
 
+
+
+## [5.0.10] - 2025-05-26
+### Fixed
+- updated sol-jcsmp to 27.0.1 to fiy windows size 0 issue
+- fix a NPE when Micrometer is not available
+
+
 ## [5.0.8] - 2025-04-15
 ### Feature
 - meter for local queue and active processing
