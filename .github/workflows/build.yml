@@ -1,13 +1,16 @@
-name: Build
+name: Build, Package, and Test
 
 on:
   push:
     branches-ignore:
       - 'master'
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build
+    name: Build and Package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,5 +19,38 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: 'maven'
       - name: Build with Maven
         run: mvn -B package --file pom.xml --no-transfer-progress
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+  integration-tests:
+    name: Run Integration Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Restore Maven cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: IT-Tests with Maven
+        run: mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml --no-transfer-progress
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: '**/target/surefire-reports/TEST-*.xml'
