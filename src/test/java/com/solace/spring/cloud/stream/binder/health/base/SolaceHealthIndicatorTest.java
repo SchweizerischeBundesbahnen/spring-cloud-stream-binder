@@ -27,7 +27,7 @@ class SolaceHealthIndicatorTest {
     @Test
     void healthReconnecting() {
         this.solaceHealthIndicator.healthReconnecting(null);
-        assertEquals(this.solaceHealthIndicator.health(), Health.status("RECONNECTING").build());
+        assertEquals(this.solaceHealthIndicator.health(), Health.down().build());
     }
 
     @Test

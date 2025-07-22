@@ -16,7 +16,6 @@ import java.util.Optional;
 @Slf4j
 @NoArgsConstructor
 public class SolaceHealthIndicator implements HealthIndicator {
-    private static final String STATUS_RECONNECTING = "RECONNECTING";
     private static final String INFO = "info";
     private static final String RESPONSE_CODE = "responseCode";
     @Setter(AccessLevel.PACKAGE)
@@ -34,8 +33,8 @@ public class SolaceHealthIndicator implements HealthIndicator {
     }
 
     public <T> void healthReconnecting(@Nullable T eventArgs) {
-        health = addEventDetails(Health.status(STATUS_RECONNECTING), eventArgs).build();
-        logDebugStatus(STATUS_RECONNECTING);
+        health = addEventDetails(Health.down(), eventArgs).build();
+        logDebugStatus(String.valueOf(Status.DOWN));
     }
 
     public <T> void healthDown(@Nullable T eventArgs) {

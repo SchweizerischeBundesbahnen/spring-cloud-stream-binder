@@ -1,6 +1,5 @@
 package com.solace.spring.cloud.stream.binder.health.indicators;
 
-import com.solace.spring.cloud.stream.binder.properties.SolaceSessionHealthProperties;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.impl.SessionEventArgsImpl;
 import org.assertj.core.api.SoftAssertions;
@@ -11,18 +10,17 @@ import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.Status;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SessionHealthIndicatorTest {
     @Test
     public void testInitialHealth() {
-        assertNotNull(new SessionHealthIndicator(new SolaceSessionHealthProperties()).health());
+        assertNotNull(new SessionHealthIndicator().health());
     }
 
     @Test
     void testUp() {
-        SessionHealthIndicator healthIndicator = new SessionHealthIndicator(new SolaceSessionHealthProperties());
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         healthIndicator.up();
         assertEquals(healthIndicator.health(), Health.up().build());
         assertTrue(healthIndicator.getHealth(true).getDetails().isEmpty());
@@ -30,61 +28,34 @@ class SessionHealthIndicatorTest {
 
     @Test
     void testReconnecting() {
-        SessionHealthIndicator healthIndicator = new SessionHealthIndicator(new SolaceSessionHealthProperties());
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         healthIndicator.reconnecting(null);
-        assertEquals(healthIndicator.health().getStatus(), Health.status("RECONNECTING").build().getStatus());
+        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
         assertTrue(healthIndicator.getHealth(true).getDetails().isEmpty());
     }
 
-    @ParameterizedTest(name = "[{index}] reconnectAttemptsUntilDown={0}")
-    @ValueSource(longs = {1, 10})
-    void testReconnectingDownThresholdReached(long reconnectAttemptsUntilDown, SoftAssertions softly) {
-        SolaceSessionHealthProperties properties = new SolaceSessionHealthProperties();
-        properties.setReconnectAttemptsUntilDown(reconnectAttemptsUntilDown);
-        SessionHealthIndicator healthIndicator = new SessionHealthIndicator(properties);
-        for (int i = 0; i < reconnectAttemptsUntilDown; i++) {
-            healthIndicator.reconnecting(null);
-            softly.assertThat(healthIndicator.health()).satisfies(h -> assertThat(h.getStatus()).isEqualTo(new Status("RECONNECTING")), h -> assertThat(h.getDetails()).isEmpty());
-        }
+    @Test
+    void testReconnectingAlwaysGoesDown() {
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
 
-        for (int i = 0; i < 3; i++) {
-            healthIndicator.reconnecting(null);
-            softly.assertThat(healthIndicator.health().getStatus()).isEqualTo(Status.DOWN);
-        }
-    }
-
-    @ParameterizedTest(name = "[{index}] resetStatus={0}")
-    @ValueSource(strings = {"DOWN", "UP"})
-    public void testReconnectingDownThresholdReset(String resetStatus, SoftAssertions softly) {
-        SolaceSessionHealthProperties properties = new SolaceSessionHealthProperties();
-        properties.setReconnectAttemptsUntilDown(1L);
-        SessionHealthIndicator healthIndicator = new SessionHealthIndicator(properties);
-
+        // Test that reconnecting always immediately goes down
         healthIndicator.reconnecting(null);
-        softly.assertThat(healthIndicator.health().getStatus()).isEqualTo(new Status("RECONNECTING"));
-        healthIndicator.reconnecting(null);
-        softly.assertThat(healthIndicator.health().getStatus()).isEqualTo(Status.DOWN);
+        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
 
-        switch (resetStatus) {
-            case "DOWN":
-                healthIndicator.down(null);
-                break;
-            case "UP":
-                healthIndicator.up();
-                break;
-            default:
-                throw new IllegalArgumentException("Test error: No handling for status=" + resetStatus);
-        }
+        // Test that subsequent reconnecting calls also go down
+        healthIndicator.reconnecting(null);
+        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
 
+        // Test that after going up, reconnecting still goes down
+        healthIndicator.up();
+        assertEquals(healthIndicator.health().getStatus(), Status.UP);
         healthIndicator.reconnecting(null);
-        softly.assertThat(healthIndicator.health().getStatus()).isEqualTo(new Status("RECONNECTING"));
-        healthIndicator.reconnecting(null);
-        softly.assertThat(healthIndicator.health().getStatus()).isEqualTo(Status.DOWN);
+        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
     }
 
     @Test
     void testDown() {
-        SessionHealthIndicator healthIndicator = new SessionHealthIndicator(new SolaceSessionHealthProperties());
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         healthIndicator.down(null);
         assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
         assertTrue(healthIndicator.getHealth(true).getDetails().isEmpty());
@@ -92,15 +63,18 @@ class SessionHealthIndicatorTest {
 
     @CartesianTest(name = "[{index}] status={0} withException={1} responseCode={2} info={3}")
     public void testDetails(@CartesianTest.Values(strings = {"DOWN", "RECONNECTING", "UP"}) String status, @CartesianTest.Values(booleans = {false, true}) boolean withException, @CartesianTest.Values(ints = {-1, 0, 1}) int responseCode, @CartesianTest.Values(strings = {"", "some-info"}) String info, SoftAssertions softly) {
-        SessionHealthIndicator healthIndicator = new SessionHealthIndicator(new SolaceSessionHealthProperties());
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         Exception healthException = withException ? new Exception("test") : null;
         SessionEventArgs sessionEventArgs = new SessionEventArgsImpl(null, info, healthException, responseCode);
+        String expectedStatus = status;
+
         switch (status) {
             case "DOWN":
                 healthIndicator.down(sessionEventArgs);
                 break;
             case "RECONNECTING":
                 healthIndicator.reconnecting(sessionEventArgs);
+                expectedStatus = "DOWN"; // reconnecting now goes to DOWN
                 break;
             case "UP":
                 healthIndicator.up();
@@ -110,21 +84,21 @@ class SessionHealthIndicatorTest {
         }
         Health health = healthIndicator.health();
 
-        softly.assertThat(health.getStatus()).isEqualTo(new Status(status));
+        softly.assertThat(health.getStatus()).isEqualTo(new Status(expectedStatus));
 
-        if (withException && !status.equals("UP")) {
+        if (withException && !expectedStatus.equals("UP")) {
             softly.assertThat(health.getDetails()).isNotEmpty().extractingByKey("error").isEqualTo(healthException.getClass().getName() + ": " + healthException.getMessage());
         } else {
             softly.assertThat(health.getDetails()).doesNotContainKey("error");
         }
 
-        if (responseCode != 0 && !status.equals("UP")) {
+        if (responseCode != 0 && !expectedStatus.equals("UP")) {
             softly.assertThat(health.getDetails()).extractingByKey("responseCode").isEqualTo(responseCode);
         } else {
             softly.assertThat(health.getDetails()).doesNotContainKey("responseCode");
         }
 
-        if (!info.isEmpty() && !status.equals("UP")) {
+        if (!info.isEmpty() && !expectedStatus.equals("UP")) {
             softly.assertThat(health.getDetails()).extractingByKey("info").isEqualTo(info);
         } else {
             softly.assertThat(health.getDetails()).doesNotContainKey("info");
@@ -133,15 +107,18 @@ class SessionHealthIndicatorTest {
 
     @ParameterizedTest(name = "[{index}] status={0}")
     @ValueSource(strings = {"DOWN", "RECONNECTING", "UP"})
-    public void testWithoutDetails(String status, SoftAssertions softly) {
-        SessionHealthIndicator healthIndicator = new SessionHealthIndicator(new SolaceSessionHealthProperties());
+    public void testWithoutDetails(String status) {
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         SessionEventArgs sessionEventArgs = new SessionEventArgsImpl(null, "some-info", new RuntimeException("test"), 1);
+        String expectedStatus = status;
+
         switch (status) {
             case "DOWN":
                 healthIndicator.down(sessionEventArgs);
                 break;
             case "RECONNECTING":
                 healthIndicator.reconnecting(sessionEventArgs);
+                expectedStatus = "DOWN"; // reconnecting now goes to DOWN
                 break;
             case "UP":
                 healthIndicator.up();
@@ -150,7 +127,7 @@ class SessionHealthIndicatorTest {
                 throw new IllegalArgumentException("Test error: No handling for status=" + status);
         }
         Health health = healthIndicator.getHealth(false);
-        softly.assertThat(health.getStatus()).isEqualTo(new Status(status));
-        softly.assertThat(health.getDetails()).isEmpty();
+        assertEquals(new Status(expectedStatus), health.getStatus());
+        assertTrue(health.getDetails().isEmpty());
     }
 }

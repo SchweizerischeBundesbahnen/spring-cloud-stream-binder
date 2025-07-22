@@ -508,17 +508,7 @@ Default: `PERSISTENT`
 
 ==== Solace Connection Health-Check Properties
 
-These properties configure the Solace connection's health indicator configurable under `solace.health-check.connection`.
-
-reconnectAttemptsUntilDown::
-The number of session reconnect attempts until the health goes `DOWN`.
-This will happen regardless if the underlying session is actually still reconnecting.
-Setting this to `0` will disable this feature.
-+
-This feature operates independently of the PubSub+ session reconnect feature.
-Meaning that if PubSub+ session reconnect is configured to retry less than the value given to this property, then this feature effectively does nothing.
-+
-Default: `0`
+The Solace connection health indicator immediately reports `DOWN` status when the connection is down or reconnecting. This ensures that health checks accurately reflect the current connection state without any delay or threshold configuration.
 
 === Solace Message Headers
 

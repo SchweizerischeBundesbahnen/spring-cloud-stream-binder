@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 
 
+## [6.0.2] - 2025-07-22
+### Removed
+- **BREAKING CHANGE**: Removed the `reconnectAttemptsUntilDown` feature from health check configuration
+- Removed `SolaceSessionHealthProperties.reconnectAttemptsUntilDown` property
+
+### Changed
+- Health indicator now immediately reports `DOWN` status when connection is down or reconnecting
+- Simplified health check behavior for more accurate connection state reporting
+
 ## [6.0.1] - 2025-06-16
 ### Fixed
 - Improved restart/reconnection reliability with proper null checks and cleanup in flow receiver handling
