@@ -2,8 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.0.1] - 2025-08-04
+### Fixed
+- Updated sol-jcsmp to 10.27.3 from 10.27.2 to fix binary update on retransmitting a message can lead to corrupt message, finally provoking broker restart (EBP-1167)
+### Changed
+- Updated Spring Boot to 3.5.4 from 3.5.3
+- Updated okhttp (okhttp3) to 5.1.0 from 4.12.0
+- Updated logging-interceptor (okhttp3) to 5.1.0 from 4.12.0
+- Updated swagger-annotations to 2.2.35 from 2.2.30
+- Updated swagger-models to 2.2.35 from 2.2.30
+- Updated swagger-codegen-maven-plugin to 3.0.71 from 3.0.69
+- Updated spring-boot-maven-plugin to 3.5.4 from 3.5.3
 
-## [6.0.2] - 2025-07-22
+## [7.0.0] - 2025-07-22
 ### Removed
 - **BREAKING CHANGE**: Removed the `reconnectAttemptsUntilDown` feature from health check configuration
 - Removed `SolaceSessionHealthProperties.reconnectAttemptsUntilDown` property
@@ -46,7 +57,7 @@ All notable changes to this project will be documented in this file.
 
 ## [5.0.10] - 2025-05-26
 ### Fixed
-- updated sol-jcsmp to 27.0.1 to fiy windows size 0 issue
+- updated sol-jcsmp to 27.0.1 to fix windows size 0 issue
 - fix a NPE when Micrometer is not available
 
 
