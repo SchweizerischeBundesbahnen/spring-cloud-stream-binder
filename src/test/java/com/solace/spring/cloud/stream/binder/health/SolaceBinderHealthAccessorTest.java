@@ -4,7 +4,6 @@ import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.contributors.BindingsHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
-import com.solace.spring.cloud.stream.binder.properties.SolaceSessionHealthProperties;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,7 +19,7 @@ public class SolaceBinderHealthAccessorTest {
     @Test
     public void testBindingHealthIndicator() {
         SolaceBinderHealthContributor healthContributor = new SolaceBinderHealthContributor(
-                new SessionHealthIndicator(new SolaceSessionHealthProperties()),
+                new SessionHealthIndicator(),
                 new BindingsHealthContributor());
         SolaceBinderHealthAccessor healthAccessor = new SolaceBinderHealthAccessor(healthContributor);
 

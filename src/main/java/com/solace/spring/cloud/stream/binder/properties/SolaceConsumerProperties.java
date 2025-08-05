@@ -102,9 +102,9 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      */
     private QualityOfService qualityOfService = QualityOfService.AT_LEAST_ONCE;
     /**
-     * Time in milliseconds till a long running consumer is logged as warning, defaults to 1000 ms.
+     * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
      */
-    private long maxProcessingTimeMs = 1000;
+    private long maxProcessingTimeMs = 2000;
     // ------------------------
 
     /**

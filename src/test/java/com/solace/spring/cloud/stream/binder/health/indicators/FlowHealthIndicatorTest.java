@@ -42,7 +42,7 @@ class SolaceHealthIndicatorTest {
         SolaceHealthIndicator healthIndicator = new SolaceHealthIndicator();
         healthIndicator.healthReconnecting(null);
         Health health = healthIndicator.health();
-        softly.assertThat(health.getStatus()).isEqualTo(new Status("RECONNECTING"));
+        softly.assertThat(health.getStatus()).isEqualTo(Status.DOWN);
         softly.assertThat(health.getDetails()).isEmpty();
     }
 
@@ -55,12 +55,15 @@ class SolaceHealthIndicatorTest {
         SolaceHealthIndicator healthIndicator = new SolaceHealthIndicator();
         Exception healthException = withException ? new Exception("test") : null;
         FlowEventArgs flowEventArgs = new FlowEventArgs(null, info, healthException, responseCode);
+        String expectedStatus = status;
+
         switch (status) {
             case "DOWN":
                 healthIndicator.healthDown(flowEventArgs);
                 break;
             case "RECONNECTING":
                 healthIndicator.healthReconnecting(flowEventArgs);
+                expectedStatus = "DOWN"; // reconnecting now goes to DOWN
                 break;
             case "UP":
                 healthIndicator.healthUp();
@@ -70,9 +73,9 @@ class SolaceHealthIndicatorTest {
         }
         Health health = healthIndicator.health();
 
-        softly.assertThat(health.getStatus()).isEqualTo(new Status(status));
+        softly.assertThat(health.getStatus()).isEqualTo(new Status(expectedStatus));
 
-        if (withException && !status.equals("UP")) {
+        if (withException && !expectedStatus.equals("UP")) {
             softly.assertThat(health.getDetails())
                     .isNotEmpty()
                     .extractingByKey("error")
@@ -81,7 +84,7 @@ class SolaceHealthIndicatorTest {
             softly.assertThat(health.getDetails()).doesNotContainKey("error");
         }
 
-        if (responseCode != 0 && !status.equals("UP")) {
+        if (responseCode != 0 && !expectedStatus.equals("UP")) {
             softly.assertThat(health.getDetails())
                     .extractingByKey("responseCode")
                     .isEqualTo(responseCode);
@@ -89,7 +92,7 @@ class SolaceHealthIndicatorTest {
             softly.assertThat(health.getDetails()).doesNotContainKey("responseCode");
         }
 
-        if (!info.isEmpty() && !status.equals("UP")) {
+        if (!info.isEmpty() && !expectedStatus.equals("UP")) {
             softly.assertThat(health.getDetails())
                     .extractingByKey("info")
                     .isEqualTo(info);
@@ -103,12 +106,15 @@ class SolaceHealthIndicatorTest {
     public void testWithoutDetails(String status, SoftAssertions softly) {
         SolaceHealthIndicator healthIndicator = new SolaceHealthIndicator();
         FlowEventArgs flowEventArgs = new FlowEventArgs(null, "some-info", new RuntimeException("test"), 1);
+        String expectedStatus = status;
+
         switch (status) {
             case "DOWN":
                 healthIndicator.healthDown(flowEventArgs);
                 break;
             case "RECONNECTING":
                 healthIndicator.healthReconnecting(flowEventArgs);
+                expectedStatus = "DOWN"; // reconnecting now goes to DOWN
                 break;
             case "UP":
                 healthIndicator.healthUp();
@@ -117,7 +123,7 @@ class SolaceHealthIndicatorTest {
                 throw new IllegalArgumentException("Test error: No handling for status=" + status);
         }
         Health health = healthIndicator.getHealth(false);
-        softly.assertThat(health.getStatus()).isEqualTo(new Status(status));
+        softly.assertThat(health.getStatus()).isEqualTo(new Status(expectedStatus));
         softly.assertThat(health.getDetails()).isEmpty();
     }
 }

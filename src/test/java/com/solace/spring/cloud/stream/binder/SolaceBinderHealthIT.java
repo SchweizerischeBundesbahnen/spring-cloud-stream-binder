@@ -7,7 +7,6 @@ import com.solace.spring.cloud.stream.binder.health.contributors.BindingsHealthC
 import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
-import com.solace.spring.cloud.stream.binder.properties.SolaceSessionHealthProperties;
 import com.solace.spring.cloud.stream.binder.test.junit.extension.SpringCloudStreamExtension;
 import com.solace.spring.cloud.stream.binder.test.spring.ConsumerInfrastructureUtil;
 import com.solace.spring.cloud.stream.binder.test.spring.SpringCloudStreamContext;
@@ -157,11 +156,14 @@ public class SolaceBinderHealthIT {
             default -> throw new IllegalArgumentException("No test for health status: " + healthStatus);
         }
 
+        // Map RECONNECTING to DOWN status since reconnecting now immediately goes to DOWN
+        Status expectedStatus = healthStatus.equals("RECONNECTING") ? Status.DOWN : new Status(healthStatus);
+
         retryAssert(2, TimeUnit.MINUTES,
                 () -> assertThat(bindingsHealthContributor)
                         .asInstanceOf(InstanceOfAssertFactories.type(BindingsHealthContributor.class))
                         .satisfies(SolaceSpringCloudStreamAssertions.isSingleBindingHealthAvailable(
-                                consumerProperties.getBindingName(), new Status(healthStatus))));
+                                consumerProperties.getBindingName(), expectedStatus)));
 
         if (healthStatus.equals("RECONNECTING")) {
             sempV2Api.config()
@@ -178,7 +180,7 @@ public class SolaceBinderHealthIT {
 
     private static void setupBinder(BindingsHealthContributor bindingsHealthContributor, SolaceTestBinder binder) throws NoSuchFieldException, IllegalAccessException {
         SolaceBinderHealthAccessor solaceBinderHealthAccessor = new SolaceBinderHealthAccessor(
-                new SolaceBinderHealthContributor(new SessionHealthIndicator(new SolaceSessionHealthProperties()),
+                new SolaceBinderHealthContributor(new SessionHealthIndicator(),
                         bindingsHealthContributor));
         Field solaceBinderHealthAccessorField = binder.getBinder().getClass().getDeclaredField("solaceBinderHealthAccessor");
         solaceBinderHealthAccessorField.setAccessible(true);

@@ -26,6 +26,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     private final Set<MessageInProgress> activeMessages = new HashSet<>();
     private final AtomicReference<SolaceMeterAccessor> solaceMeterAccessor = new AtomicReference<>();
     private final AtomicReference<String> bindingName = new AtomicReference<>();
+    private final Set<Thread> receiverThreads = new HashSet<>();
     private int messageIdIndex = 0;
     private volatile boolean running = true;
 
@@ -38,20 +39,70 @@ public class FlowXMLMessageListener implements XMLMessageListener {
         if (maxProcessingTimeMs < 100) {
             throw new IllegalArgumentException("maxProcessingTimeMs must be at least 100ms");
         }
-        for (int i = 0; i < count; i++) {
-            String threadName = threadNamePrefix + "-" + i;
-            Thread thread = new Thread(() -> loop(threadName, messageConsumer));
-            thread.setName(threadName);
-            thread.start();
-            log.info("Started receiving thread {}", thread.getName());
+
+        // Check if threads are already running and stop them first (outside synchronized block to avoid deadlock)
+        boolean needToStop;
+        synchronized (receiverThreads) {
+            needToStop = !receiverThreads.isEmpty();
         }
-        Thread thread = new Thread(() -> watchdog(maxProcessingTimeMs));
-        thread.setName(threadNamePrefix + "-watchdog");
-        thread.start();
+
+        if (needToStop) {
+            log.warn("Receiver threads are already running, stopping them first");
+            stopReceiverThreads();
+        }
+
+        synchronized (receiverThreads) {
+            // Clear the message queue to avoid processing stale messages
+            messageQueue.clear();
+
+            // Set running to true before starting threads
+            running = true;
+
+            for (int i = 0; i < count; i++) {
+                String threadName = threadNamePrefix + "-" + i;
+                Thread thread = new Thread(() -> loop(threadName, messageConsumer));
+                thread.setName(threadName);
+                receiverThreads.add(thread);
+                thread.start();
+                log.info("Started receiving thread {}", thread.getName());
+            }
+            Thread watchdogThread = new Thread(() -> watchdog(maxProcessingTimeMs));
+            watchdogThread.setName(threadNamePrefix + "-watchdog");
+            receiverThreads.add(watchdogThread);
+            watchdogThread.start();
+        }
     }
 
     public void stopReceiverThreads() {
         running = false;
+
+        synchronized (receiverThreads) {
+            if (receiverThreads.isEmpty()) {
+                return; // No threads to stop
+            }
+
+            log.info("Stopping {} receiver threads", receiverThreads.size());
+
+            // Wait for all threads to finish
+            for (Thread thread : receiverThreads) {
+                try {
+                    thread.join(5000); // Wait up to 5 seconds for each thread
+                    if (thread.isAlive()) {
+                        log.warn("Thread {} did not stop within timeout, interrupting", thread.getName());
+                        thread.interrupt();
+                    } else {
+                        log.info("Thread {} stopped successfully", thread.getName());
+                    }
+                } catch (InterruptedException e) {
+                    log.warn("Interrupted while waiting for thread {} to stop", thread.getName());
+                    Thread.currentThread().interrupt();
+                }
+            }
+
+            // Clear the thread tracking
+            receiverThreads.clear();
+            log.info("All receiver threads stopped and cleared");
+        }
     }
 
     @SuppressWarnings("BusyWait")
@@ -77,7 +128,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                         }
                         if (!messageInProgress.errored && timeInProcessing > maxProcessingTimeMs * 10) {
                             messageInProgress.setErrored(true);
-                            log.error("message is in progress for too long thread={} durationMs={} messageId={}", messageInProgress.threadName, timeInProcessing, messageInProgress.bytesXMLMessage.getMessageId());
+                            log.warn("message is still in progress for too long thread={} durationMs={} messageId={}", messageInProgress.threadName, timeInProcessing, messageInProgress.bytesXMLMessage.getMessageId());
                         }
                     }
                 }

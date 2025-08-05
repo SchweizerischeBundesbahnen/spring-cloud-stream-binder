@@ -246,8 +246,12 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     protected void doStop() {
         if (!isRunning()) return;
         solaceBinderHealthAccessor.ifPresent(solaceBinderHealth -> solaceBinderHealth.removeBindingHealthIndicator(consumerProperties.getBindingName()));
-        this.flowReceiver.get().stop();
-        this.flowReceiver.get().close();
+        FlowReceiver currentFlowReceiver = this.flowReceiver.get();
+        if (currentFlowReceiver != null) {
+            currentFlowReceiver.stop();
+            currentFlowReceiver.close();
+            this.flowReceiver.set(null); // Clear the reference to ensure clean restart
+        }
         this.flowXMLMessageListener.stopReceiverThreads();
     }
 
@@ -279,7 +283,10 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         log.info("Resuming inbound adapter binding={}", consumerDestination.getName());
         paused.set(false);
         try {
-            this.flowReceiver.get().start();
+            FlowReceiver currentFlowReceiver = this.flowReceiver.get();
+            if (currentFlowReceiver != null) {
+                currentFlowReceiver.start();
+            }
         } catch (JCSMPException e) {
             log.error("Failed to resume/start flow receiver", e);
             throw new RuntimeException(e);
