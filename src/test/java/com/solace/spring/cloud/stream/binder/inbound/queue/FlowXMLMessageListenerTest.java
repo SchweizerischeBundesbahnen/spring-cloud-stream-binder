@@ -1,6 +1,8 @@
 package com.solace.spring.cloud.stream.binder.inbound.queue;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.Topic;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -58,6 +60,9 @@ class FlowXMLMessageListenerTest {
 
         // Simulate a message being received
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
+        Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
+        Mockito.when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
+
         listener.onReceive(mockMessage);
 
         // Wait briefly to allow message to be processed
@@ -95,6 +100,9 @@ class FlowXMLMessageListenerTest {
         long start = System.nanoTime();
         for (int i = 0; i < 20; i++) {
             BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
+            Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
+            Mockito.when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
+
             listener.onReceive(mockMessage);
         }
         long afterSend = System.nanoTime();
@@ -134,6 +142,7 @@ class FlowXMLMessageListenerTest {
         // Simulate a message being received
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
         Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
+        Mockito.when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
         listener.onReceive(mockMessage);
 
 
