@@ -5,11 +5,13 @@ import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.XMLMessage;
 import com.solacesystems.jcsmp.XMLMessageListener;
-import lombok.Data;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -152,11 +154,16 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                 if (polled != null) {
                     MessageInProgress mip = new MessageInProgress(System.currentTimeMillis(), threadName, polled);
                     synchronized (activeMessages) {
+                        log.trace("loop add mip={}", mip);
                         activeMessages.add(mip);
                     }
-                    messageConsumer.accept(polled);
-                    synchronized (activeMessages) {
-                        activeMessages.remove(mip);
+                    try {
+                        messageConsumer.accept(polled);
+                    } finally {
+                        synchronized (activeMessages) {
+                            log.trace("loop remove mip={}", mip);
+                            activeMessages.remove(mip);
+                        }
                     }
                 }
             } catch (Throwable e) {
@@ -199,13 +206,47 @@ public class FlowXMLMessageListener implements XMLMessageListener {
         log.error("Failed to receive message", e);
     }
 
-    @Data
+    @Getter
+    @Setter
     @RequiredArgsConstructor
     static class MessageInProgress {
         private final long startMillis;
         private final String threadName;
         private final BytesXMLMessage bytesXMLMessage;
+
+        // Should not be part of hashcode. Because a changing hash or equal will prevent removing from `activeMessages` set.
         private boolean warned = false;
         private boolean errored = false;
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof MessageInProgress that)) {
+                return false;
+            }
+
+            return startMillis == that.startMillis &&
+                    Objects.equals(threadName, that.threadName) &&
+                    Objects.equals(bytesXMLMessage, that.bytesXMLMessage);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(
+                    startMillis,
+                    threadName,
+                    bytesXMLMessage.getDestination().getName(),
+                    bytesXMLMessage.getMessageId()
+            );
+        }
+
+        @Override
+        public String toString() {
+            return "MessageInProgress[threadName=%s, startMillis=%d, bytesXMLMessage.destination=%s, bytesXMLMessage.messageId=%s]".formatted(
+                    threadName,
+                    startMillis,
+                    bytesXMLMessage.getDestination().getName(),
+                    bytesXMLMessage.getMessageId()
+            );
+        }
     }
 }
