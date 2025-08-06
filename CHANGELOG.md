@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+### Fixed
+- Fix false positive "messages is still in progress" log warn message
+### Changed
+- Introduced log trace to get detail information about message processing times
+
 ## [7.0.1] - 2025-08-04
 ### Fixed
 - Updated sol-jcsmp to 10.27.3 from 10.27.2 to fix binary update on retransmitting a message can lead to corrupt message, finally provoking broker restart (EBP-1167)
