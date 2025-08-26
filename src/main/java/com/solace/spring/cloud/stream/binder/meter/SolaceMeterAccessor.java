@@ -24,4 +24,7 @@ public class SolaceMeterAccessor {
     public void recordActiveMessages(String bindingName, int activeMessages) {
         solaceMessageMeterBinder.recordActiveMessages(bindingName, activeMessages);
     }
+    public void recordQueueBackpressure(String bindingName, long oldestMessagesWaitingForMs) {
+        solaceMessageMeterBinder.recordQueueBackpressure(bindingName, oldestMessagesWaitingForMs);
+    }
 }

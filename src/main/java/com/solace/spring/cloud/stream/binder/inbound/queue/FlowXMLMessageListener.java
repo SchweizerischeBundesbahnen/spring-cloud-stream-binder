@@ -115,6 +115,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                 }
                 long currentTimeMillis = System.currentTimeMillis();
                 long sleepMillis = maxProcessingTimeMs / 2;
+                long maxTimeInProcessing = Long.MIN_VALUE;
                 synchronized (activeMessages) {
                     for (MessageInProgress messageInProgress : activeMessages) {
                         long timeInProcessing = currentTimeMillis - messageInProgress.startMillis;
@@ -130,8 +131,13 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                             messageInProgress.setErrored(true);
                             log.warn("message is still in progress for too long thread={} durationMs={} messageId={}", messageInProgress.threadName, timeInProcessing, messageInProgress.bytesXMLMessage.getMessageId());
                         }
+                        maxTimeInProcessing = Math.max(maxTimeInProcessing, timeInProcessing);
                     }
                 }
+                if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
+                    solaceMeterAccessor.get().recordQueueBackpressure(this.bindingName.get(), maxTimeInProcessing);
+                }
+
                 Thread.sleep(sleepMillis);
             } catch (Throwable e) {
                 log.error(e.getMessage(), e);

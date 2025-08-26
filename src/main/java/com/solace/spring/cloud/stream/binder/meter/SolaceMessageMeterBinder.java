@@ -16,10 +16,12 @@ public class SolaceMessageMeterBinder implements MeterBinder {
     public static final String METER_NAME_PAYLOAD_SIZE = "solace.message.size.payload";
     public static final String METER_NAME_QUEUE_SIZE = "solace.message.queue.size";
     public static final String METER_NAME_ACTIVE_MESSAGES_SIZE = "solace.message.active.size";
+    public static final String METER_NAME_QUEUE_BACKPRESSURE = "solace.message.queue.backpressure";
     public static final String METER_DESCRIPTION_TOTAL_SIZE = "Total message size";
     public static final String METER_DESCRIPTION_PAYLOAD_SIZE = "Message payload size";
     public static final String METER_DESCRIPTION_QUEUE_SIZE = "Message queue size";
     public static final String METER_DESCRIPTION_ACTIVE_MESSAGES_SIZE = "Messages active in processing";
+    public static final String METER_DESCRIPTION_QUEUE_BACKPRESSURE = "The age of the oldest message that is waiting for being processed in process queue.";
     public static final String TAG_NAME = "name";
 
     public final Map<String, DistributionSummary> meterCache = new ConcurrentHashMap<>();
@@ -71,6 +73,22 @@ public class SolaceMessageMeterBinder implements MeterBinder {
                                 .register(registry)
                 )
                 .record(activeMessages);
+    }
+
+    public void recordQueueBackpressure(String bindingName, long oldestMessagesWaitingForMs) {
+        if (registry == null) {
+            return;
+        }
+
+        meterCache.computeIfAbsent(
+                        METER_NAME_QUEUE_BACKPRESSURE + bindingName,
+                        ignored -> DistributionSummary.builder(METER_NAME_QUEUE_BACKPRESSURE)
+                                .description(METER_DESCRIPTION_QUEUE_BACKPRESSURE)
+                                .tag(TAG_NAME, bindingName)
+                                .baseUnit(BaseUnits.MILLISECONDS)
+                                .register(registry)
+                )
+                .record(oldestMessagesWaitingForMs);
     }
 
     private DistributionSummary registerSizeMeter(String meterName,
