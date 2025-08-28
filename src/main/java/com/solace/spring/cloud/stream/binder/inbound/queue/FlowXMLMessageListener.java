@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -154,9 +155,12 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                     synchronized (activeMessages) {
                         activeMessages.add(mip);
                     }
-                    messageConsumer.accept(polled);
-                    synchronized (activeMessages) {
-                        activeMessages.remove(mip);
+                    try {
+                        messageConsumer.accept(polled);
+                    } finally {
+                        synchronized (activeMessages) {
+                            activeMessages.remove(mip);
+                        }
                     }
                 }
             } catch (Throwable e) {
@@ -207,5 +211,20 @@ public class FlowXMLMessageListener implements XMLMessageListener {
         private final BytesXMLMessage bytesXMLMessage;
         private boolean warned = false;
         private boolean errored = false;
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof MessageInProgress that)) {
+                return false;
+            }
+
+            return Objects.equals(threadName, that.threadName) &&
+                    Objects.equals(bytesXMLMessage.getMessageId(), that.bytesXMLMessage.getMessageId());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(threadName, bytesXMLMessage.getMessageId());
+        }
     }
 }
