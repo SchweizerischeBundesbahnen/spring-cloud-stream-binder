@@ -521,53 +521,254 @@ public class SolaceBinderProvisioningLifecycleIT {
     }
 
     @Test
-    public void testFailConsumerConcurrencyWithExclusiveQueue(SpringCloudStreamContext context) throws Exception {
+    public void testConsumerConcurrencyWithExclusiveQueue(SempV2Api sempV2Api,
+                                                                SpringCloudStreamContext context,
+                                                                SoftAssertions softly,
+                                                                TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = context.getBinder();
+
+        DirectChannel moduleOutputChannel = context.createBindableChannel("output", new BindingProperties());
+        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(50);
         String group0 = RandomStringUtils.randomAlphanumeric(10);
 
-        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
+        Binding<MessageChannel> producerBinding = binder.bindProducer(
+                destination0, moduleOutputChannel, context.createProducerProperties(testInfo));
 
+        int consumerConcurrency = 3;
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        consumerProperties.setConcurrency(2);
+        consumerProperties.setConcurrency(consumerConcurrency);
         consumerProperties.getExtension().setQueueAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
+        Binding<MessageChannel> consumerBinding = binder.bindConsumer(
+                destination0, group0, moduleInputChannel, consumerProperties);
 
-        try {
-            Binding<MessageChannel> consumerBinding = binder.bindConsumer(
-                    destination0, group0, moduleInputChannel, consumerProperties);
-            consumerBinding.unbind();
-            fail("Expected consumer provisioning to fail");
-        } catch (ProvisioningException e) {
-            assertThat(e).hasNoCause();
-            assertThat(e.getMessage()).containsIgnoringCase("not supported");
-            assertThat(e.getMessage()).containsIgnoringCase("concurrency > 1");
-            assertThat(e.getMessage()).containsIgnoringCase("exclusive queue");
+        int numMsgsPerFlow = 10;
+        Set<Message<?>> messages = new HashSet<>();
+        Map<String, Instant> foundPayloads = new HashMap<>();
+        for (int i = 0; i < numMsgsPerFlow * consumerConcurrency; i++) {
+            String payload = "foo-" + i;
+            foundPayloads.put(payload, null);
+            messages.add(MessageBuilder.withPayload(payload.getBytes())
+                    .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
+                    .build());
         }
+
+        context.binderBindUnbindLatency();
+
+        String queue0 = binder.getConsumerQueueName(consumerBinding);
+
+        final long stallIntervalInMillis = 100;
+        final CyclicBarrier barrier = new CyclicBarrier(consumerConcurrency);
+        final CountDownLatch latch = new CountDownLatch(numMsgsPerFlow * consumerConcurrency);
+        moduleInputChannel.subscribe(message1 -> {
+            @SuppressWarnings("unchecked")
+            List<byte[]> payloads = consumerProperties.isBatchMode() ? (List<byte[]>) message1.getPayload() :
+                    Collections.singletonList((byte[]) message1.getPayload());
+            for (byte[] payloadBytes : payloads) {
+                String payload = new String(payloadBytes);
+                synchronized (foundPayloads) {
+                    if (!foundPayloads.containsKey(payload)) {
+                        softly.fail("Received unexpected message %s", payload);
+                        return;
+                    }
+                }
+            }
+
+            Instant timestamp;
+            try { // Align the timestamps between the threads with a human-readable stall interval
+                barrier.await();
+                Thread.sleep(stallIntervalInMillis);
+                timestamp = Instant.now();
+                log.info("Received message {} (size: {}) (timestamp: {})",
+                        StaticMessageHeaderAccessor.getId(message1), payloads.size(), timestamp);
+            } catch (InterruptedException e) {
+                log.error("Interrupt received", e);
+                return;
+            } catch (BrokenBarrierException e) {
+                log.error("Unexpected barrier error", e);
+                return;
+            }
+
+            for (byte[] payloadBytes : payloads) {
+                String payload = new String(payloadBytes);
+                synchronized (foundPayloads) {
+                    foundPayloads.put(payload, timestamp);
+                }
+                latch.countDown();
+            }
+        });
+
+        messages.forEach(moduleOutputChannel::send);
+
+        assertThat(latch.await(1, TimeUnit.MINUTES)).isTrue();
+        assertThat(foundPayloads).allSatisfy((payload, instant) -> {
+            assertThat(instant).as("Did not receive message %s", payload).isNotNull();
+            assertThat(foundPayloads.values()
+                    .stream()
+                    // Get "closest" messages with a margin of error of half the stalling interval
+                    .filter(instant1 -> Duration.between(instant, instant1).abs()
+                            .minusMillis(stallIntervalInMillis / 2).isNegative())
+                    .count())
+                    .as("Unexpected number of messages in parallel")
+                    .isEqualTo((long) consumerConcurrency);
+        });
+
+        String msgVpnName = (String) context.getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
+        List<String> txFlowsIds = sempV2Api.monitor().getMsgVpnQueueTxFlows(
+                        msgVpnName,
+                        queue0,
+                        Integer.MAX_VALUE, null, null, null)
+                .getData()
+                .stream()
+                .map(MonitorMsgVpnQueueTxFlow::getFlowId)
+                .map(String::valueOf)
+                .collect(Collectors.toList());
+
+        // only one flow, concurrency is handled internal
+        assertThat(txFlowsIds).hasSize(1).allSatisfy(flowId -> retryAssert(() ->
+                assertThat(sempV2Api.monitor()
+                        .getMsgVpnQueueTxFlow(msgVpnName, queue0, flowId, null)
+                        .getData()
+                        .getAckedMsgCount())
+                        .as("Expected all flows to receive exactly %s messages", numMsgsPerFlow)
+                        .isEqualTo(numMsgsPerFlow * consumerConcurrency)));
+
+        retryAssert(() -> assertThat(txFlowsIds.stream()
+                .map((ThrowingFunction<String, MonitorMsgVpnQueueTxFlowResponse>)
+                        flowId -> sempV2Api.monitor().getMsgVpnQueueTxFlow(msgVpnName, queue0, flowId, null))
+                .mapToLong(r -> r.getData().getAckedMsgCount())
+                .sum())
+                .as("Flows did not receive expected number of messages")
+                .isEqualTo((long) numMsgsPerFlow * consumerConcurrency));
+
+        producerBinding.unbind();
+        consumerBinding.unbind();
     }
 
     @Test
-    public void testFailConsumerConcurrencyWithAnonConsumerGroup(SpringCloudStreamContext context) throws Exception {
+    public void testConsumerConcurrencyWithAnonConsumerGroup(SempV2Api sempV2Api,
+                                                                   SpringCloudStreamContext context,
+                                                                   SoftAssertions softly,
+                                                                   TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = context.getBinder();
+
+        DirectChannel moduleOutputChannel = context.createBindableChannel("output", new BindingProperties());
+        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(50);
 
-        DirectChannel moduleInputChannel = context.createBindableChannel("input", new BindingProperties());
+        Binding<MessageChannel> producerBinding = binder.bindProducer(
+                destination0, moduleOutputChannel, context.createProducerProperties(testInfo));
 
+        int consumerConcurrency = 3;
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = context.createConsumerProperties();
-        consumerProperties.setConcurrency(2);
+        consumerProperties.setConcurrency(consumerConcurrency);
+        consumerProperties.getExtension().setQueueAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
+        Binding<MessageChannel> consumerBinding = binder.bindConsumer(
+                destination0, null, moduleInputChannel, consumerProperties);
 
-        try {
-            Binding<MessageChannel> consumerBinding = binder.bindConsumer(
-                    destination0, null, moduleInputChannel, consumerProperties);
-            consumerBinding.unbind();
-            fail("Expected consumer provisioning to fail");
-        } catch (ProvisioningException e) {
-            assertThat(e).hasNoCause();
-            assertThat(e.getMessage()).containsIgnoringCase("not supported");
-            assertThat(e.getMessage()).containsIgnoringCase("concurrency > 1");
-            assertThat(e.getMessage()).containsIgnoringCase("anonymous consumer groups");
+        int numMsgsPerFlow = 10;
+        Set<Message<?>> messages = new HashSet<>();
+        Map<String, Instant> foundPayloads = new HashMap<>();
+        for (int i = 0; i < numMsgsPerFlow * consumerConcurrency; i++) {
+            String payload = "foo-" + i;
+            foundPayloads.put(payload, null);
+            messages.add(MessageBuilder.withPayload(payload.getBytes())
+                    .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
+                    .build());
         }
+
+        context.binderBindUnbindLatency();
+
+        String queue0 = binder.getConsumerQueueName(consumerBinding);
+
+        final long stallIntervalInMillis = 100;
+        final CyclicBarrier barrier = new CyclicBarrier(consumerConcurrency);
+        final CountDownLatch latch = new CountDownLatch(numMsgsPerFlow * consumerConcurrency);
+        moduleInputChannel.subscribe(message1 -> {
+            @SuppressWarnings("unchecked")
+            List<byte[]> payloads = consumerProperties.isBatchMode() ? (List<byte[]>) message1.getPayload() :
+                    Collections.singletonList((byte[]) message1.getPayload());
+            for (byte[] payloadBytes : payloads) {
+                String payload = new String(payloadBytes);
+                synchronized (foundPayloads) {
+                    if (!foundPayloads.containsKey(payload)) {
+                        softly.fail("Received unexpected message %s", payload);
+                        return;
+                    }
+                }
+            }
+
+            Instant timestamp;
+            try { // Align the timestamps between the threads with a human-readable stall interval
+                barrier.await();
+                Thread.sleep(stallIntervalInMillis);
+                timestamp = Instant.now();
+                log.info("Received message {} (size: {}) (timestamp: {})",
+                        StaticMessageHeaderAccessor.getId(message1), payloads.size(), timestamp);
+            } catch (InterruptedException e) {
+                log.error("Interrupt received", e);
+                return;
+            } catch (BrokenBarrierException e) {
+                log.error("Unexpected barrier error", e);
+                return;
+            }
+
+            for (byte[] payloadBytes : payloads) {
+                String payload = new String(payloadBytes);
+                synchronized (foundPayloads) {
+                    foundPayloads.put(payload, timestamp);
+                }
+                latch.countDown();
+            }
+        });
+
+        messages.forEach(moduleOutputChannel::send);
+
+        assertThat(latch.await(1, TimeUnit.MINUTES)).isTrue();
+        assertThat(foundPayloads).allSatisfy((payload, instant) -> {
+            assertThat(instant).as("Did not receive message %s", payload).isNotNull();
+            assertThat(foundPayloads.values()
+                    .stream()
+                    // Get "closest" messages with a margin of error of half the stalling interval
+                    .filter(instant1 -> Duration.between(instant, instant1).abs()
+                            .minusMillis(stallIntervalInMillis / 2).isNegative())
+                    .count())
+                    .as("Unexpected number of messages in parallel")
+                    .isEqualTo((long) consumerConcurrency);
+        });
+
+        String msgVpnName = (String) context.getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
+        List<String> txFlowsIds = sempV2Api.monitor().getMsgVpnQueueTxFlows(
+                        msgVpnName,
+                        queue0,
+                        Integer.MAX_VALUE, null, null, null)
+                .getData()
+                .stream()
+                .map(MonitorMsgVpnQueueTxFlow::getFlowId)
+                .map(String::valueOf)
+                .collect(Collectors.toList());
+
+        // only one flow, concurrency is handled internal
+        assertThat(txFlowsIds).hasSize(1).allSatisfy(flowId -> retryAssert(() ->
+                assertThat(sempV2Api.monitor()
+                        .getMsgVpnQueueTxFlow(msgVpnName, queue0, flowId, null)
+                        .getData()
+                        .getAckedMsgCount())
+                        .as("Expected all flows to receive exactly %s messages", numMsgsPerFlow)
+                        .isEqualTo(numMsgsPerFlow * consumerConcurrency)));
+
+        retryAssert(() -> assertThat(txFlowsIds.stream()
+                .map((ThrowingFunction<String, MonitorMsgVpnQueueTxFlowResponse>)
+                        flowId -> sempV2Api.monitor().getMsgVpnQueueTxFlow(msgVpnName, queue0, flowId, null))
+                .mapToLong(r -> r.getData().getAckedMsgCount())
+                .sum())
+                .as("Flows did not receive expected number of messages")
+                .isEqualTo((long) numMsgsPerFlow * consumerConcurrency));
+
+        producerBinding.unbind();
+        consumerBinding.unbind();
     }
 
     @Test
@@ -1618,20 +1819,4 @@ public class SolaceBinderProvisioningLifecycleIT {
             if (producerBinding != null) producerBinding.unbind();
         }
     }
-
-    void operatorProvisionTopicEndpoint(SempV2Api sempV2Api, String vpnName, String endpointName, String subscription, long maxBindCount) throws
-            com.solace.test.integration.semp.v2.config.ApiException {
-
-        final ConfigMsgVpnTopicEndpoint config = new ConfigMsgVpnTopicEndpoint();
-        config.setAccessType(ConfigMsgVpnTopicEndpoint.AccessTypeEnum.NON_EXCLUSIVE);
-        config.setPermission(ConfigMsgVpnTopicEndpoint.PermissionEnum.DELETE);
-        config.setMaxBindCount(maxBindCount);
-        config.setTopicEndpointName(endpointName);
-        config.setIngressEnabled(true);
-        config.setEgressEnabled(true);
-        config.setMsgVpnName(vpnName);
-        // assume TE is created, when not created test will catch it
-        sempV2Api.config().createMsgVpnTopicEndpoint(config, vpnName, null, null);
-    }
-
 }

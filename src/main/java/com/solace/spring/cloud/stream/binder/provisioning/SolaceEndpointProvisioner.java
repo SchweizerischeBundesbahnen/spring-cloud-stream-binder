@@ -96,21 +96,6 @@ public class SolaceEndpointProvisioner
         String groupQueueName = queueNames.getConsumerGroupQueueName();
 
         EndpointProperties endpointProperties = SolaceProvisioningUtil.getEndpointProperties(properties.getExtension());
-        ConsumerFlowProperties consumerFlowProperties = SolaceProvisioningUtil.getConsumerFlowProperties(name, properties);
-
-        if (properties.getConcurrency() > 1) {
-            if (endpointProperties.getAccessType().equals(EndpointProperties.ACCESSTYPE_EXCLUSIVE)) {
-                String msg = "Concurrency > 1 is not supported when using exclusive queues, " +
-                        "either configure a concurrency of 1 or use a non-exclusive queue";
-                log.warn(msg);
-                throw new ProvisioningException(msg);
-            } else if (!StringUtils.hasText(group)) {
-                String msg = "Concurrency > 1 is not supported when using anonymous consumer groups, " +
-                        "either configure a concurrency of 1 or define a consumer group";
-                log.warn(msg);
-                throw new ProvisioningException(msg);
-            }
-        }
 
         log.info(isAnonEndpoint ?
                 String.format("Creating anonymous (temporary) queue %s", groupQueueName) :
