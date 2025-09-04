@@ -8,12 +8,20 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Slf4j
 @RequiredArgsConstructor
 @Setter
 public class SolaceFlowEventHandler implements FlowEventHandler {
     private String bindingName;
     private SolaceHealthIndicator bindingHealthIndicator;
+    private List<Runnable> reconnectRunnables = new ArrayList<>();
+
+    public void addReconnectRunnable(Runnable runnable) {
+        reconnectRunnables.add(runnable);
+    }
 
     @Override
     public void handleEvent(Object source, FlowEventArgs flowEventArgs) {
@@ -42,6 +50,11 @@ public class SolaceFlowEventHandler implements FlowEventHandler {
                 case FLOW_RECONNECTED:
                     if (bindingHealthIndicator != null) {
                         bindingHealthIndicator.healthUp();
+                    }
+                    if (!reconnectRunnables.isEmpty()) {
+                        for (Runnable runnable : reconnectRunnables) {
+                            runnable.run();
+                        }
                     }
                     break;
             }
