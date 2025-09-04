@@ -1,5 +1,5 @@
 = Spring Cloud Stream Binder for Solace PubSub+
-:revnumber: 6.0.1
+:revnumber: 7.1.0
 :toc: preamble
 :toclevels: 3
 :icons: font
@@ -868,15 +868,45 @@ Users can provide any valid SpEL expression in order to generate custom error qu
 
 Configure Spring Cloud Stream's https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_consumer_properties[concurrency consumer property] to enable concurrent message consumption for a particular consumer binding.
 
-Though note that there are few limitations:
+- Concurrent processing is now supported for exclusive queues and for anonymous consumer groups.
+- This enables higher throughput when you cannot or do not want to use non-exclusive queues.
+- There will be no guarantee of ordering any more when concurrent processing is used.
 
-. `concurrency` &gt; 1 is not supported for exclusive queues.
-. `concurrency` &gt; 1 is not supported for consumer bindings which are a part of anonymous consumer groups.
-. `concurrency` &gt; 1 is ignored for polled consumers.
-. `concurrency` &gt; 1 is not supported with auto-provisioned topic endpoints.
+Notes and limitations:
 . Setting `provisionDurableQueue` to `false` disables endpoint configuration validation.
-Meaning that point 1 cannot be validated.
-In this scenario, it is the developer's responsibility to ensure that point 1 is followed.
+  In this scenario, it is the developer's responsibility to ensure queue settings meet your expectations.
+
+How to enable
+
+- Simply set the Spring Cloud Stream consumer property `concurrency` to a value &gt; 1 on your binding.
+- Works for both well-known (durable) groups and anonymous (temporary queue) consumers, regardless of queue access type.
+
+Example (application.yml)
+
+[source,yaml]
+----
+spring:
+  cloud:
+    stream:
+      bindings:
+        input:
+          destination: orders
+          group: accounting
+          consumer:
+            concurrency: 4
+----
+
+Caveats specific to exclusive queues
+
+- With exclusive access type, the broker still delivers to a single flow, but the binder now dispatches messages to multiple processing threads, allowing parallel handling within the same consumer instance.
+- Ensure your message handling logic is thread-safe.
+- There will be no guarantee of ordering any more.
+
+Caveats specific to anonymous groups
+
+- Anonymous groups use temporary queues; multiple processing threads will share the same underlying flow.
+- Make sure any stateful components are safe for concurrent use.
+- There will be no guarantee of ordering any more.
 
 ====
 == Partitioning

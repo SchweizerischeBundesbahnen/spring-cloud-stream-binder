@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.1.0] - 2025-09-04
+### Added
+- Add concurrent processing on exclusive queues and anonymous consumer groups
+
+### Changed
+- Updated sol-jcsmp to 10.28.1
+- Updated solace-java-spring-boot-autoconfigure to 5.4.2
+- Updated Spring Boot parent to 3.5.5
+- Updated spring-boot-maven-plugin to 3.5.4
+- Updated maven-javadoc-plugin to 3.11.2
+- Updated maven-source-plugin to 3.3.1
+- Updated central-publishing-maven-plugin to 0.8.0
+- Updated swagger-codegen-maven-plugin to 3.0.71
+- Updated build-helper-maven-plugin to 3.6.1
+- Updated maven-failsafe-plugin to 3.5.3
+
 ## [7.0.3] - 2025-08-29
 ### Fixed
 - Fix false positive "messages is still in progress" log warn message
