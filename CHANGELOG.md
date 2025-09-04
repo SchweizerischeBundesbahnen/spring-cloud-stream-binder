@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## [7.1.0] - 2025-09-04
+### Fixed
+- reapply the subscriptions to queues after reconnect to ensure they are present after the temporary queue has been removed during a long disconnect
 ### Added
 - Add concurrent processing on exclusive queues and anonymous consumer groups
 
