@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## [5.1.0] - 2025-09-05 - Backport from 7.1.0 all features and fixes
+### Fixed
+- reapply the subscriptions to queues after reconnect to ensure they are present after the temporary queue has been removed during a long disconnect
+- Fix false positive "messages is still in progress" log warn message
+- New metric "oldest messages in the processing queue" that exposes the same age calculation used for WARN and ERROR log thresholds to monitoring systems
+- Improved restart/reconnection reliability with proper null checks and cleanup in flow receiver handling
+- Enhanced flow receiver lifecycle management to ensure clean restarts
+- Updated sol-jcsmp to 10.28.1 because of window size 0 and other fixed bugs
+
+### Added
+- Add concurrent processing on exclusive queues and anonymous consumer groups
+- New integration test for binder restart functionality (SolaceBinderRestartIT)
+
+### Changed
+- Introduced log trace to get detail information about message processing times
+- Health indicator now immediately reports `DOWN` status when connection is down or reconnecting
+- Simplified health check behavior for more accurate connection state reporting
+- Improved restart/reconnection reliability with proper null checks and cleanup in flow receiver handling
+- Enhanced flow receiver lifecycle management to ensure clean restarts
+
 ## [7.1.0] - 2025-09-04
 ### Fixed
 - reapply the subscriptions to queues after reconnect to ensure they are present after the temporary queue has been removed during a long disconnect
