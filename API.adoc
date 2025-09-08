@@ -860,6 +860,9 @@ The definitions of each segment of the error queue matches that from <<Generated
 
 group::
 The consumer `group` name.
++
+TIP: As a workaround since its impossible to configure a non-durable queue with programmatic start there is the "group: non-durable" magic word to declare the queue as non-durable.
++
 
 The `errorQueueNameExpression` property's default SpEL expression conforms to the above format.
 Users can provide any valid SpEL expression in order to generate custom error queue names using the same evaluation context as described in <<Generated Queue Name Syntax>>.

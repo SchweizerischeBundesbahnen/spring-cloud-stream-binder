@@ -68,7 +68,7 @@ public class SolaceProvisioningUtil {
     }
 
     public static boolean isAnonEndpoint(String groupName, QualityOfService qualityOfService) {
-        return !StringUtils.hasText(groupName) || isTopicSubscription(qualityOfService);
+        return "non-durable".equals(groupName) || !StringUtils.hasText(groupName) || isTopicSubscription(qualityOfService);
     }
 
     public static boolean isDurableEndpoint(String groupName, QualityOfService qualityOfService) {
