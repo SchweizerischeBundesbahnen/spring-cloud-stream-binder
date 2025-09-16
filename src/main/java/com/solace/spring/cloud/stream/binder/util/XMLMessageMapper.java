@@ -25,6 +25,7 @@ import org.springframework.util.MimeType;
 import org.springframework.util.SerializationUtils;
 
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,6 +35,7 @@ import java.util.function.Function;
 public class XMLMessageMapper {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final MessageBuilderFactory MESSAGE_BUILDER_FACTORY = new DefaultMessageBuilderFactory();
+    private static final String KAFKA_TOPIC = "k_topic";
     static final int MESSAGE_VERSION = 1;
     static final Encoder DEFAULT_ENCODING = Encoder.BASE64;
 
@@ -318,6 +320,18 @@ public class XMLMessageMapper {
             }
             if (value instanceof ByteArray byteArray) {
                 value = byteArray.asBytes();
+
+                if (metadata.containsKey(KAFKA_TOPIC)) { // Was imported via kafka bridge.
+                    try {
+                        value = new String((byte[]) value, StandardCharsets.UTF_8);
+                    } catch (Exception e) {
+                        log.warn(
+                                "Header conversion failed for Kafka byte[] header {} to String",
+                                headers.keySet(),
+                                e
+                        );
+                    }
+                }
             }
             headers.put(h, value);
         });
