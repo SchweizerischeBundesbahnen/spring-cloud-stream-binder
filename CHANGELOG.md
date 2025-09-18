@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 
 
+## [5.1.1] - 2025-09-18
+### Fixed
+- Fix header deserialisation for messages that passed the kafka bridge.
+
 ## [5.1.0] - 2025-09-05 - Backport from 7.1.0 all features and fixes
 ### Fixed
 - reapply the subscriptions to queues after reconnect to ensure they are present after the temporary queue has been removed during a long disconnect
