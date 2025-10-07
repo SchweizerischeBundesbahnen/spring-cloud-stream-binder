@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.2.2] - 2025-10-07
+### Changed
+- Updated solace-java-spring-boot-autoconfigure to 5.5.0
+- Updated swagger-annotations to 2.2.38
+- Updated swagger-core to 2.2.37
+- Updated swagger-models to 2.2.38
+- Updated gson to 2.13.2
+
 ## [7.2.1] - 2025-09-18
 ### Fixed
 - Fix header deserialisation for messages that passed the kafka bridge.
