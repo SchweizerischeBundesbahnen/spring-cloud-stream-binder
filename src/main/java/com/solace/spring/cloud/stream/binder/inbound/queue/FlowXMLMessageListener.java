@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -22,14 +23,12 @@ import java.util.function.Consumer;
 @Slf4j
 @SuppressWarnings("deprecation")
 public class FlowXMLMessageListener implements XMLMessageListener {
-    @SuppressWarnings("MismatchedReadAndWriteOfArray") // to keep the messageId's in memory and be able to analyze them in the stacktrace
-    private final String[] messageIdRingBuffer = new String[128];
     private final BlockingQueue<BytesXMLMessage> messageQueue = new LinkedBlockingDeque<>();
     private final Set<MessageInProgress> activeMessages = new HashSet<>();
     private final AtomicReference<SolaceMeterAccessor> solaceMeterAccessor = new AtomicReference<>();
     private final AtomicReference<String> bindingName = new AtomicReference<>();
+    private final AtomicReference<LocalDateTime> latestWarning = new AtomicReference<>(LocalDateTime.now());
     private final Set<Thread> receiverThreads = new HashSet<>();
-    private int messageIdIndex = 0;
     private volatile boolean running = true;
 
     public void setSolaceMeterAccessor(SolaceMeterAccessor solaceMeterAccessor, String bindingName) {
@@ -68,7 +67,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                 thread.start();
                 log.info("Started receiving thread {}", thread.getName());
             }
-            Thread watchdogThread = new Thread(() -> watchdog(maxProcessingTimeMs));
+            Thread watchdogThread = new Thread(() -> watchdog(maxProcessingTimeMs, count));
             watchdogThread.setName(threadNamePrefix + "-watchdog");
             receiverThreads.add(watchdogThread);
             watchdogThread.start();
@@ -108,13 +107,24 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     }
 
     @SuppressWarnings("BusyWait")
-    private void watchdog(long maxProcessingTimeMs) {
+    private void watchdog(long maxProcessingTimeMs, int threadCount) {
         while (running) {
             try {
                 if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
                     solaceMeterAccessor.get().recordQueueSize(this.bindingName.get(), messageQueue.size());
                     solaceMeterAccessor.get().recordActiveMessages(this.bindingName.get(), activeMessages.size());
                 }
+
+                LocalDateTime now = LocalDateTime.now();
+                if (now.isAfter(latestWarning.get().plusMinutes(5)) && messageQueue.size() > threadCount) {
+                    if (messageQueue.size() > threadCount * 3) {
+                        log.warn("Too many messages in queue! 3 times more messages than threads, check what is causing the congestion: messages={}, threads={}", messageQueue.size(), threadCount);
+                    } else {
+                        log.warn("More messages in queue than threads: messages={}, threads={}.", messageQueue.size(), threadCount);
+                    }
+                    latestWarning.set(now);
+                }
+
                 long currentTimeMillis = System.currentTimeMillis();
                 long sleepMillis = maxProcessingTimeMs / 2;
                 long maxTimeInProcessing = Long.MIN_VALUE;
@@ -127,11 +137,9 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                         }
                         if (!messageInProgress.warned && timeInProcessing > maxProcessingTimeMs) {
                             messageInProgress.setWarned(true);
-                            log.warn("message is in progress for too long thread={} durationMs={} messageId={}", messageInProgress.threadName, timeInProcessing, messageInProgress.bytesXMLMessage.getMessageId());
                         }
                         if (!messageInProgress.errored && timeInProcessing > maxProcessingTimeMs * 10) {
                             messageInProgress.setErrored(true);
-                            log.warn("message is still in progress for too long thread={} durationMs={} messageId={}", messageInProgress.threadName, timeInProcessing, messageInProgress.bytesXMLMessage.getMessageId());
                         }
                         maxTimeInProcessing = Math.max(maxTimeInProcessing, timeInProcessing);
                     }
@@ -175,7 +183,6 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     @Override
     public void onReceive(BytesXMLMessage bytesXMLMessage) {
         log.debug("Received BytesXMLMessage:{}", bytesXMLMessage);
-        keepMessageIdInMemoryForDebugPurposes(bytesXMLMessage);
         try {
             int i = 0;
             while (i++ < 100) {
@@ -192,13 +199,6 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                 log.error(ex.getMessage(), ex);
             }
         }
-    }
-
-
-    private void keepMessageIdInMemoryForDebugPurposes(BytesXMLMessage bytesXMLMessage) {
-        this.messageIdRingBuffer[messageIdIndex] = bytesXMLMessage.getMessageId();
-        messageIdIndex = ++messageIdIndex % messageIdRingBuffer.length;
-        log.trace("Message ID stored in ring buffer. messageId={}", bytesXMLMessage.getMessageId());
     }
 
     @Override

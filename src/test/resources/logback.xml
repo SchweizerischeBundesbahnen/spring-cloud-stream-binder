@@ -6,5 +6,6 @@
     <logger name="com.solace.spring.cloud.stream.binder" level="OFF"/>
     <logger name="com.solace.spring.cloud.stream.binder.inbound.BatchCollector" level="OFF"/>
     <logger name="com.solace.spring.cloud.stream.binder.inbound.acknowledge" level="OFF"/>
+    <logger name="com.solace.spring.cloud.stream.binder.inbound.queue.FlowXMLMessageListener" level="WARN"/>
     <logger name="com.solace.spring.cloud.stream.binder.test" level="OFF"/>
 </configuration>

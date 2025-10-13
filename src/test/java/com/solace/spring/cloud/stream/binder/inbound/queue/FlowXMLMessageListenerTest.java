@@ -4,20 +4,26 @@ import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.Topic;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.lang.reflect.Field;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class FlowXMLMessageListenerTest {
 
     @Test
@@ -151,5 +157,54 @@ class FlowXMLMessageListenerTest {
                 .until(() -> activeMessages.iterator().next().isWarned());
         await().atMost(5500, TimeUnit.MILLISECONDS)
                 .until(() -> activeMessages.iterator().next().isErrored());
+    }
+
+    @Test
+    void testStartReceiverThreads_WatchdogLogsWarningForCongestedQueue(CapturedOutput capturedOutput) throws NoSuchFieldException, IllegalAccessException {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        // Use reflection to access the private 'latestWarning' field
+        Field latestWarningField = FlowXMLMessageListener.class.getDeclaredField("latestWarning");
+        latestWarningField.setAccessible(true);
+        AtomicReference<LocalDateTime> latestWarning = (AtomicReference<LocalDateTime>) latestWarningField.get(listener);
+        latestWarning.set(LocalDateTime.now().minusMinutes(6));
+        Consumer<BytesXMLMessage> messageConsumer = message -> {
+            try {
+                // Simulate a long message processing time
+                Thread.sleep(6000);
+            } catch (InterruptedException ignored) {
+            }
+        };
+
+        int threadCount = 2;
+        String threadNamePrefix = "WatchdogTestThread";
+        long processingTime = 500;
+
+        // Start the receiver threads
+        listener.startReceiverThreads(threadCount, threadNamePrefix, messageConsumer, processingTime);
+
+        // Simulate messages being received
+        Topic topic = JCSMPFactory.onlyInstance().createTopic("test/topic");
+        for (int i = 0; i < 5; i++) {
+            BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
+            Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
+            Mockito.when(mockMessage.getDestination()).thenReturn(topic);
+            listener.onReceive(mockMessage);
+        }
+
+        // Wait for the warning to be logged
+        await().atMost(6000, TimeUnit.MILLISECONDS)
+                .until(() -> capturedOutput.getOut().contains("More messages in queue than threads"));
+
+        latestWarning.set(LocalDateTime.now().minusMinutes(6));
+
+        for (int i = 0; i < 10; i++) {
+            BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
+            Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
+            Mockito.when(mockMessage.getDestination()).thenReturn(topic);
+            listener.onReceive(mockMessage);
+        }
+
+        await().atMost(6000, TimeUnit.MILLISECONDS)
+                .until(() -> capturedOutput.getOut().contains("Too many messages in queue!"));
     }
 }
