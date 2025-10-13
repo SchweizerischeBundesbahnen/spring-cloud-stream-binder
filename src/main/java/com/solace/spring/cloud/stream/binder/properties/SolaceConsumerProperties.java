@@ -104,7 +104,23 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
     /**
      * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
      */
+    @Deprecated
     private long maxProcessingTimeMs = 2000;
+
+    /**
+     * When the message queue size exceeds concurrency*urgentWarningMultiplier, a more urgent warning is logged, defaults to 3
+     */
+    private Integer urgentWarningMultiplier = 3;
+
+    /**
+     * Time in seconds between warning of queue congestion, defaults to 300 s.
+     */
+    private Integer timeBetweenWarningsS = 300;
+
+    /**
+     * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
+     */
+    private long watchdogTimeoutMs = 2000;
     // ------------------------
 
     /**

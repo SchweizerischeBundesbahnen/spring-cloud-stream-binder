@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.3.0] - 2025-10-13
+### Changed
+- Removed warning logs for message being in progress for too long
+- Added warnings for when queues are getting long based on concurrency
+
 ## [7.2.2] - 2025-10-07
 ### Changed
 - Updated solace-java-spring-boot-autoconfigure to 5.5.0

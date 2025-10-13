@@ -8,10 +8,7 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestination;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil;
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
-import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
-import com.solace.spring.cloud.stream.binder.util.LargeMessageSupport;
-import com.solace.spring.cloud.stream.binder.util.SolaceAcknowledgmentException;
-import com.solace.spring.cloud.stream.binder.util.XMLMessageMapper;
+import com.solace.spring.cloud.stream.binder.util.*;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.impl.JCSMPBasicSession;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +55,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     private final ThreadLocal<XMLMessageMapper> xmlMessageMapper = ThreadLocal.withInitial(XMLMessageMapper::new);
     private final AtomicBoolean paused = new AtomicBoolean(false);
     private final SolaceFlowEventHandler solaceFlowEventHandler = new SolaceFlowEventHandler();
-    private final FlowXMLMessageListener flowXMLMessageListener = new FlowXMLMessageListener();
+    private final FlowXMLMessageListener flowXMLMessageListener = new FlowXMLMessageListener(new WatchdogLogger());
     private final AtomicReference<FlowReceiver> flowReceiver = new AtomicReference<>();
     private final LargeMessageSupport largeMessageSupport = new LargeMessageSupport();
 
@@ -215,13 +212,14 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         checkPropertiesAndBroker();
         setupFlowEventHandler();
         ConsumerFlowProperties consumerFlowProperties = getConsumerFlowProperties(endpointName);
-        long maxProcessingTimeMs = consumerProperties.getExtension().getMaxProcessingTimeMs();
         this.solaceMeterAccessor.ifPresent(ma -> this.flowXMLMessageListener.setSolaceMeterAccessor(ma, consumerProperties.getBindingName()));
         this.flowXMLMessageListener.startReceiverThreads(
                 consumerProperties.getConcurrency(),
                 consumerDestination.getBindingDestinationName(),
                 this::onReceiveConcurrent,
-                maxProcessingTimeMs);
+                consumerProperties.getExtension().getUrgentWarningMultiplier(),
+                consumerProperties.getExtension().getTimeBetweenWarningsS(),
+                consumerProperties.getExtension().getWatchdogTimeoutMs());
         this.flowReceiver.set(jcsmpSession.createFlow(flowXMLMessageListener, consumerFlowProperties, endpointProperties, solaceFlowEventHandler));
         if (!paused.get()) {
             this.flowReceiver.get().start();

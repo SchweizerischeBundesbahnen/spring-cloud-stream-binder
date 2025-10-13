@@ -376,6 +376,21 @@ After 10*maxProcessingTimeMs another warning is logged.
 +
 Default: `2000`
 
+urgentWarningMultiplier::
+When the message queue size exceeds concurrency*urgentWarningMultiplier, a more urgent warning is logged.
++
+Default: `3`
+
+timeBetweenWarningsS::
+Time in seconds between warning of queue congestion.
++
+Default: `300`
+
+watchdogTimeoutMs::
+Time in milliseconds till a long running consumer is logged as warning.
++
+Default: `2000`
+
 ==== Solace Producer Properties
 
 The following properties are available for Solace producers only and must be prefixed with `spring.cloud.stream.solace.bindings.&lt;bindingName&gt;.producer.` where `bindingName` looks something like `functionName-out-0` as defined in https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_functional_binding_names[Functional Binding Names].
@@ -1270,3 +1285,30 @@ For more information about Solace technology in general please visit these resou
 
 * The Solace Developer Portal website at: https://solace.dev
 * Ask the https://solace.community[Solace community]
+
+
+== Watchdog
+
+=== Explanation
+
+A watchdog thread is created to monitor the message load.
+This thread compares the number of messages in the queue to the number of working threads.
+That can cause 2 log messages:
+
+* "More messages in queue than threads: messages={}, threads={}":
+This is logged when there are more messages in queues than threads.
+This is not cause for alarm, since a bit of backpressure can help reduce latency.
+* "Too many messages in queue! urgentWarningMultiplier times more messages than threads, check what is causing the congestion: messages={}, threads={}":
+This is logged when there are more than urgentWarningMultiplier times more messages in the queue than threads.
+This is the point where action is likely required.
+
+These messages are logged at most every 5 minutes.
+
+=== Mitigation
+
+To address the congestion issues there are two options:
+
+* Optimize the application: If possible try to increase the processing speed in the application.
+This would ease the congestion on the queue, but is the most complex option and might not always be possible.
+* Increase concurrency: Having more worker threads increases throughput because more messages are consumed.
+This solution is simple to do, but comes at the cost of increased resource usage.
