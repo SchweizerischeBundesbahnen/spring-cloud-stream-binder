@@ -121,7 +121,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
 
                 Instant now = clock.now();
                 Duration timeSinceLastWarning = Duration.between(latestWarning, now);
-                if (timeSinceLastWarning.toMinutes() > 5 && messageQueue.size() > threadCount) {
+                if (timeSinceLastWarning.toSeconds() > 300 && messageQueue.size() > threadCount) {
                     if (messageQueue.size() > threadCount * 3) {
                         log.warn("Too many messages in queue! 3 times more messages than threads, check what is causing the congestion: messages={}, threads={}", messageQueue.size(), threadCount);
                     } else {

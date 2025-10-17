@@ -189,13 +189,13 @@ class FlowXMLMessageListenerTest {
             listener.onReceive(mockMessage);
         }
 
-        clock.add(7, TimeUnit.MINUTES);
+        clock.add(6, TimeUnit.MINUTES);
 
         // Wait for the warning to be logged
         await().atMost(8000, TimeUnit.MILLISECONDS)
                 .until(() -> capturedOutput.getOut().contains("More messages in queue than threads"));
 
-        clock.add(7, TimeUnit.MINUTES);
+        clock.add(6, TimeUnit.MINUTES);
 
         for (int i = 0; i < 10; i++) {
             BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
