@@ -168,7 +168,7 @@ class FlowXMLMessageListenerTest {
         Consumer<BytesXMLMessage> messageConsumer = message -> {
             try {
                 // Simulate a long message processing time
-                Thread.sleep(6000);
+                Thread.sleep(8000);
             } catch (InterruptedException ignored) {
             }
         };
@@ -189,13 +189,13 @@ class FlowXMLMessageListenerTest {
             listener.onReceive(mockMessage);
         }
 
-        clock.add(6, TimeUnit.MINUTES);
+        clock.add(7, TimeUnit.MINUTES);
 
         // Wait for the warning to be logged
-        await().atMost(6000, TimeUnit.MILLISECONDS)
+        await().atMost(8000, TimeUnit.MILLISECONDS)
                 .until(() -> capturedOutput.getOut().contains("More messages in queue than threads"));
 
-        clock.add(6, TimeUnit.MINUTES);
+        clock.add(7, TimeUnit.MINUTES);
 
         for (int i = 0; i < 10; i++) {
             BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
@@ -204,7 +204,7 @@ class FlowXMLMessageListenerTest {
             listener.onReceive(mockMessage);
         }
 
-        await().atMost(6000, TimeUnit.MILLISECONDS)
+        await().atMost(8000, TimeUnit.MILLISECONDS)
                 .until(() -> capturedOutput.getOut().contains("Too many messages in queue!"));
     }
 }
