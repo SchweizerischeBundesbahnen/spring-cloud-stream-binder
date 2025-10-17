@@ -1,6 +1,7 @@
 package com.solace.spring.cloud.stream.binder.inbound.queue;
 
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
+import com.solace.spring.cloud.stream.binder.util.Clock;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.XMLMessage;
@@ -10,7 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -27,16 +29,18 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     private final Set<MessageInProgress> activeMessages = new HashSet<>();
     private final AtomicReference<SolaceMeterAccessor> solaceMeterAccessor = new AtomicReference<>();
     private final AtomicReference<String> bindingName = new AtomicReference<>();
-    private final AtomicReference<LocalDateTime> latestWarning = new AtomicReference<>(LocalDateTime.now());
     private final Set<Thread> receiverThreads = new HashSet<>();
     private volatile boolean running = true;
+
+    private Instant latestWarning = Instant.now();
+    protected Clock clock = Clock.SYSTEM;
 
     public void setSolaceMeterAccessor(SolaceMeterAccessor solaceMeterAccessor, String bindingName) {
         this.solaceMeterAccessor.set(solaceMeterAccessor);
         this.bindingName.set(bindingName);
     }
 
-    public void startReceiverThreads(int count, String threadNamePrefix, Consumer<BytesXMLMessage> messageConsumer, long maxProcessingTimeMs) {
+    public void startReceiverThreads(int threadCount, String threadNamePrefix, Consumer<BytesXMLMessage> messageConsumer, long maxProcessingTimeMs) {
         if (maxProcessingTimeMs < 100) {
             throw new IllegalArgumentException("maxProcessingTimeMs must be at least 100ms");
         }
@@ -59,7 +63,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
             // Set running to true before starting threads
             running = true;
 
-            for (int i = 0; i < count; i++) {
+            for (int i = 0; i < threadCount; i++) {
                 String threadName = threadNamePrefix + "-" + i;
                 Thread thread = new Thread(() -> loop(threadName, messageConsumer));
                 thread.setName(threadName);
@@ -67,7 +71,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                 thread.start();
                 log.info("Started receiving thread {}", thread.getName());
             }
-            Thread watchdogThread = new Thread(() -> watchdog(maxProcessingTimeMs, count));
+            Thread watchdogThread = new Thread(() -> watchdog(maxProcessingTimeMs, threadCount));
             watchdogThread.setName(threadNamePrefix + "-watchdog");
             receiverThreads.add(watchdogThread);
             watchdogThread.start();
@@ -115,14 +119,15 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                     solaceMeterAccessor.get().recordActiveMessages(this.bindingName.get(), activeMessages.size());
                 }
 
-                LocalDateTime now = LocalDateTime.now();
-                if (now.isAfter(latestWarning.get().plusMinutes(5)) && messageQueue.size() > threadCount) {
+                Instant now = clock.now();
+                Duration timeSinceLastWarning = Duration.between(latestWarning, now);
+                if (timeSinceLastWarning.toMinutes() > 5 && messageQueue.size() > threadCount) {
                     if (messageQueue.size() > threadCount * 3) {
                         log.warn("Too many messages in queue! 3 times more messages than threads, check what is causing the congestion: messages={}, threads={}", messageQueue.size(), threadCount);
                     } else {
                         log.warn("More messages in queue than threads: messages={}, threads={}.", messageQueue.size(), threadCount);
                     }
-                    latestWarning.set(now);
+                    latestWarning = now;
                 }
 
                 long currentTimeMillis = System.currentTimeMillis();

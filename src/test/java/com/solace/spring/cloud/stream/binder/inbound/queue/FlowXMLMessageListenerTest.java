@@ -1,5 +1,6 @@
 package com.solace.spring.cloud.stream.binder.inbound.queue;
 
+import com.solace.spring.cloud.stream.binder.util.MockClock;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.Topic;
@@ -10,13 +11,12 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.lang.reflect.Field;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -160,13 +160,11 @@ class FlowXMLMessageListenerTest {
     }
 
     @Test
-    void testStartReceiverThreads_WatchdogLogsWarningForCongestedQueue(CapturedOutput capturedOutput) throws NoSuchFieldException, IllegalAccessException {
+    void testStartReceiverThreads_WatchdogLogsWarningForCongestedQueue(CapturedOutput capturedOutput) {
         FlowXMLMessageListener listener = new FlowXMLMessageListener();
-        // Use reflection to access the private 'latestWarning' field
-        Field latestWarningField = FlowXMLMessageListener.class.getDeclaredField("latestWarning");
-        latestWarningField.setAccessible(true);
-        AtomicReference<LocalDateTime> latestWarning = (AtomicReference<LocalDateTime>) latestWarningField.get(listener);
-        latestWarning.set(LocalDateTime.now().minusMinutes(6));
+        MockClock clock = new MockClock();
+        clock.setCurrentTime(Instant.now());
+        listener.clock = clock;
         Consumer<BytesXMLMessage> messageConsumer = message -> {
             try {
                 // Simulate a long message processing time
@@ -184,18 +182,20 @@ class FlowXMLMessageListenerTest {
 
         // Simulate messages being received
         Topic topic = JCSMPFactory.onlyInstance().createTopic("test/topic");
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 6; i++) {
             BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
             Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
             Mockito.when(mockMessage.getDestination()).thenReturn(topic);
             listener.onReceive(mockMessage);
         }
 
+        clock.add(6, TimeUnit.MINUTES);
+
         // Wait for the warning to be logged
         await().atMost(6000, TimeUnit.MILLISECONDS)
                 .until(() -> capturedOutput.getOut().contains("More messages in queue than threads"));
 
-        latestWarning.set(LocalDateTime.now().minusMinutes(6));
+        clock.add(6, TimeUnit.MINUTES);
 
         for (int i = 0; i < 10; i++) {
             BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);

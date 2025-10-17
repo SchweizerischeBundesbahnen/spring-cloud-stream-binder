@@ -83,6 +83,32 @@ Check out the difference between this fork and the original solace spring cloud 
 Read [API.adoc](API.adoc) for a description of the properties and API.
 All Changes are documented in the [Changelog](CHANGELOG.md).
 
+## Watchdog
+
+### Explanation
+
+A watchdog thread is created to monitor the message load.
+This thread compares the number of messages in the queue to the number of working threads.
+That can cause 2 log messages:
+
+- "More messages in queue than threads: messages={}, threads={}":
+This is logged when there are more messages in queues than threads.
+This is not cause for alarm, since a bit of backpressure can help reduce latency.
+- "Too many messages in queue! 3 times more messages than threads, check what is causing the congestion: messages={}, threads={}":
+This is logged when there are more than 3 times more messages in the queue than threads.
+This is the point where action is likely required.
+
+These messages are logged at most every 5 minutes.
+
+### Mitigation
+
+To address the congestion issues there are two options:
+
+- Optimize the application: If possible try to increase the processing speed in the application.
+This would ease the congestion on the queue, but is the most complex option and might not always be possible.
+- Increase concurrency: Having more worker threads increases throughput because more messages are consumed.
+This solution is simple to do, but comes at the cost of increased resource usage.
+
 ## Contributing
 
 To build/release read [DEVELOPER.md](DEVELOPER.md).
