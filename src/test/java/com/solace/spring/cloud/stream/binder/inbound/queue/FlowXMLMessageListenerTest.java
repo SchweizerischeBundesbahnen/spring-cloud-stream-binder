@@ -1,12 +1,17 @@
 package com.solace.spring.cloud.stream.binder.inbound.queue;
 
+import com.solace.spring.cloud.stream.binder.util.MockClock;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.Topic;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -18,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class FlowXMLMessageListenerTest {
 
     @Test
@@ -151,5 +157,54 @@ class FlowXMLMessageListenerTest {
                 .until(() -> activeMessages.iterator().next().isWarned());
         await().atMost(5500, TimeUnit.MILLISECONDS)
                 .until(() -> activeMessages.iterator().next().isErrored());
+    }
+
+    @Test
+    void testStartReceiverThreads_WatchdogLogsWarningForCongestedQueue(CapturedOutput capturedOutput) {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        MockClock clock = new MockClock();
+        clock.setCurrentTime(Instant.now());
+        listener.clock = clock;
+        Consumer<BytesXMLMessage> messageConsumer = message -> {
+            try {
+                // Simulate a long message processing time
+                Thread.sleep(8000);
+            } catch (InterruptedException ignored) {
+            }
+        };
+
+        int threadCount = 2;
+        String threadNamePrefix = "WatchdogTestThread";
+        long processingTime = 500;
+
+        // Start the receiver threads
+        listener.startReceiverThreads(threadCount, threadNamePrefix, messageConsumer, processingTime);
+
+        // Simulate messages being received
+        Topic topic = JCSMPFactory.onlyInstance().createTopic("test/topic");
+        for (int i = 0; i < 6; i++) {
+            BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
+            Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
+            Mockito.when(mockMessage.getDestination()).thenReturn(topic);
+            listener.onReceive(mockMessage);
+        }
+
+        clock.add(6, TimeUnit.MINUTES);
+
+        // Wait for the warning to be logged
+        await().atMost(8000, TimeUnit.MILLISECONDS)
+                .until(() -> capturedOutput.getOut().contains("More messages in queue than threads"));
+
+        clock.add(6, TimeUnit.MINUTES);
+
+        for (int i = 0; i < 10; i++) {
+            BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
+            Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
+            Mockito.when(mockMessage.getDestination()).thenReturn(topic);
+            listener.onReceive(mockMessage);
+        }
+
+        await().atMost(8000, TimeUnit.MILLISECONDS)
+                .until(() -> capturedOutput.getOut().contains("Too many messages in queue!"));
     }
 }
