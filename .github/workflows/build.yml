@@ -50,7 +50,7 @@ jobs:
       - name: IT-Tests with Maven
         run: mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml --no-transfer-progress
       - name: Publish Test Report
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v5
         if: always()
         with:
           report_paths: '**/target/surefire-reports/TEST-*.xml'
