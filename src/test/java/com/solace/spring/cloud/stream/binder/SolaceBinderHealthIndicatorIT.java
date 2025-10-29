@@ -7,8 +7,8 @@ import com.solace.spring.cloud.stream.binder.test.spring.SpringCloudStreamContex
 import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -26,7 +26,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 @Slf4j
@@ -49,7 +49,7 @@ public class SolaceBinderHealthIndicatorIT {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
     }
 
-    @Ignore("Strategy is flawed as SolaceMessageChannelBinderConfiguration.initSession() is not called when creating binder")
+    @Disabled("Strategy is flawed as SolaceMessageChannelBinderConfiguration.initSession() is not called when creating binder")
     void testHealthEndpoint(SpringCloudStreamContext context) throws Exception {
         assertNotNull(webAppContext);
         ResultActions result = mockMvc.perform(get("/actuator/health"));

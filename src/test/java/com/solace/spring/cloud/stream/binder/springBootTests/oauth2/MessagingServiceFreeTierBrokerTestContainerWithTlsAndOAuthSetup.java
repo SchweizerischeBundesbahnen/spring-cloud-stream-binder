@@ -26,7 +26,6 @@ public interface MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup
 
   ComposeContainer COMPOSE_CONTAINER = new ComposeContainer(
       new File(FULL_DOCKER_COMPOSE_FILE_PATH))
-          .withLocalCompose(false)
           .withPull(true)
       .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 8080)
       .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 55443)
