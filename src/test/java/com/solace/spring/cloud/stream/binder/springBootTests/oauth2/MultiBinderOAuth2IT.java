@@ -13,6 +13,7 @@ import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnClient;
 import org.assertj.core.util.Files;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("multibinderOAuth2")
 @DirtiesContext //Ensures all listeners are stopped
+@Isolated
 class MultiBinderOAuth2IT implements
         MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup {
 
