@@ -31,6 +31,7 @@ import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -118,7 +119,11 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         if (deliveryAttempt != null) {
             deliveryAttempt.incrementAndGet();
         }
+        long beforeMessageProcessing = System.nanoTime();
         sendMessage(message);
+        long afterMessageProcessing = System.nanoTime();
+        solaceMeterAccessor.ifPresent(meterAccessor -> meterAccessor.recordMessageProcessingTimeDuration(consumerProperties.getBindingName(),
+                TimeUnit.NANOSECONDS.toMillis(afterMessageProcessing - beforeMessageProcessing)));
     }
 
     public void onReceiveConcurrent(BytesXMLMessage bytesXMLMessageRaw) {

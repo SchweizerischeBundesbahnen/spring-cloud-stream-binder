@@ -273,6 +273,56 @@ public class SolaceSpringCloudStreamAssertions {
         );
     }
 
+    /**
+     * <p>Returns a function to evaluate that a Solace message size meter is valid.</p>
+     * <p>Should be used as a parameter of
+     * {@link org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[]) satisfies(ThrowingConsumer[])}.</p>
+     *
+     * @param nameTagValue value of the name tag
+     * @param lowerBound the expected minimum value (inclusive) {@link Statistic#TOTAL}
+     * @param upperBound the expected maximum value (exclusive) {@link Statistic#TOTAL}
+     * @return meter evaluator
+     * @see org.assertj.core.api.AbstractAssert#satisfies(ThrowingConsumer[])
+     */
+    public static ThrowingConsumer<Meter> isMeterInGivenRange(String nameTagValue, int count, double lowerBound, double upperBound, String expectedBaseUnit) {
+        return meter -> assertThat(meter).satisfies(
+                m -> assertThat(m.getId())
+                        .as("Checking ID for meter %s", meter)
+                        .satisfies(
+                                meterId -> assertThat(meterId.getType()).isEqualTo(Meter.Type.DISTRIBUTION_SUMMARY),
+                                meterId -> assertThat(meterId.getBaseUnit()).isEqualTo(expectedBaseUnit),
+                                meterId -> assertThat(meterId.getTags())
+                                        .singleElement()
+                                        .satisfies(
+                                                tag -> assertThat(tag.getKey())
+                                                        .isEqualTo(SolaceMessageMeterBinder.TAG_NAME),
+                                                tag -> assertThat(tag.getValue()).isEqualTo(nameTagValue)
+                                        )
+                        ),
+                m -> assertThat(m.measure())
+                        .as("Checking count stat measurement for meter %s", meter)
+                        .filteredOn(measurement -> measurement.getStatistic().equals(Statistic.COUNT))
+                        .singleElement()
+                        .extracting(Measurement::getValue)
+                        .asInstanceOf(DOUBLE)
+                        .isEqualTo(count),
+                m -> assertThat(m.measure())
+                        .as("Checking total stat measurement for meter %s", meter)
+                        .filteredOn(measurement -> measurement.getStatistic().equals(Statistic.TOTAL))
+                        .singleElement()
+                        .extracting(Measurement::getValue)
+                        .asInstanceOf(DOUBLE)
+                        .isGreaterThanOrEqualTo(lowerBound),
+                m -> assertThat(m.measure())
+                        .as("Checking total stat measurement for meter %s", meter)
+                        .filteredOn(measurement -> measurement.getStatistic().equals(Statistic.TOTAL))
+                        .singleElement()
+                        .extracting(Measurement::getValue)
+                        .asInstanceOf(DOUBLE)
+                        .isLessThan(upperBound)
+        );
+    }
+
     public static ThrowingConsumer<BindingsHealthContributor> isSingleBindingHealthAvailable(String bindingName, Status status) {
         return bindingsHealthContributor -> assertThat(StreamSupport.stream(bindingsHealthContributor.spliterator(), false))
                 .singleElement()

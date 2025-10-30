@@ -20,6 +20,7 @@ import org.springframework.util.CollectionUtils;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -69,7 +70,7 @@ public class JCSMPInboundTopicMessageProducer extends MessageProducerSupport imp
                 synchronized (msg) {
                     message = xmlMessageMapper.map(msg, noop, consumerProperties.getExtension());
                 }
-                Consumer<Message<?>> sendToCustomerConsumer = this::sendMessage;
+                Consumer<Message<?>> sendToCustomerConsumer = this::sendMessageWithProcessingTimeTracking;
                 if (tracingProxy.isPresent() && msg.getProperties() != null && tracingProxy.get().hasTracingHeader(msg.getProperties())) {
                     sendToCustomerConsumer = tracingProxy.get().wrapInTracingContext(msg.getProperties(), sendToCustomerConsumer);
                 }
@@ -79,6 +80,17 @@ public class JCSMPInboundTopicMessageProducer extends MessageProducerSupport imp
                 log.error("onReceive", ex);
             }
         });
+    }
+
+    private void sendMessageWithProcessingTimeTracking(Message<?> message) {
+        if (this.solaceMeterAccessor.isPresent()) {
+            long beforeMessageProcessing = System.nanoTime();
+            this.sendMessage(message);
+            long afterMessageProcessing = System.nanoTime();
+            this.solaceMeterAccessor.get().recordMessageProcessingTimeDuration(consumerProperties.getBindingName(), TimeUnit.NANOSECONDS.toMillis((afterMessageProcessing - beforeMessageProcessing)));
+        } else {
+            this.sendMessage(message);
+        }
     }
 
     public Set<String> getAllTopics() {

@@ -21,10 +21,16 @@ public class SolaceMeterAccessor {
     public void recordQueueSize(String bindingName, int queueSize) {
         solaceMessageMeterBinder.recordQueueSize(bindingName, queueSize);
     }
+
     public void recordActiveMessages(String bindingName, int activeMessages) {
         solaceMessageMeterBinder.recordActiveMessages(bindingName, activeMessages);
     }
+
     public void recordQueueBackpressure(String bindingName, long oldestMessagesWaitingForMs) {
         solaceMessageMeterBinder.recordQueueBackpressure(bindingName, oldestMessagesWaitingForMs);
+    }
+
+    public void recordMessageProcessingTimeDuration(String bindingName, long processingDurationMs) {
+        solaceMessageMeterBinder.recordMessageProcessingTimeDuration(bindingName, processingDurationMs);
     }
 }

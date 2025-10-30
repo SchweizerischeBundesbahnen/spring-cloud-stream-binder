@@ -14,11 +14,13 @@ public class SolaceMessageMeterBinder implements MeterBinder {
 
     public static final String METER_NAME_TOTAL_SIZE = "solace.message.size.total";
     public static final String METER_NAME_PAYLOAD_SIZE = "solace.message.size.payload";
+    public static final String METER_NAME_PROCESSING_TIME = "solace.message.processing.time";
     public static final String METER_NAME_QUEUE_SIZE = "solace.message.queue.size";
     public static final String METER_NAME_ACTIVE_MESSAGES_SIZE = "solace.message.active.size";
     public static final String METER_NAME_QUEUE_BACKPRESSURE = "solace.message.queue.backpressure";
     public static final String METER_DESCRIPTION_TOTAL_SIZE = "Total message size";
     public static final String METER_DESCRIPTION_PAYLOAD_SIZE = "Message payload size";
+    public static final String METER_DESCRIPTION_PROCESSING_TIME = "How long each message has been processed, before thread has been handed back";
     public static final String METER_DESCRIPTION_QUEUE_SIZE = "Message queue size";
     public static final String METER_DESCRIPTION_ACTIVE_MESSAGES_SIZE = "Messages active in processing";
     public static final String METER_DESCRIPTION_QUEUE_BACKPRESSURE = "The age of the oldest message that is waiting for being processed in process queue.";
@@ -89,6 +91,22 @@ public class SolaceMessageMeterBinder implements MeterBinder {
                                 .register(registry)
                 )
                 .record(oldestMessagesWaitingForMs);
+    }
+
+    public void recordMessageProcessingTimeDuration(String bindingName, long processingDurationMs) {
+        if (registry == null) {
+            return;
+        }
+
+        meterCache.computeIfAbsent(
+                        METER_NAME_PROCESSING_TIME + bindingName,
+                        ignored -> DistributionSummary.builder(METER_NAME_PROCESSING_TIME)
+                                .description(METER_DESCRIPTION_PROCESSING_TIME)
+                                .tag(TAG_NAME, bindingName)
+                                .baseUnit(BaseUnits.MILLISECONDS)
+                                .register(registry)
+                )
+                .record(processingDurationMs);
     }
 
     private DistributionSummary registerSizeMeter(String meterName,
