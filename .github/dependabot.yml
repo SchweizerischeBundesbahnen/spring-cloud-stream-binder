@@ -15,3 +15,10 @@ updates:
           - "org.springframework.*"
           - "org.springframework.boot.*"
           - "org.springframework.cloud.*"
+    ignore:
+      - dependency-name: "org.springframework.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.springframework.boot.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.springframework.cloud.*"
+        update-types: ["version-update:semver-major"]
