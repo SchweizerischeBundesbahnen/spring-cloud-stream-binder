@@ -24,7 +24,7 @@
 
     <properties>
         <java.version>17</java.version>
-        <spring-cloud.version>2025.0.0</spring-cloud.version>
+        <spring-cloud.version>2025.1.0</spring-cloud.version>
         <solace.jcsmp.version>10.29.0</solace.jcsmp.version>
         <maven.test.skip>true</maven.test.skip>
         <build.timestamp>${maven.build.timestamp}</build.timestamp>
