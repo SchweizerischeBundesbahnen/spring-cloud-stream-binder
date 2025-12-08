@@ -12,7 +12,7 @@ public class PubSubPlusContainer extends GenericContainer<PubSubPlusContainer> {
     private String adminUsername;
     private String adminPassword;
 
-    public static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("solace/solace-pubsub-standard");
+    public static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("solace/solace-pubsub-standard:10.25.0");
     public static final String DEFAULT_IMAGE_TAG = "latest";
     private static final String DEFAULT_ADMIN_USERNAME = "admin";
     private static final String DEFAULT_ADMIN_PASSWORD = "admin";
