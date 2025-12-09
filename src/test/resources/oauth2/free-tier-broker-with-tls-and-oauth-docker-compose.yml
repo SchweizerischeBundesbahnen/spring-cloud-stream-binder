@@ -4,7 +4,7 @@ networks:
 
 services:
   solbroker:
-    image: solace/solace-pubsub-standard:10.4.0.23
+    image: solace/solace-pubsub-standard:10.25.0
     hostname: solbroker
     networks:
       - solace_msg_net
@@ -14,8 +14,8 @@ services:
     ulimits:
       memlock: -1
       nofile:
-        soft: 2448
-        hard: 42192
+        soft: 1048576
+        hard: 1048576
     secrets:
       - server.pem
 

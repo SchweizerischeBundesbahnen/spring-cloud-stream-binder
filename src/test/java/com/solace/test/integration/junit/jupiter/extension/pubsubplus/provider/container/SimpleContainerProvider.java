@@ -5,6 +5,8 @@ import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.testcontainer.PubSubPlusContainer;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 import java.util.function.Supplier;
 
@@ -13,7 +15,11 @@ import java.util.function.Supplier;
  */
 public class SimpleContainerProvider implements PubSubPlusExtension.ContainerProvider {
     public Supplier<PubSubPlusContainer> containerSupplier(ExtensionContext extensionContext) {
-        return PubSubPlusContainer::new;
+        return () -> {
+            PubSubPlusContainer container = new PubSubPlusContainer();
+            container.withLogConsumer(new Slf4jLogConsumer(LoggerFactory.getLogger(PubSubPlusContainer.class)));
+            return container;
+        };
     }
 
     public void containerPostStart(ExtensionContext extensionContext, PubSubPlusContainer container) {

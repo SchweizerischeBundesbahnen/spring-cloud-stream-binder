@@ -1,10 +1,14 @@
 package com.solace.test.integration.testcontainer;
 
+import com.github.dockerjava.api.model.Ulimit;
 import lombok.Getter;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.Duration;
 import java.util.Arrays;
 
 @Getter
@@ -12,8 +16,8 @@ public class PubSubPlusContainer extends GenericContainer<PubSubPlusContainer> {
     private String adminUsername;
     private String adminPassword;
 
-    public static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("solace/solace-pubsub-standard:10.25.0");
-    public static final String DEFAULT_IMAGE_TAG = "latest";
+    public static final DockerImageName DEFAULT_IMAGE_NAME = DockerImageName.parse("solace/solace-pubsub-standard");
+    public static final String DEFAULT_IMAGE_TAG = "10.25.0";
     private static final String DEFAULT_ADMIN_USERNAME = "admin";
     private static final String DEFAULT_ADMIN_PASSWORD = "admin";
     private static final String DEFAULT_MAX_CONNECTION_COUNT = "100";
@@ -35,7 +39,15 @@ public class PubSubPlusContainer extends GenericContainer<PubSubPlusContainer> {
                 .withAdminPassword(DEFAULT_ADMIN_PASSWORD)
                 .withMaxConnectionCount(DEFAULT_MAX_CONNECTION_COUNT)
                 .withSharedMemorySize(DEFAULT_SHM_SIZE)
-                .waitingFor(Wait.forListeningPort());
+                .withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withUlimits(new Ulimit[]{new Ulimit("nofile", 1048576L, 1048576L)}))
+                .waitingFor(Wait.forHttp("/SEMP/v2/monitor/msgVpns/default")
+                        .forPort(8080)
+                        .withBasicCredentials(DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD)
+                        .forStatusCode(200)
+                        .forResponsePredicate(s -> s.contains("\"state\":\"up\""))
+                        .withStartupTimeout(Duration.ofMinutes(5)));
+
+        this.withLogConsumer(new Slf4jLogConsumer(LoggerFactory.getLogger(PubSubPlusContainer.class)));
     }
 
     public String getOrigin(Port port) {
@@ -43,7 +55,7 @@ public class PubSubPlusContainer extends GenericContainer<PubSubPlusContainer> {
             throw new IllegalArgumentException(String.format("Getting origin of port %s is not supported", port.name()));
         }
 
-        return String.format("%s://%s:%s", port.getProtocol(), getContainerIpAddress(),
+        return String.format("%s://%s:%s", port.getProtocol(), getHost(),
                 getMappedPort(port.getInternalPort()));
     }
 
