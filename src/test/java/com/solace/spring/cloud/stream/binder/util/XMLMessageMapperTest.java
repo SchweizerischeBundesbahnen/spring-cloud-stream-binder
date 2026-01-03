@@ -213,6 +213,9 @@ public class XMLMessageMapperTest {
             messageBuilder.setHeader(header.getKey(), new Object());
         }
 
+        // Non serializable header.
+        messageBuilder.setHeader("my-header", UUID.randomUUID());
+
         Message<?> testSpringMessage = messageBuilder.build();
         XMLMessage xmlMessage = xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT);
 
@@ -1050,9 +1053,8 @@ public class XMLMessageMapperTest {
         Set<String> serializedHeaders = objectReader.forType(new TypeReference<Set<String>>() {
                 })
                 .readValue(serializedHeadersJson);
-        assertThat(serializedHeaders, hasSize(2));
+        assertThat(serializedHeaders, hasSize(1));
         assertThat(serializedHeaders, hasItem(key));
-        assertThat(serializedHeaders, hasItem(MessageHeaders.ID));
     }
 
     @Test
@@ -1318,6 +1320,9 @@ public class XMLMessageMapperTest {
         do {
             log.info(String.format("Iteration %s - Message<?> to XMLMessage:\n%s", i, springMessage));
             xmlMessage = xmlMessageMapper.map(springMessage, null, false, DeliveryMode.PERSISTENT);
+            springHeaders.remove("id");
+            springHeaders.remove("timestamp");
+
             validateXMLProperties(xmlMessage, expectedSpringMessage.getPayload(), expectedSpringMessage.getHeaders(),
                     springHeaders);
 
@@ -1326,17 +1331,13 @@ public class XMLMessageMapperTest {
             springMessage = xmlMessageMapper.map(xmlMessage, acknowledgmentCallback, consumerProperties);
             validateSpringHeaders(springMessage.getHeaders(), expectedXmlMessage);
 
-            // Update the expected default spring headers
-            springHeaders.put(MessageHeaders.ID, springMessage.getHeaders().getId());
-            springHeaders.put(MessageHeaders.TIMESTAMP, springMessage.getHeaders().getTimestamp());
-
             i++;
         } while (i < 3);
     }
 
     private void validateXMLProperties(XMLMessage xmlMessage, Message<?> springMessage)
             throws Exception {
-        validateXMLProperties(xmlMessage, springMessage.getPayload(), springMessage.getHeaders());
+        validateXMLProperties(xmlMessage, springMessage.getPayload(), new HashMap<>(springMessage.getHeaders()));
     }
 
     private void validateXMLProperties(XMLMessage xmlMessage,
@@ -1351,6 +1352,9 @@ public class XMLMessageMapperTest {
             Object springMessagePayload,
             Map<String, Object> springMessageHeaders,
             Map<String, Object> expectedHeaders) throws Exception {
+        expectedHeaders.remove("id");
+        expectedHeaders.remove("timestamp");
+
         assertEquals(DeliveryMode.PERSISTENT, xmlMessage.getDeliveryMode());
         Assertions.assertThat(new GenericMessage<>(springMessagePayload, springMessageHeaders))
                 .extracting(StaticMessageHeaderAccessor::getContentType)
