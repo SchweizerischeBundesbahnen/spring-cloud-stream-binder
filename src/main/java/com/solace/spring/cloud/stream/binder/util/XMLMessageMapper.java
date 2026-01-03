@@ -234,7 +234,7 @@ public class XMLMessageMapper {
         SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
         Set<String> serializedHeaders = new HashSet<>();
         for (Map.Entry<String, Object> header : headers.entrySet()) {
-            if (header.getKey().equalsIgnoreCase(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK) || header.getKey().equalsIgnoreCase(BinderHeaders.TARGET_DESTINATION) || header.getKey().equalsIgnoreCase(SolaceBinderHeaders.CONFIRM_CORRELATION) || SolaceHeaderMeta.META.containsKey(header.getKey()) || SolaceBinderHeaderMeta.META.containsKey(header.getKey())) {
+            if (isJcsmpDefaultHeader(header) || isSpringPollutedHeader(header)) {
                 continue;
             }
             if (excludedHeaders != null && excludedHeaders.contains(header.getKey())) {
@@ -266,6 +266,20 @@ public class XMLMessageMapper {
             metadata.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, DEFAULT_ENCODING.getName());
         }
         return metadata;
+    }
+
+    private static boolean isSpringPollutedHeader(Map.Entry<String, Object> header) {
+        return header.getKey().equals("target-protocol") || // A not true header: https://github.com/spring-cloud/spring-cloud-stream/issues/2222
+                (header.getKey().equals("id") && header.getValue() instanceof UUID) || // Message header pollution from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L137
+                (header.getKey().equals("timestamp"));// JCSMP lib supports better supported header via config flags: GENERATE_RCV_TIMESTAMPS and GENERATE_SEND_TIMESTAMPS don't use the polluted version from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L151
+    }
+
+    private static boolean isJcsmpDefaultHeader(Map.Entry<String, Object> header) {
+        return header.getKey().equalsIgnoreCase(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK) ||
+                header.getKey().equalsIgnoreCase(BinderHeaders.TARGET_DESTINATION) ||
+                header.getKey().equalsIgnoreCase(SolaceBinderHeaders.CONFIRM_CORRELATION) ||
+                SolaceHeaderMeta.META.containsKey(header.getKey()) ||
+                SolaceBinderHeaderMeta.META.containsKey(header.getKey());
     }
 
     @SneakyThrows
