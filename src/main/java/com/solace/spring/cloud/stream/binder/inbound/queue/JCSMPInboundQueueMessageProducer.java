@@ -95,7 +95,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             log.trace("handleMessageWithoutRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
             ts = System.currentTimeMillis();
 
-            bytesXMLMessage.ackMessage();
+            acknowledgmentCallback.acknowledge();
             log.trace("handleMessageWithoutRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
         } catch (Exception ex) {
             handleException(acknowledgmentCallback, bytesXMLMessage, ex);
@@ -133,6 +133,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         LargeMessageSupport.MessageContext messageContext = largeMessageSupport.assemble(bytesXMLMessageRaw, acknowledgmentCallback);
         // we got an incomplete large message and wait for more chunks
         if (messageContext == null) {
+            log.trace("onReceiveConcurrent step=incompleteLargeMessage messageId={}", bytesXMLMessageRaw.getMessageId());
             return;
         }
         BytesXMLMessage bytesXMLMessage = messageContext.bytesMessage();
@@ -156,9 +157,9 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             ts = System.currentTimeMillis();
 
             if (retryTemplate.isPresent()) {
-                handleMessageWithRetry(message, sendToCustomerConsumer, acknowledgmentCallback, bytesXMLMessage);
+                handleMessageWithRetry(message, sendToCustomerConsumer, messageContext.acknowledgmentCallback(), bytesXMLMessage);
             } else {
-                handleMessageWithoutRetry(sendToCustomerConsumer, message, bytesXMLMessage, acknowledgmentCallback);
+                handleMessageWithoutRetry(sendToCustomerConsumer, message, bytesXMLMessage, messageContext.acknowledgmentCallback());
             }
             log.trace("onReceiveConcurrent step=handleWithRetry duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessageRaw.getMessageId());
             ts = System.currentTimeMillis();
@@ -180,7 +181,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         } catch (RuntimeException e) {
             boolean processedByErrorHandler = this.sendErrorMessageIfNecessary(null, e);
             if (processedByErrorHandler) {
-                bytesXMLMessage.ackMessage();
+                acknowledgmentCallback.acknowledge();
             } else {
                 log.warn("Failed to map to a Spring Message and no error channel was configured. Message will be rejected: {}", bytesXMLMessage, e);
                 requeueMessage(bytesXMLMessage);
