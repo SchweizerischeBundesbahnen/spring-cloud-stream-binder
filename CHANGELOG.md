@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.4.3] - 2026-01-06
+
+### Fixed
+- Fix message acknowledgment of large messages
+
+### Changed
+- Update dependencies
+- Reducing header noise by excluding spring generates nonsense headers
+
 ## [7.4.3] - [7.4.1] - 2025-12-08
 ### Changed
 - Update dependencies
