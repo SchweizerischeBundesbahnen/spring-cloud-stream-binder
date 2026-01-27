@@ -16,6 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.api.parallel.Isolated;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
@@ -53,7 +55,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Isolated
 @DirtiesContext
 public class SolaceBinderRestartIT extends SpringCloudStreamContext {
-
     @BeforeEach
     void setUp(JCSMPSession jcsmpSession, SempV2Api sempV2Api) {
         setJcsmpSession(jcsmpSession);

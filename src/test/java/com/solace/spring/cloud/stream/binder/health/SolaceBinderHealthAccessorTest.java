@@ -9,7 +9,7 @@ import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.actuate.health.NamedContributor;
+import org.springframework.boot.health.contributor.HealthContributors;
 
 import java.util.stream.StreamSupport;
 
@@ -30,8 +30,8 @@ public class SolaceBinderHealthAccessorTest {
 
         assertThat(StreamSupport.stream(healthContributor.getSolaceBindingsHealthContributor().spliterator(), false))
                 .singleElement()
-                .satisfies(n -> assertThat(n.getName()).isEqualTo(bindingName))
-                .extracting(NamedContributor::getContributor)
+                .satisfies(n -> assertThat(n.name()).isEqualTo(bindingName))
+                .extracting(HealthContributors.Entry::contributor)
                 .asInstanceOf(InstanceOfAssertFactories.type(SolaceHealthIndicator.class));
 
         healthAccessor.removeBindingHealthIndicator(bindingName);

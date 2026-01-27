@@ -7,11 +7,11 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.messaging.Message;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.oauth2.client.endpoint.DefaultClientCredentialsTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.OAuth2ClientCredentialsGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.RestClientClientCredentialsTokenResponseClient;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -39,7 +39,7 @@ public class SpringCloudStreamOAuth2App {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http.authorizeHttpRequests(requests -> requests
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated());
@@ -48,12 +48,12 @@ public class SpringCloudStreamOAuth2App {
 
     @Bean
     public OAuth2AccessTokenResponseClient<OAuth2ClientCredentialsGrantRequest> clientCredentialsTokenResponseClient() {
-        DefaultClientCredentialsTokenResponseClient client = new DefaultClientCredentialsTokenResponseClient();
-        client.setRestOperations(restTemplateWithDisabledSsl());
+        RestClientClientCredentialsTokenResponseClient client = new RestClientClientCredentialsTokenResponseClient();
+        client.setRestClient(restClientWithDisabledSsl());
         return client;
     }
 
-    private RestTemplate restTemplateWithDisabledSsl() {
+    private RestClient restClientWithDisabledSsl() {
         try {
             TrustManager[] trustAllCerts = new TrustManager[]{
                     new X509TrustManager() {
@@ -76,10 +76,11 @@ public class SpringCloudStreamOAuth2App {
             SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
             requestFactory.setConnectTimeout(5000);
             requestFactory.setReadTimeout(5000);
-
-            return new RestTemplate(requestFactory);
+            return RestClient.builder()
+                    .requestFactory(requestFactory)
+                    .build();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create RestTemplate with disabled SSL validation", e);
+            throw new RuntimeException("Failed to create RestClient with disabled SSL validation", e);
         }
     }
 }

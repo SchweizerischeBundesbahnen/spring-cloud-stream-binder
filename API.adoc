@@ -1142,7 +1142,7 @@ Also, your environment will be polluted with orphaned Error Queues whenever thes
 
 === Mutating Messages while using Spring's Retry Template
 
-When locally reprocessing failed messages with https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_retry_template[Spring's Retry Template] (i.e. when consumer `maxAttempts > 1`), mutations of nested objects within the Spring `Message<?>` may persist between retries.
+When locally reprocessing failed messages with https://docs.spring.io/spring-cloud-stream/docs/{scst-version}/reference/html/spring-cloud-stream.html#_retry_template[Spring's Retry Template] (i.e. when consumer `maxAttempts > 0`), mutations of nested objects within the Spring `Message<?>` may persist between retries.
 
 .Example: Mutating `SDTMap` payload and failing the message
 [source,java]

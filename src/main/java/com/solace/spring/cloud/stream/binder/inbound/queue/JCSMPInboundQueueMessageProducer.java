@@ -11,23 +11,25 @@ import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
 import com.solace.spring.cloud.stream.binder.util.*;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.impl.JCSMPBasicSession;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.cloud.stream.binder.RequeueCurrentMessageException;
+import org.springframework.core.AttributeAccessor;
+import org.springframework.core.retry.RetryException;
+import org.springframework.core.retry.RetryTemplate;
 import org.springframework.integration.StaticMessageHeaderAccessor;
 import org.springframework.integration.acks.AckUtils;
 import org.springframework.integration.acks.AcknowledgmentCallback;
 import org.springframework.integration.context.OrderlyShutdownCapable;
 import org.springframework.integration.core.Pausable;
 import org.springframework.integration.endpoint.MessageProducerSupport;
+import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
 import org.springframework.integration.support.ErrorMessageUtils;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessagingException;
-import org.springframework.retry.RecoveryCallback;
-import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Optional;
 import java.util.Set;
@@ -39,7 +41,6 @@ import java.util.function.Consumer;
 
 @Slf4j
 @Setter
-@RequiredArgsConstructor
 public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport implements OrderlyShutdownCapable, Pausable {
     private final SolaceConsumerDestination consumerDestination;
     private final JCSMPSession jcsmpSession;
@@ -50,7 +51,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     private final Optional<TracingProxy> tracingProxy;
     private final Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor;
     private final Optional<RetryTemplate> retryTemplate;
-    private final Optional<RecoveryCallback<?>> recoveryCallback;
+    private final Optional<ErrorMessageSendingRecoverer> recoveryCallback;
     private final Optional<ErrorQueueInfrastructure> errorQueueInfrastructure;
 
     private final ThreadLocal<XMLMessageMapper> xmlMessageMapper = ThreadLocal.withInitial(XMLMessageMapper::new);
@@ -60,31 +61,59 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     private final AtomicReference<FlowReceiver> flowReceiver = new AtomicReference<>();
     private final LargeMessageSupport largeMessageSupport = new LargeMessageSupport();
 
+    public JCSMPInboundQueueMessageProducer(
+            SolaceConsumerDestination consumerDestination,
+            JCSMPSession jcsmpSession,
+            ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
+            EndpointProperties endpointProperties,
+            Consumer<Endpoint> postStart,
+            BeanFactory beanFactory,
+            Optional<SolaceMeterAccessor> solaceMeterAccessor,
+            Optional<TracingProxy> tracingProxy,
+            Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor,
+            Optional<RetryTemplate> retryTemplate,
+            Optional<ErrorMessageSendingRecoverer> recoveryCallback,
+            Optional<ErrorQueueInfrastructure> errorQueueInfrastructure
+    ) {
+        this.consumerDestination = consumerDestination;
+        this.jcsmpSession = jcsmpSession;
+        this.consumerProperties = consumerProperties;
+        this.endpointProperties = endpointProperties;
+        this.postStart = postStart;
+        setBeanFactory(beanFactory);
+        this.solaceMeterAccessor = solaceMeterAccessor;
+        this.tracingProxy = tracingProxy;
+        this.solaceBinderHealthAccessor = solaceBinderHealthAccessor;
+        this.retryTemplate = retryTemplate;
+        this.recoveryCallback = recoveryCallback;
+        this.errorQueueInfrastructure = errorQueueInfrastructure;
+    }
+
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     void handleMessageWithRetry(Message<?> message, Consumer<Message<?>> sendToConsumerHandler,
                                 AcknowledgmentCallback acknowledgmentCallback, BytesXMLMessage bytesXMLMessage)
             throws SolaceAcknowledgmentException {
-        retryTemplate.get().execute((context) -> {
-            long ts = System.currentTimeMillis();
-            sendToConsumerHandler.accept(message);
-            log.trace("handleMessageWithRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
-            ts = System.currentTimeMillis();
+        try {
+            retryTemplate.get().execute(() -> {
+                long ts = System.currentTimeMillis();
+                sendToConsumerHandler.accept(message);
+                log.trace("handleMessageWithRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+                ts = System.currentTimeMillis();
 
-            AckUtils.autoAck(acknowledgmentCallback);
-            log.trace("handleMessageWithRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
-            return null;
-        }, (context) -> {
-            try {
-                context.setAttribute(ErrorMessageUtils.INPUT_MESSAGE_CONTEXT_KEY, message);
-                Object toReturn = recoveryCallback.get().recover(context);
                 AckUtils.autoAck(acknowledgmentCallback);
-                return toReturn;
+                log.trace("handleMessageWithRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+                return null;
+            });
+        } catch (RetryException e) {
+            try {
+                AttributeAccessor attributeAccessor = ErrorMessageUtils.getAttributeAccessor(message, null);
+                recoveryCallback.get().recover(attributeAccessor, e.getCause());
+                AckUtils.autoAck(acknowledgmentCallback);
             } catch (Exception ex) {
                 handleException(acknowledgmentCallback, bytesXMLMessage, ex);
-                return null;
             }
-        });
+        }
     }
 
     private static void handleMessageWithoutRetry(Consumer<Message<?>> sendToCustomerConsumer, Message<?> message, BytesXMLMessage bytesXMLMessage, AcknowledgmentCallback acknowledgmentCallback) {
