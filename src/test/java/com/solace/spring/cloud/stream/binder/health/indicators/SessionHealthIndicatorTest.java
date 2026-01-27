@@ -7,8 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.Status;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,15 +23,15 @@ class SessionHealthIndicatorTest {
         SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         healthIndicator.up();
         assertEquals(healthIndicator.health(), Health.up().build());
-        assertTrue(healthIndicator.getHealth(true).getDetails().isEmpty());
+        assertTrue(healthIndicator.health(true).getDetails().isEmpty());
     }
 
     @Test
     void testReconnecting() {
         SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         healthIndicator.reconnecting(null);
-        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
-        assertTrue(healthIndicator.getHealth(true).getDetails().isEmpty());
+        assertEquals(Status.DOWN, healthIndicator.health().getStatus());
+        assertTrue(healthIndicator.health(true).getDetails().isEmpty());
     }
 
     @Test
@@ -40,25 +40,25 @@ class SessionHealthIndicatorTest {
 
         // Test that reconnecting always immediately goes down
         healthIndicator.reconnecting(null);
-        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
+        assertEquals(Status.DOWN, healthIndicator.health().getStatus());
 
         // Test that subsequent reconnecting calls also go down
         healthIndicator.reconnecting(null);
-        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
+        assertEquals(Status.DOWN, healthIndicator.health().getStatus());
 
         // Test that after going up, reconnecting still goes down
         healthIndicator.up();
-        assertEquals(healthIndicator.health().getStatus(), Status.UP);
+        assertEquals(Status.UP, healthIndicator.health().getStatus());
         healthIndicator.reconnecting(null);
-        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
+        assertEquals(Status.DOWN, healthIndicator.health().getStatus());
     }
 
     @Test
     void testDown() {
         SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         healthIndicator.down(null);
-        assertEquals(healthIndicator.health().getStatus(), Status.DOWN);
-        assertTrue(healthIndicator.getHealth(true).getDetails().isEmpty());
+        assertEquals(Status.DOWN, healthIndicator.health().getStatus());
+        assertTrue(healthIndicator.health(true).getDetails().isEmpty());
     }
 
     @CartesianTest(name = "[{index}] status={0} withException={1} responseCode={2} info={3}")
@@ -126,7 +126,7 @@ class SessionHealthIndicatorTest {
             default:
                 throw new IllegalArgumentException("Test error: No handling for status=" + status);
         }
-        Health health = healthIndicator.getHealth(false);
+        Health health = healthIndicator.health(false);
         assertEquals(new Status(expectedStatus), health.getStatus());
         assertTrue(health.getDetails().isEmpty());
     }

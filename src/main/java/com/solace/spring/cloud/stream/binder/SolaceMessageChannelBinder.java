@@ -21,12 +21,12 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.cloud.stream.binder.*;
 import org.springframework.cloud.stream.provisioning.ConsumerDestination;
 import org.springframework.cloud.stream.provisioning.ProducerDestination;
+import org.springframework.core.retry.RetryTemplate;
 import org.springframework.integration.core.MessageProducer;
+import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
 import org.springframework.integration.support.ErrorMessageStrategy;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
-import org.springframework.retry.RecoveryCallback;
-import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -128,7 +128,7 @@ public class SolaceMessageChannelBinder
         SolaceConsumerDestination consumerDestination = (SolaceConsumerDestination) destination;
         EndpointProperties endpointProperties = getConsumerEndpointProperties(consumerProperties);
         Optional<RetryTemplate> retryTemplate;
-        Optional<RecoveryCallback<?>> recoveryCallback;
+        Optional<ErrorMessageSendingRecoverer> recoveryCallback;
         Optional<ErrorQueueInfrastructure> errorQueueInfrastructure;
 
         if (consumerProperties.getExtension().isAutoBindErrorQueue()) {

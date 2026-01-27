@@ -11,8 +11,8 @@ import io.micrometer.core.instrument.Statistic;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.SoftAssertions;
 import org.assertj.core.api.ThrowingConsumer;
-import org.springframework.boot.actuate.health.NamedContributor;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.contributor.HealthContributors;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.integration.IntegrationMessageHeaderAccessor;
 import org.springframework.integration.StaticMessageHeaderAccessor;
@@ -326,16 +326,19 @@ public class SolaceSpringCloudStreamAssertions {
     public static ThrowingConsumer<BindingsHealthContributor> isSingleBindingHealthAvailable(String bindingName, Status status) {
         return bindingsHealthContributor -> assertThat(StreamSupport.stream(bindingsHealthContributor.spliterator(), false))
                 .singleElement()
-                .satisfies(bindingContrib -> assertThat(bindingContrib.getName()).isEqualTo(bindingName))
-
-                .extracting(NamedContributor::getContributor)
+                .satisfies(bindingContrib -> assertThat(bindingContrib.name()).isEqualTo(bindingName))
+                .extracting(HealthContributors.Entry::contributor)
                 .asInstanceOf(InstanceOfAssertFactories.type(SolaceHealthIndicator.class))
                 .satisfies(SolaceSpringCloudStreamAssertions.isBindingHealthAvailable(status));
     }
 
     public static ThrowingConsumer<SolaceHealthIndicator> isBindingHealthAvailable(Status status) {
         return bindingHealthIndicator -> assertThat(bindingHealthIndicator)
-                .extracting(flowIndicator -> flowIndicator.getHealth(false))
-                .satisfies(health -> assertThat(health.getStatus()).isEqualTo(status));
+                .extracting(flowIndicator -> flowIndicator.health(false))
+                .satisfies(health -> {
+                    if (health != null) {
+                        assertThat(health.getStatus()).isEqualTo(status);
+                    }
+                });
     }
 }

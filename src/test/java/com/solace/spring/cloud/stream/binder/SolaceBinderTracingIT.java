@@ -23,8 +23,8 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.autoconfigure.tracing.OpenTelemetryTracingAutoConfiguration;
-import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
+import org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.OpenTelemetryTracingAutoConfiguration;
+import org.springframework.boot.micrometer.tracing.test.autoconfigure.AutoConfigureTracing;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.BinderHeaders;
 import org.springframework.cloud.stream.binder.Binding;
@@ -50,13 +50,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Tests for tracing propagation.
  */
 @SpringJUnitConfig(classes = {SolaceJavaAutoConfiguration.class,
-        OpenTelemetryTracingAutoConfiguration.class,
-        org.springframework.boot.actuate.autoconfigure.opentelemetry.OpenTelemetryAutoConfiguration.class},
+        OpenTelemetryTracingAutoConfiguration.class},
         initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
 @Slf4j
-@AutoConfigureObservability
+@AutoConfigureTracing
 @Isolated
 @DirtiesContext
 public class SolaceBinderTracingIT {

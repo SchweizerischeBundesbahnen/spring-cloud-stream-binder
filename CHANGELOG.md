@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [7.4.3] - [8.0.0] - 2026-01-28
+### Changed
+- Update Spring Boot parent to 4.0.2
+- Update spring-cloud-dependenecies to 2025.1.0
+
 ## [7.4.3] - 2026-01-06
 
 ### Fixed

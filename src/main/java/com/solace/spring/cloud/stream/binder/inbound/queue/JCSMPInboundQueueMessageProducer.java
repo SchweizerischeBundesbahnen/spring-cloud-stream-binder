@@ -17,17 +17,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.cloud.stream.binder.RequeueCurrentMessageException;
+import org.springframework.core.AttributeAccessor;
+import org.springframework.core.retry.RetryException;
+import org.springframework.core.retry.RetryTemplate;
+import org.springframework.core.retry.Retryable;
 import org.springframework.integration.StaticMessageHeaderAccessor;
 import org.springframework.integration.acks.AckUtils;
 import org.springframework.integration.acks.AcknowledgmentCallback;
 import org.springframework.integration.context.OrderlyShutdownCapable;
 import org.springframework.integration.core.Pausable;
 import org.springframework.integration.endpoint.MessageProducerSupport;
-import org.springframework.integration.support.ErrorMessageUtils;
+import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessagingException;
-import org.springframework.retry.RecoveryCallback;
-import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Optional;
 import java.util.Set;
@@ -50,7 +52,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     private final Optional<TracingProxy> tracingProxy;
     private final Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor;
     private final Optional<RetryTemplate> retryTemplate;
-    private final Optional<RecoveryCallback<?>> recoveryCallback;
+    private final Optional<ErrorMessageSendingRecoverer> recoveryCallback;
     private final Optional<ErrorQueueInfrastructure> errorQueueInfrastructure;
 
     private final ThreadLocal<XMLMessageMapper> xmlMessageMapper = ThreadLocal.withInitial(XMLMessageMapper::new);
@@ -65,26 +67,20 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     void handleMessageWithRetry(Message<?> message, Consumer<Message<?>> sendToConsumerHandler,
                                 AcknowledgmentCallback acknowledgmentCallback, BytesXMLMessage bytesXMLMessage)
             throws SolaceAcknowledgmentException {
-        retryTemplate.get().execute((context) -> {
-            long ts = System.currentTimeMillis();
-            sendToConsumerHandler.accept(message);
-            log.trace("handleMessageWithRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
-            ts = System.currentTimeMillis();
+        try {
+            retryTemplate.get().execute(() -> {
+                long ts = System.currentTimeMillis();
+                sendToConsumerHandler.accept(message);
+                log.trace("handleMessageWithRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+                ts = System.currentTimeMillis();
 
-            AckUtils.autoAck(acknowledgmentCallback);
-            log.trace("handleMessageWithRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
-            return null;
-        }, (context) -> {
-            try {
-                context.setAttribute(ErrorMessageUtils.INPUT_MESSAGE_CONTEXT_KEY, message);
-                Object toReturn = recoveryCallback.get().recover(context);
                 AckUtils.autoAck(acknowledgmentCallback);
-                return toReturn;
-            } catch (Exception ex) {
-                handleException(acknowledgmentCallback, bytesXMLMessage, ex);
+                log.trace("handleMessageWithRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
                 return null;
-            }
-        });
+            });
+        } catch (RetryException e) {
+            handleException(acknowledgmentCallback, bytesXMLMessage, e);
+        }
     }
 
     private static void handleMessageWithoutRetry(Consumer<Message<?>> sendToCustomerConsumer, Message<?> message, BytesXMLMessage bytesXMLMessage, AcknowledgmentCallback acknowledgmentCallback) {
