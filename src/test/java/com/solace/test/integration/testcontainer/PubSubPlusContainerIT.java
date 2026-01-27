@@ -1,6 +1,5 @@
 package com.solace.test.integration.testcontainer;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
@@ -13,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.JsonNode;
 
 import java.time.Duration;
 import java.util.Optional;

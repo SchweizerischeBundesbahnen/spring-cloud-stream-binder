@@ -1,5 +1,6 @@
 package com.solace.spring.cloud.stream.binder;
 
+import com.solace.spring.cloud.stream.binder.test.spring.configuration.TestTracingConfiguration;
 import community.solace.spring.boot.starter.solaceclientconfig.SolaceJavaAutoConfiguration;
 import com.solace.spring.cloud.stream.binder.config.autoconfigure.SolaceTracerConfiguration;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
@@ -22,9 +23,10 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.autoconfigure.tracing.OpenTelemetryTracingAutoConfiguration;
-import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
+import org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.OpenTelemetryTracingAutoConfiguration;
+import org.springframework.boot.micrometer.tracing.test.autoconfigure.AutoConfigureTracing;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.BinderHeaders;
 import org.springframework.cloud.stream.binder.Binding;
@@ -51,12 +53,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringJUnitConfig(classes = {SolaceJavaAutoConfiguration.class,
         OpenTelemetryTracingAutoConfiguration.class,
-        org.springframework.boot.actuate.autoconfigure.opentelemetry.OpenTelemetryAutoConfiguration.class},
+        TestTracingConfiguration.class},
         initializers = ConfigDataApplicationContextInitializer.class)
 @ExtendWith(PubSubPlusExtension.class)
 @ExtendWith(SpringCloudStreamExtension.class)
 @Slf4j
-@AutoConfigureObservability
+@AutoConfigureTracing
 @Isolated
 @DirtiesContext
 public class SolaceBinderTracingIT {
@@ -64,6 +66,8 @@ public class SolaceBinderTracingIT {
     Tracer tracer;
     @Autowired
     Propagator propagator;
+    @Autowired
+    BeanFactory beanFactory;
 
     @CartesianTest(name = "[{index}] deliveryMode={0}, qualityOfService={1}, group={2}")
     @Execution(ExecutionMode.CONCURRENT)
@@ -77,7 +81,7 @@ public class SolaceBinderTracingIT {
         SolaceTracerConfiguration solaceTracerConfiguration = new SolaceTracerConfiguration();
         TracingImpl tracingImpl = solaceTracerConfiguration.tracingImpl(tracer, propagator);
         TracingProxy tracingProxy = solaceTracerConfiguration.tracingProxy(tracingImpl);
-        SolaceTestBinder binder = new SolaceTestBinder(context.getBinder(), tracingProxy);
+        SolaceTestBinder binder = new SolaceTestBinder(context.getBinder(), tracingProxy, beanFactory);
 
         DirectChannel output = context.createBindableChannel("output", new BindingProperties());
         DirectChannel input = context.createBindableChannel("input", new BindingProperties());
@@ -98,7 +102,9 @@ public class SolaceBinderTracingIT {
         input.subscribe(m -> {
             result.set(m);
             Span currentSpan = tracer.currentSpan();
-            spanInMessage.set(currentSpan.toString());
+            if (currentSpan != null) {
+                spanInMessage.set(currentSpan.toString());
+            }
         });
 
         Span sendMessageSpan = tracer.nextSpan().name("sendMessage");

@@ -136,9 +136,14 @@ public class JCSMPOutboundMessageHandlerTest {
 
         AtomicInteger timesSuccessResolved = new AtomicInteger(0);
         AtomicInteger timesFailureResolved = new AtomicInteger(0);
-        correlationData.getFuture().addCallback(
-                v -> timesSuccessResolved.incrementAndGet(),
-                e -> timesFailureResolved.incrementAndGet());
+        correlationData.getFuture().whenComplete(
+                (v, e) -> {
+                    if (e == null) {
+                        timesSuccessResolved.incrementAndGet();
+                    } else {
+                        timesFailureResolved.incrementAndGet();
+                    }
+                });
 
         getCorrelationKeys().forEach(pubEventHandlerCaptor.getValue()::responseReceivedEx);
         assertThat(xmlMessageCaptor.getAllValues())
@@ -165,9 +170,14 @@ public class JCSMPOutboundMessageHandlerTest {
                 .build());
         AtomicInteger timesSuccessResolved = new AtomicInteger(0);
         AtomicInteger timesFailureResolved = new AtomicInteger(0);
-        correlationData.getFuture().addCallback(
-                v -> timesSuccessResolved.incrementAndGet(),
-                e -> timesFailureResolved.incrementAndGet());
+        correlationData.getFuture().whenComplete(
+                (v, e) -> {
+                    if (e == null) {
+                        timesSuccessResolved.incrementAndGet();
+                    } else {
+                        timesFailureResolved.incrementAndGet();
+                    }
+                });
         JCSMPException exception = new JCSMPException("ooooops");
         getCorrelationKeys().forEach(k -> pubEventHandlerCaptor.getValue()
                 .handleErrorEx(k, exception, 1111));

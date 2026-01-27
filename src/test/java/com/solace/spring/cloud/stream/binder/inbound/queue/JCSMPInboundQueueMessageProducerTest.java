@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.messaging.MessageHandler;
@@ -30,6 +31,8 @@ class JCSMPInboundQueueMessageProducerTest {
     private EndpointProperties endpointProperties;
     @Mock
     private ErrorQueueInfrastructure errorQueueInfrastructure;
+    @Mock
+    private BeanFactory beanFactory;
 
     private JCSMPInboundQueueMessageProducer producer;
     private MessageHandler messageHandler;
@@ -50,6 +53,7 @@ class JCSMPInboundQueueMessageProducerTest {
                 endpointProperties,
                 e -> {
                 },
+                beanFactory,
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),

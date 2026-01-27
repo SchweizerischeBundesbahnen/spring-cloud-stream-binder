@@ -7,6 +7,7 @@ import com.solacesystems.jcsmp.*;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ public class JCSMPInboundTopicMessageMultiplexerTest {
     @Test
     void testCallFromMultipleThreads_shouldNotThrowConcurrentModification() throws JCSMPException, ExecutionException, InterruptedException {
         var session = Mockito.mock(JCSMPSession.class);
+        var beanFactory = Mockito.mock(BeanFactory.class);
 
         AtomicReference<XMLMessageListener> capturedListener = new AtomicReference<>();
 
@@ -35,7 +37,7 @@ public class JCSMPInboundTopicMessageMultiplexerTest {
             return mock(XMLMessageConsumer.class);
         });
 
-        JCSMPInboundTopicMessageMultiplexer multiplexer = new JCSMPInboundTopicMessageMultiplexer(session, Optional.empty(), Optional.empty());
+        JCSMPInboundTopicMessageMultiplexer multiplexer = new JCSMPInboundTopicMessageMultiplexer(session, beanFactory, Optional.empty(), Optional.empty());
         SolaceConsumerDestination consumerDestination = Mockito.mock(SolaceConsumerDestination.class);
         Mockito.when(consumerDestination.getName()).thenReturn("consumer");
         ExtendedConsumerProperties<SolaceConsumerProperties> properties = Mockito.mock(ExtendedConsumerProperties.class);

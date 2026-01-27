@@ -17,16 +17,17 @@ import com.solace.spring.cloud.stream.binder.util.*;
 import com.solacesystems.jcsmp.*;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.cloud.stream.binder.*;
 import org.springframework.cloud.stream.provisioning.ConsumerDestination;
 import org.springframework.cloud.stream.provisioning.ProducerDestination;
+import org.springframework.core.retry.RetryTemplate;
 import org.springframework.integration.core.MessageProducer;
+import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
 import org.springframework.integration.support.ErrorMessageStrategy;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
-import org.springframework.retry.RecoveryCallback;
-import org.springframework.retry.support.RetryTemplate;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -45,6 +46,7 @@ public class SolaceMessageChannelBinder
     private final Context jcsmpContext;
     private final JCSMPSessionProducerManager sessionProducerManager;
     private final String errorHandlerProducerKey = UUID.randomUUID().toString();
+    private final BeanFactory beanFactory;
     private final Optional<SolaceMeterAccessor> solaceMeterAccessor;
     private final Optional<TracingProxy> tracingProxy;
     private final Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor;
@@ -56,17 +58,19 @@ public class SolaceMessageChannelBinder
     public SolaceMessageChannelBinder(JCSMPSession jcsmpSession,
                                       Context jcsmpContext,
                                       SolaceEndpointProvisioner solaceEndpointProvisioner,
+                                      BeanFactory beanFactory,
                                       Optional<SolaceMeterAccessor> solaceMeterAccessor,
                                       Optional<TracingProxy> tracingProxy,
                                       Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
         super(new String[0], solaceEndpointProvisioner);
         this.jcsmpSession = jcsmpSession;
         this.jcsmpContext = jcsmpContext;
+        this.beanFactory = beanFactory;
         this.solaceMeterAccessor = solaceMeterAccessor;
         this.tracingProxy = tracingProxy;
         this.solaceBinderHealthAccessor = solaceBinderHealthAccessor;
         this.sessionProducerManager = new JCSMPSessionProducerManager(jcsmpSession);
-        this.jcsmpInboundTopicMessageMultiplexer = new JCSMPInboundTopicMessageMultiplexer(jcsmpSession, this.solaceMeterAccessor, this.tracingProxy);
+        this.jcsmpInboundTopicMessageMultiplexer = new JCSMPInboundTopicMessageMultiplexer(jcsmpSession, beanFactory, this.solaceMeterAccessor, this.tracingProxy);
     }
 
     @Override
@@ -128,7 +132,7 @@ public class SolaceMessageChannelBinder
         SolaceConsumerDestination consumerDestination = (SolaceConsumerDestination) destination;
         EndpointProperties endpointProperties = getConsumerEndpointProperties(consumerProperties);
         Optional<RetryTemplate> retryTemplate;
-        Optional<RecoveryCallback<?>> recoveryCallback;
+        Optional<ErrorMessageSendingRecoverer> recoveryCallback;
         Optional<ErrorQueueInfrastructure> errorQueueInfrastructure;
 
         if (consumerProperties.getExtension().isAutoBindErrorQueue()) {
@@ -142,7 +146,7 @@ public class SolaceMessageChannelBinder
         }
 
         ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, group, consumerProperties);
-        if (consumerProperties.getMaxAttempts() > 1) {
+        if (consumerProperties.getMaxAttempts() > 0) {
             retryTemplate = Optional.of(buildRetryTemplate(consumerProperties));
             recoveryCallback = Optional.of(errorInfra.getRecoverer());
         } else {
@@ -156,6 +160,7 @@ public class SolaceMessageChannelBinder
                 consumerProperties,
                 endpointProperties,
                 getConsumerPostStart(consumerDestination, consumerProperties),
+                beanFactory,
                 solaceMeterAccessor,
                 tracingProxy,
                 solaceBinderHealthAccessor,

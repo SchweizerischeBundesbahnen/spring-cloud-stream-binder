@@ -9,6 +9,7 @@ import com.solacesystems.jcsmp.BytesXMLMessage;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.integration.acks.AcknowledgmentCallback;
 import org.springframework.integration.context.OrderlyShutdownCapable;
@@ -44,12 +45,14 @@ public class JCSMPInboundTopicMessageProducer extends MessageProducerSupport imp
     public JCSMPInboundTopicMessageProducer(SolaceConsumerDestination consumerDestination,
                                             String group,
                                             ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
+                                            BeanFactory beanFactory,
                                             Optional<SolaceMeterAccessor> solaceMeterAccessor,
                                             Optional<TracingProxy> tracingProxy,
                                             JCSMPInboundTopicMessageMultiplexer.LivecycleHooks livecycleHooks) {
         this.consumerDestination = consumerDestination;
         this.group = group;
         this.consumerProperties = consumerProperties;
+        setBeanFactory(beanFactory);
         this.solaceMeterAccessor = solaceMeterAccessor;
         this.tracingProxy = tracingProxy;
         this.executorService = Executors.newFixedThreadPool(Math.max(1, consumerProperties.getConcurrency()));

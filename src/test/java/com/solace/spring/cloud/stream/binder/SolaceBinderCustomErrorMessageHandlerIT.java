@@ -62,7 +62,7 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
     @CartesianTest(name = "[{index}] channelType={0}, maxAttempts={1}")
     public <T> void testConsumerOverrideErrorMessageHandler(
             @Values(classes = {DirectChannel.class}) Class<T> channelType,
-            @Values(ints = {1, 3}) int maxAttempts,
+            @Values(ints = {0, 2}) int maxAttempts,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
             SpringCloudStreamContext context,
@@ -138,7 +138,7 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
     @CartesianTest(name = "[{index}] channelType={0}, maxAttempts={1}")
     public <T> void testConsumerOverrideErrorMessageHandlerThrowException(
             @Values(classes = {DirectChannel.class}) Class<T> channelType,
-            @Values(ints = {1, 3}) int maxAttempts,
+            @Values(ints = {0, 2}) int maxAttempts,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
             SpringCloudStreamContext context,
@@ -211,7 +211,7 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
     @CartesianTest(name = "[{index}] channelType={0}, maxAttempts={1}")
     public <T> void testConsumerOverrideErrorMessageHandlerThrowRequeueException(
             @Values(classes = {DirectChannel.class}) Class<T> channelType,
-            @Values(ints = {1, 3}) int maxAttempts,
+            @Values(ints = {0, 2}) int maxAttempts,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
             SpringCloudStreamContext context,
@@ -252,7 +252,7 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
 
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 1,
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 2,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     log.info("Received message {}", StaticMessageHeaderAccessor.getId(msg));

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [8.0.0] - 2026-02-19
+### Changed
+- Update Spring Boot parent to 4.0.2
+- Update spring-cloud-dependenecies to 2025.1.1
+- Retries now start counting at 0 instead of 1, so maxAttempts=0 means no retries
+
 ## [7.4.5] - 2026-02-10
 
 ### Fixed
