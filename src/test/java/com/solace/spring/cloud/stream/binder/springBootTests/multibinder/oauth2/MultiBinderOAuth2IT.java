@@ -1,4 +1,4 @@
-package com.solace.spring.cloud.stream.binder.springBootTests.oauth2;
+package com.solace.spring.cloud.stream.binder.springBootTests.multibinder.oauth2;
 
 import com.solace.it.util.semp.config.BrokerConfiguratorBuilder;
 import com.solace.it.util.semp.config.BrokerConfiguratorBuilder.BrokerConfigurator;
@@ -39,11 +39,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Isolated
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("multibinderOAuth2")
 @DirtiesContext //Ensures all listeners are stopped
-@Isolated
 class MultiBinderOAuth2IT implements
         MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup {
 

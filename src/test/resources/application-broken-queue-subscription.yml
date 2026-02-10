@@ -1,0 +1,16 @@
+spring:
+  cloud:
+    function:
+      definition: >-
+        receiveBrokenConfig
+    config.failfast: true
+    stream:
+      bindings:
+        receiveBrokenConfig-in-0:
+          destination: broken/subscription/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"

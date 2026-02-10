@@ -1,0 +1,44 @@
+spring:
+  cloud:
+    function:
+      definition: >-
+        receiveDuplicateSubscription
+    config.failfast: true
+    stream:
+      default:
+        binder: solace
+      bindings:
+        receiveDuplicateSubscription-in-0:
+          destination: valid/subscription
+          group: test
+        bridgeFakeOutlet-out-0:
+          destination: will/be/overwritten
+      solace:
+        bindings:
+          receiveDuplicateSubscription-in-0:
+            consumer:
+              qualityOfService: AT_LEAST_ONCE
+              provisionDurableQueue: true
+              queueAdditionalSubscriptions:
+                - valid/subscription
+                - other/valid/sub
+
+  autoconfigure:
+    exclude:
+      - com.wavefront.spring.actuate.WavefrontEndpointAutoConfiguration
+      - com.wavefront.spring.autoconfigure.WavefrontAutoConfiguration
+      - org.springframework.boot.actuate.autoconfigure.metrics.export.wavefront.WavefrontMetricsExportAutoConfiguration
+      - org.springframework.boot.actuate.autoconfigure.tracing.OpenTelemetryTracingAutoConfiguration
+      - org.springframework.boot.actuate.autoconfigure.tracing.wavefront.WavefrontTracingAutoConfiguration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info,restart"
+  endpoint:
+    restart:
+      access: unrestricted
+
+    logfile:
+      external-file: logs/test.log

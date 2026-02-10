@@ -1,8 +1,7 @@
-package com.solace.spring.cloud.stream.binder.springBootTests.oauth2;
+package com.solace.spring.cloud.stream.binder.springBootTests.multibinder.oauth2;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.messaging.Message;
@@ -61,8 +60,10 @@ public class SpringCloudStreamOAuth2App {
                         public X509Certificate[] getAcceptedIssuers() {
                             return new X509Certificate[0];
                         }
+
                         public void checkClientTrusted(X509Certificate[] certs, String authType) {
                         }
+
                         public void checkServerTrusted(X509Certificate[] certs, String authType) {
                         }
                     }

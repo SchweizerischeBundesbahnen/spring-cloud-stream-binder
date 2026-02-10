@@ -4,6 +4,7 @@ import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
 import com.solace.spring.cloud.stream.binder.health.contributors.BindingsHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.handlers.SolaceSessionEventHandler;
+import com.solace.spring.cloud.stream.binder.health.indicators.ProvisioningHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.SolaceSessionOAuth2TokenProvider;
@@ -33,8 +34,8 @@ public class SolaceHealthIndicatorsConfiguration {
         }
         return new SolaceBinderHealthContributor(
                 new SessionHealthIndicator(),
-                new BindingsHealthContributor()
-        );
+                new BindingsHealthContributor(),
+                new ProvisioningHealthIndicator());
     }
 
     @Bean

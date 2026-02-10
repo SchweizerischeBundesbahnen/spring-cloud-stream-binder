@@ -38,41 +38,41 @@ public class JCSMPSessionConfiguration {
     @Bean
     @Lazy
     public JCSMPSessionEventHandler jcsmpSessionEventHandler(JCSMPProperties jcsmpProperties,
-                                                             Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
+                                                             Optional<SolaceBinderHealthContributor> binderHealthContributor,
                                                              Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
                                                              Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider) {
-        return ensureSessionCache(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider).jcsmpSessionEventHandler();
+        return ensureSessionCache(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider).jcsmpSessionEventHandler();
     }
 
     @Bean
     @Lazy
     public JCSMPSession jcsmpSession(JCSMPProperties jcsmpProperties,
-                                     Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
+                                     Optional<SolaceBinderHealthContributor> binderHealthContributor,
                                      Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
                                      Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider) {
-        return ensureSessionCache(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider).jcsmpSession();
+        return ensureSessionCache(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider).jcsmpSession();
     }
 
     @Bean
     @Lazy
     public Context jcsmpContext(JCSMPProperties jcsmpProperties,
-                                Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
+                                Optional<SolaceBinderHealthContributor> binderHealthContributor,
                                 Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
                                 Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider) {
-        return ensureSessionCache(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider).context();
+        return ensureSessionCache(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider).context();
     }
 
     @Bean
     @Lazy
     public SolaceEndpointProvisioner jcsmpProvisioningProvider(JCSMPProperties jcsmpProperties,
-                                                               Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
+                                                               Optional<SolaceBinderHealthContributor> binderHealthContributor,
                                                                Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
                                                                Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider) {
-        return ensureSessionCache(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider).solaceEndpointProvisioner();
+        return ensureSessionCache(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider).solaceEndpointProvisioner();
     }
 
     private SessionCacheEntry ensureSessionCache(JCSMPProperties jcsmpProperties,
-                                                 Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
+                                                 Optional<SolaceBinderHealthContributor> binderHealthContributor,
                                                  Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
                                                  Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider) {
         log.info("Connect to host {}", jcsmpProperties.getProperty(JCSMPProperties.HOST));
@@ -87,14 +87,14 @@ public class JCSMPSessionConfiguration {
             properties.storeToXML(os, "cached");
             os.close();
             String configAsString = os.toString();
-            return SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, sessionHealthIndicator, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider));
+            return SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider));
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
     }
 
     private static SessionCacheEntry createSession(JCSMPProperties jcsmpProperties,
-                                                   Optional<SolaceBinderHealthContributor> sessionHealthIndicator,
+                                                   Optional<SolaceBinderHealthContributor> binderHealthContributor,
                                                    Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
                                                    Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider) {
         JCSMPProperties solaceJcsmpProperties = (JCSMPProperties) jcsmpProperties.clone();
@@ -116,7 +116,7 @@ public class JCSMPSessionConfiguration {
             // we should not be worried about setting its status to DOWN,
             // as the call closing JCSMP session also delete the context
             // and terminates the application
-            sessionHealthIndicator.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator).ifPresent(SessionHealthIndicator::up);
+            binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator).ifPresent(SessionHealthIndicator::up);
             solaceSessionEventHandler.ifPresent(jcsmpSessionEventHandler::addSessionEventHandler);
             if (jcsmpSession instanceof JCSMPBasicSession session && !session.isRequiredSettlementCapable(Set.of(ACCEPTED, FAILED, REJECTED))) {
                 log.warn("The connected Solace PubSub+ Broker is not compatible. It doesn't support message NACK capability. Consumer bindings will fail to start.");
@@ -127,7 +127,7 @@ public class JCSMPSessionConfiguration {
             }
             throw new RuntimeException(e);
         }
-        SolaceEndpointProvisioner solaceEndpointProvisioner = new SolaceEndpointProvisioner(jcsmpSession);
+        SolaceEndpointProvisioner solaceEndpointProvisioner = new SolaceEndpointProvisioner(jcsmpSession, binderHealthContributor);
         return new SessionCacheEntry(solaceJcsmpProperties, jcsmpSessionEventHandler, jcsmpSession, context, solaceEndpointProvisioner, solaceSessionOAuth2TokenProviderValue);
     }
 
