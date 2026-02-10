@@ -26,6 +26,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.DOUBLE;
 
 @SpringJUnitConfig(SolaceMessageMeterBinderTest.Config.class)
 public class SolaceMessageMeterBinderTest {
+
     @CartesianTest(name = "[{index}] writeAttachment={0}, writeXmlContent={1}, writeMetadata={2}")
     public void testMessageSizeTotalMeter(@Values(booleans = {false, true}) boolean writeAttachment,
                                           @Values(booleans = {false, true}) boolean writeXmlContent,

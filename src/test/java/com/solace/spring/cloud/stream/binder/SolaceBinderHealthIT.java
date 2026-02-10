@@ -1,10 +1,10 @@
 package com.solace.spring.cloud.stream.binder;
 
-import community.solace.spring.boot.starter.solaceclientconfig.SolaceJavaAutoConfiguration;
 import com.solace.spring.cloud.stream.binder.config.SolaceHealthIndicatorsConfiguration;
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
 import com.solace.spring.cloud.stream.binder.health.contributors.BindingsHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
+import com.solace.spring.cloud.stream.binder.health.indicators.ProvisioningHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.test.junit.extension.SpringCloudStreamExtension;
@@ -16,21 +16,19 @@ import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnQueue;
 import com.solacesystems.jcsmp.JCSMPProperties;
+import community.solace.spring.boot.starter.solaceclientconfig.SolaceJavaAutoConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.assertj.core.api.InstanceOfAssertFactories;
-import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
-import org.mockito.Mockito;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.cloud.stream.config.BindingProperties;
 import org.springframework.integration.channel.DirectChannel;
-import org.springframework.messaging.MessageChannel;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import java.lang.reflect.Field;
@@ -181,7 +179,8 @@ public class SolaceBinderHealthIT {
     private static void setupBinder(BindingsHealthContributor bindingsHealthContributor, SolaceTestBinder binder) throws NoSuchFieldException, IllegalAccessException {
         SolaceBinderHealthAccessor solaceBinderHealthAccessor = new SolaceBinderHealthAccessor(
                 new SolaceBinderHealthContributor(new SessionHealthIndicator(),
-                        bindingsHealthContributor));
+                        bindingsHealthContributor,
+                        new ProvisioningHealthIndicator()));
         Field solaceBinderHealthAccessorField = binder.getBinder().getClass().getDeclaredField("solaceBinderHealthAccessor");
         solaceBinderHealthAccessorField.setAccessible(true);
         solaceBinderHealthAccessorField.set(binder.getBinder(), Optional.of(solaceBinderHealthAccessor));
