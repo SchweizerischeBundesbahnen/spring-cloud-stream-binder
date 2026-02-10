@@ -7,18 +7,18 @@ A Spring Cloud Stream Binder for Solace
 ## Table of contents
 
 - [Spring Cloud Stream Binder for Solace](#spring-cloud-stream-binder-for-solace)
-  - [Overview](#overview)
-  - [Table of contents](#table-of-contents)
-  - [Spring Cloud Version Compatibility](#spring-cloud-version-compatibility)
-  - [Fork vs Original](#fork-vs-original)
-  - [Using it with Maven](#using-it-with-maven)
-  - [Documentation](#documentation)
-  - [Contributing](#contributing)
-  - [Authors](#authors)
-  - [License](#license)
-  - [Code of Conduct](#code-of-conduct)
-  - [Support](#support)
-  - [Links](#links)
+    - [Overview](#overview)
+    - [Table of contents](#table-of-contents)
+    - [Spring Cloud Version Compatibility](#spring-cloud-version-compatibility)
+    - [Fork vs Original](#fork-vs-original)
+    - [Using it with Maven](#using-it-with-maven)
+    - [Documentation](#documentation)
+    - [Contributing](#contributing)
+    - [Authors](#authors)
+    - [License](#license)
+    - [Code of Conduct](#code-of-conduct)
+    - [Support](#support)
+    - [Links](#links)
 
 ---
 
@@ -28,6 +28,7 @@ Consult the table below to determine which version of the BOM you need to use:
 
 | Spring Cloud | Spring Cloud Stream Binder Solace | Spring Boot | sol-jcsmp |
 |--------------|-----------------------------------|-------------|-----------|
+| 2025.0.0     | 7.4.5                             | 3.5.8       | 10.29.0   |
 | 2025.0.0     | 7.4.4                             | 3.5.8       | 10.29.0   |
 | 2025.0.0     | 7.4.3                             | 3.5.8       | 10.29.0   |
 | 2025.0.0     | 7.4.2                             | 3.5.8       | 10.29.0   |
@@ -117,4 +118,5 @@ to abide by its terms.
 Open an issue at https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/issues
 
 ## Links
+
 [Java profiler](https://www.ej-technologies.com/jprofiler) used to improve performance: [![JProfiler](https://www.ej-technologies.com/images/product_banners/jprofiler_small.png)](https://www.ej-technologies.com/jprofiler)

@@ -11,7 +11,7 @@
     </parent>
     <groupId>ch.sbb</groupId>
     <artifactId>spring-cloud-stream-binder-solace</artifactId>
-    <version>7.4.4</version>
+    <version>7.4.5</version>
 
     <name>Spring Cloud Stream Binder Solace</name>
     <description>A Spring Cloud Stream Binder implementation using the Solace Java API (JCSMP)</description>
