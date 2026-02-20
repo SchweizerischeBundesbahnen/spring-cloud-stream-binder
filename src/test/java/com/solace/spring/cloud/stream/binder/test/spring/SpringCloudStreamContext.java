@@ -13,8 +13,10 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.*;
 import org.springframework.cloud.stream.config.BindingProperties;
+import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.integration.channel.AbstractSubscribableChannel;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.messaging.MessageHandler;
@@ -80,7 +82,9 @@ public class SpringCloudStreamContext extends PartitionCapableBinderTests<Solace
                 throw new IllegalStateException("JCSMPSession cannot be null or closed");
             }
             log.info("Creating new test binder");
-            testBinder = new SolaceTestBinder(jcsmpSession, JCSMPFactory.onlyInstance().createContext(new ContextProperties()), sempV2Api);
+            GenericApplicationContext context = new GenericApplicationContext();
+            BeanFactory beanFactory = context.getBeanFactory();
+            testBinder = new SolaceTestBinder(jcsmpSession, JCSMPFactory.onlyInstance().createContext(new ContextProperties()), sempV2Api, beanFactory);
         }
         return testBinder;
     }

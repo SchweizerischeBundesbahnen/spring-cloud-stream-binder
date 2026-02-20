@@ -1,4 +1,4 @@
-package com.solace.spring.cloud.stream.binder.springBootTests;
+package com.solace.spring.cloud.stream.binder.springBootTests.multibinder;
 
 import com.solace.test.integration.testcontainer.PubSubPlusContainer;
 import com.solacesystems.jcsmp.*;
@@ -7,8 +7,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;

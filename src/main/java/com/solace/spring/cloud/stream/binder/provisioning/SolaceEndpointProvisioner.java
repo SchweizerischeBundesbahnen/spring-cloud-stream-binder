@@ -1,10 +1,12 @@
 package com.solace.spring.cloud.stream.binder.provisioning;
 
+import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceCommonProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties;
 import com.solace.spring.cloud.stream.binder.util.DestinationType;
 import com.solacesystems.jcsmp.*;
+import com.solacesystems.jcsmp.Queue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
@@ -13,12 +15,8 @@ import org.springframework.cloud.stream.provisioning.ConsumerDestination;
 import org.springframework.cloud.stream.provisioning.ProducerDestination;
 import org.springframework.cloud.stream.provisioning.ProvisioningException;
 import org.springframework.cloud.stream.provisioning.ProvisioningProvider;
-import org.springframework.util.StringUtils;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -27,6 +25,7 @@ public class SolaceEndpointProvisioner
         implements ProvisioningProvider<ExtendedConsumerProperties<SolaceConsumerProperties>, ExtendedProducerProperties<SolaceProducerProperties>> {
 
     private final JCSMPSession jcsmpSession;
+    private final Optional<SolaceBinderHealthContributor> solaceBinderHealthContributor;
 
     @Override
     public ProducerDestination provisionProducerDestination(String name,
@@ -72,7 +71,6 @@ public class SolaceEndpointProvisioner
                     log.warn("Groups [{}] are not required groups. The additional subscriptions defined for them were ignored...",
                             String.join(", ", ignoredExtraSubs));
                 }
-
                 return new SolaceProducerDestination(topicName);
             }
             default -> throw new ProvisioningException(String.format("Destination type %s is not supported for producers",
@@ -144,10 +142,21 @@ public class SolaceEndpointProvisioner
             String action = isDurable ? "provision durable" : "create temporary";
             String msg = String.format("Failed to %s endpoint %s", action, name);
             log.warn(msg, e);
+            setHealthDownIfIndicatorPresent(msg, e, name);
             throw new ProvisioningException(msg, e);
         }
 
         return endpoint;
+    }
+
+    private void setHealthDownIfIndicatorPresent(String message, Exception e, String endpointNameLogHint) {
+        if (solaceBinderHealthContributor.isPresent()) {
+            FlowEventArgs flowEventArgs = new FlowEventArgs(null, message, e, 500);
+            solaceBinderHealthContributor.get().getProvisioningHealthIndicator().down(flowEventArgs);
+            log.info("Health endpoint was set down: endpoint={}", endpointNameLogHint);
+        } else {
+            log.warn("The provisioning has failed for an endpoint. But no solace binder health contributor is present, so the overall health page will not be down. brokenEndpoint={}", endpointNameLogHint);
+        }
     }
 
     private Queue provisionErrorQueue(String errorQueueName, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
@@ -182,11 +191,8 @@ public class SolaceEndpointProvisioner
         } catch (JCSMPException e) {
             String msg = String.format("Failed to add subscription of %s to queue %s", topicName, queue.getName());
             log.warn(msg, e);
+            setHealthDownIfIndicatorPresent(msg, e, queue.getName());
             throw new ProvisioningException(msg, e);
         }
-    }
-
-    private String getEndpointTypeLabel(Endpoint endpoint) {
-        return endpoint instanceof TopicEndpoint ? "topic endpoint" : "queue";
     }
 }

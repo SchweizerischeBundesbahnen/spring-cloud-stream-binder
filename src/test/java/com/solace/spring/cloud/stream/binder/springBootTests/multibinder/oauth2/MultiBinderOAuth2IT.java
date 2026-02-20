@@ -1,4 +1,4 @@
-package com.solace.spring.cloud.stream.binder.springBootTests.oauth2;
+package com.solace.spring.cloud.stream.binder.springBootTests.multibinder.oauth2;
 
 import com.solace.it.util.semp.config.BrokerConfiguratorBuilder;
 import com.solace.it.util.semp.config.BrokerConfiguratorBuilder.BrokerConfigurator;
@@ -17,8 +17,8 @@ import org.junit.jupiter.api.parallel.Isolated;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -39,11 +39,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Isolated
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("multibinderOAuth2")
 @DirtiesContext //Ensures all listeners are stopped
-@Isolated
 class MultiBinderOAuth2IT implements
         MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup {
 

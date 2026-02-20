@@ -6,12 +6,12 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceEndpointProvisioner;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceProvisioningUtil;
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
-import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.config.ApiException;
 import com.solacesystems.jcsmp.*;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.AbstractTestBinder;
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
@@ -40,22 +40,22 @@ public class SolaceTestBinder
     private final Map<String, String> bindingNameToQueueName = new HashMap<>();
     private final Map<String, String> bindingNameToErrorQueueName = new HashMap<>();
 
-    public SolaceTestBinder(JCSMPSession jcsmpSession, Context context, SempV2Api sempV2Api) {
+    public SolaceTestBinder(JCSMPSession jcsmpSession, Context context, SempV2Api sempV2Api, BeanFactory beanFactory) {
         this.applicationContext = new AnnotationConfigApplicationContext(Config.class);
         this.jcsmpSession = jcsmpSession;
         this.sempV2Api = sempV2Api;
         this.context = context;
-        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, context, new SolaceEndpointProvisioner(jcsmpSession), Optional.empty(), Optional.empty(), Optional.empty());
+        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, context, new SolaceEndpointProvisioner(jcsmpSession, Optional.empty()), beanFactory, Optional.empty(), Optional.empty(), Optional.empty());
         binder.setApplicationContext(this.applicationContext);
         this.setBinder(binder);
     }
 
-    public SolaceTestBinder(SolaceTestBinder original, TracingProxy tracingProxy) {
+    public SolaceTestBinder(SolaceTestBinder original, TracingProxy tracingProxy, BeanFactory beanFactory) {
         this.applicationContext = new AnnotationConfigApplicationContext(Config.class);
         this.jcsmpSession = original.jcsmpSession;
         this.sempV2Api = original.sempV2Api;
         this.context = original.context;
-        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, this.context, new SolaceEndpointProvisioner(jcsmpSession), Optional.empty(), Optional.of(tracingProxy), Optional.empty());
+        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, this.context, new SolaceEndpointProvisioner(jcsmpSession, Optional.empty()), beanFactory, Optional.empty(), Optional.of(tracingProxy), Optional.empty());
         binder.setApplicationContext(this.applicationContext);
         this.setBinder(binder);
     }

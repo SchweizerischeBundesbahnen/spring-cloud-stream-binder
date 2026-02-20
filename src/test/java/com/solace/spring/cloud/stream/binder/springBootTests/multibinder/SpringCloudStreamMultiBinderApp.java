@@ -1,4 +1,4 @@
-package com.solace.spring.cloud.stream.binder.springBootTests;
+package com.solace.spring.cloud.stream.binder.springBootTests.multibinder;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -10,10 +10,10 @@ import org.springframework.security.web.SecurityFilterChain;
 import java.util.function.Consumer;
 
 @SpringBootApplication
-public class SpringCloudStreamApp {
+public class SpringCloudStreamMultiBinderApp {
 
     public static void main(String[] args) {
-        SpringApplication.run(SpringCloudStreamApp.class, args);
+        SpringApplication.run(SpringCloudStreamMultiBinderApp.class, args);
     }
 
     @Bean

@@ -564,7 +564,7 @@ public class SolaceBinderClientAckIT<T> {
         context.binderBindUnbindLatency();
         String queueName = binder.getConsumerQueueName(consumerBinding);
 
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 1,
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 2,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     if (isRedelivered(msg)) {
@@ -732,7 +732,7 @@ public class SolaceBinderClientAckIT<T> {
         context.binderBindUnbindLatency();
         String queueName = binder.getConsumerQueueName(consumerBinding);
 
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 1,
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 2,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     if (isRedelivered(msg)) {
@@ -793,7 +793,7 @@ public class SolaceBinderClientAckIT<T> {
         String endpointName = binder.getConsumerQueueName(consumerBinding);
         String errorQueueName = binder.getConsumerErrorQueueName(consumerBinding);
 
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts(),
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 1,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     AcknowledgmentCallback ackCallback = StaticMessageHeaderAccessor.getAcknowledgmentCallback(msg);
@@ -964,7 +964,7 @@ public class SolaceBinderClientAckIT<T> {
         String queueName = binder.getConsumerQueueName(consumerBinding);
         String errorQueueName = binder.getConsumerErrorQueueName(consumerBinding);
 
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 1,
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 2,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     if (isRedelivered(msg)) {

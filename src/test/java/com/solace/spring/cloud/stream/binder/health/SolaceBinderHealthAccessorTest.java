@@ -3,12 +3,13 @@ package com.solace.spring.cloud.stream.binder.health;
 import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.contributors.BindingsHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
+import com.solace.spring.cloud.stream.binder.health.indicators.ProvisioningHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.actuate.health.NamedContributor;
+import org.springframework.boot.health.contributor.HealthContributors;
 
 import java.util.stream.StreamSupport;
 
@@ -20,7 +21,8 @@ public class SolaceBinderHealthAccessorTest {
     public void testBindingHealthIndicator() {
         SolaceBinderHealthContributor healthContributor = new SolaceBinderHealthContributor(
                 new SessionHealthIndicator(),
-                new BindingsHealthContributor());
+                new BindingsHealthContributor(),
+                new ProvisioningHealthIndicator());
         SolaceBinderHealthAccessor healthAccessor = new SolaceBinderHealthAccessor(healthContributor);
 
         String bindingName = "binding-name";
@@ -28,8 +30,8 @@ public class SolaceBinderHealthAccessorTest {
 
         assertThat(StreamSupport.stream(healthContributor.getSolaceBindingsHealthContributor().spliterator(), false))
                 .singleElement()
-                .satisfies(n -> assertThat(n.getName()).isEqualTo(bindingName))
-                .extracting(NamedContributor::getContributor)
+                .satisfies(n -> assertThat(n.name()).isEqualTo(bindingName))
+                .extracting(HealthContributors.Entry::contributor)
                 .asInstanceOf(InstanceOfAssertFactories.type(SolaceHealthIndicator.class));
 
         healthAccessor.removeBindingHealthIndicator(bindingName);

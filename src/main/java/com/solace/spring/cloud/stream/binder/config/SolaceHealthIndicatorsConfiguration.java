@@ -4,19 +4,20 @@ import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
 import com.solace.spring.cloud.stream.binder.health.contributors.BindingsHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.handlers.SolaceSessionEventHandler;
+import com.solace.spring.cloud.stream.binder.health.indicators.ProvisioningHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.SolaceSessionOAuth2TokenProvider;
 import jakarta.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.actuate.autoconfigure.health.ConditionalOnEnabledHealthIndicator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEnabledHealthIndicator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Slf4j
 @Configuration
-@ConditionalOnClass(name = "org.springframework.boot.actuate.health.HealthIndicator")
+@ConditionalOnClass(name = "org.springframework.boot.health.contributor.HealthIndicator")
 @ConditionalOnEnabledHealthIndicator("binders")
 public class SolaceHealthIndicatorsConfiguration {
 
@@ -33,8 +34,8 @@ public class SolaceHealthIndicatorsConfiguration {
         }
         return new SolaceBinderHealthContributor(
                 new SessionHealthIndicator(),
-                new BindingsHealthContributor()
-        );
+                new BindingsHealthContributor(),
+                new ProvisioningHealthIndicator());
     }
 
     @Bean

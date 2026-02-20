@@ -8,6 +8,7 @@ import com.solace.spring.cloud.stream.binder.util.LargeMessageSupport;
 import com.solacesystems.jcsmp.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.cloud.stream.provisioning.ConsumerDestination;
 import org.springframework.messaging.MessagingException;
@@ -19,6 +20,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class JCSMPInboundTopicMessageMultiplexer {
     private final JCSMPSession jcsmpSession;
+    private final BeanFactory beanFactory;
     private final Optional<SolaceMeterAccessor> solaceMeterAccessorSupplier;
     private final Optional<TracingProxy> tracingProxy;
     private final List<JCSMPInboundTopicMessageProducer> jcsmpInboundTopicMessageProducers = new ArrayList<>();
@@ -142,7 +144,7 @@ public class JCSMPInboundTopicMessageMultiplexer {
 
     public JCSMPInboundTopicMessageProducer createTopicMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         this.ensureXMLMessageConsumer();
-        return new JCSMPInboundTopicMessageProducer((SolaceConsumerDestination) destination, group, properties, this.solaceMeterAccessorSupplier, tracingProxy, livecycleHooks);
+        return new JCSMPInboundTopicMessageProducer((SolaceConsumerDestination) destination, group, properties, beanFactory, this.solaceMeterAccessorSupplier, tracingProxy, livecycleHooks);
     }
 
     public interface LivecycleHooks {

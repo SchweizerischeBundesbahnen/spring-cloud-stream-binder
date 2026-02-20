@@ -34,6 +34,8 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.*;
 import org.springframework.cloud.stream.config.BindingProperties;
@@ -328,7 +330,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     @Execution(ExecutionMode.CONCURRENT)
     public void testConsumerRequeue(
             @Values(booleans = {false, true}) boolean namedConsumerGroup,
-            @Values(ints = {1, 3}) int maxAttempts,
+            @Values(ints = {0, 2}) int maxAttempts,
             @Values(booleans = {false, true}) boolean throwMessagingExceptionWithMissingAckCallback,
             SoftAssertions softly,
             TestInfo testInfo) throws Exception {
@@ -357,7 +359,8 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
         binderBindUnbindLatency();
 
-        final AtomicInteger numRetriesRemaining = new AtomicInteger(consumerProperties.getMaxAttempts());
+        final AtomicInteger numRetriesRemaining = new AtomicInteger(consumerProperties.getMaxAttempts() + 1);
+        final AtomicBoolean reachedAssertion = new AtomicBoolean(false);
         consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, numRetriesRemaining.get() + 1,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
@@ -372,10 +375,13 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
                                 new RuntimeException("Throwing expected exception!");
                     } else {
                         log.info("Received message");
+                        reachedAssertion.set(true);
                         softly.assertThat(msg).satisfies(hasNestedHeader(SolaceHeaders.REDELIVERED, Boolean.class, v -> assertThat(v).isTrue()));
                         callback.run();
                     }
                 });
+
+        Assertions.assertTrue(reachedAssertion.get());
 
         producerBinding.unbind();
         consumerBinding.unbind();
@@ -385,7 +391,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     @Execution(ExecutionMode.CONCURRENT)
     public void testConsumerErrorQueueRepublish(
             @Values(booleans = {false, true}) boolean namedConsumerGroup,
-            @Values(ints = {1, 3}) int maxAttempts,
+            @Values(ints = {0, 2}) int maxAttempts,
             @Values(booleans = {false, true}) boolean throwMessagingExceptionWithMissingAckCallback,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
@@ -418,7 +424,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
         binderBindUnbindLatency();
 
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts(),
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 1,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     callback.run();

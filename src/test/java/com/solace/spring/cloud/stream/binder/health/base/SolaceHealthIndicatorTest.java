@@ -4,8 +4,8 @@ import com.solacesystems.jcsmp.FlowEvent;
 import com.solacesystems.jcsmp.FlowEventArgs;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.actuate.health.Health;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.Status;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -43,9 +43,9 @@ class SolaceHealthIndicatorTest {
                 new Exception("Test Exception"), 500);
         Health health = this.solaceHealthIndicator.addEventDetails(Health.down(), flowEventArgs).build();
 
-        assertEquals(health.getStatus(), Status.DOWN);
-        assertEquals(health.getDetails().get("error"), "java.lang.Exception: Test Exception");
-        assertEquals(health.getDetails().get("responseCode"), 500);
+        assertEquals(Status.DOWN, health.getStatus());
+        assertEquals("java.lang.Exception: Test Exception", health.getDetails().get("error"));
+        assertEquals(500, health.getDetails().get("responseCode"));
     }
 
     @Test
