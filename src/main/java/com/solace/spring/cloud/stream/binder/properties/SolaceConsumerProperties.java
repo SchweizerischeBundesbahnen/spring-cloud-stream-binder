@@ -107,20 +107,14 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
     @Deprecated
     private long maxProcessingTimeMs = 2000;
 
-    /**
-     * When the message queue size exceeds concurrency*urgentWarningMultiplier, a more urgent warning is logged, defaults to 3
-     */
-    private Integer urgentWarningMultiplier = 3;
 
     /**
-     * Time in seconds between warning of queue congestion, defaults to 300 s.
+     * Time in milliseconds before a long-running message processing thread is logged as a warning.
+     * This is used to detect potential deadlocks or stuck threads.
+     * A warning is logged once per message when processing time exceeds this threshold.
+     * Default: 300000 (5 minutes)
      */
-    private Integer timeBetweenWarningsS = 300;
-
-    /**
-     * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
-     */
-    private long watchdogTimeoutMs = 2000;
+    private long watchdogTimeoutMs = 300000;
     // ------------------------
 
     /**

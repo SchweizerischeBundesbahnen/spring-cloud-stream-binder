@@ -82,15 +82,16 @@ Check out the difference between this fork and the original solace spring cloud 
     <dependency>
         <groupId>ch.sbb</groupId>
         <artifactId>spring-cloud-stream-binder-solace</artifactId>
-        <version>8.0.0</version>
+        <version>9.0.0</version>
     </dependency>
 </dependencies>
 ```
 
 ## Documentation
 
-Read [API.adoc](API.adoc) for a description of the properties and API.
-All Changes are documented in the [Changelog](CHANGELOG.md).
+*   **[API Documentation](API.md)**: Detailed description of properties, configuration options, and API usage.
+*   **[Migration Guide](MIGRATION.md)**: Steps for upgrading between major versions.
+*   **[Changelog](CHANGELOG.md)**: List of all notable changes for each release.
 
 ## Contributing
 

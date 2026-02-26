@@ -1,7 +1,6 @@
 package com.solace.spring.cloud.stream.binder.inbound.queue;
 
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
-import com.solace.spring.cloud.stream.binder.util.WatchdogLogger;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.XMLMessage;
@@ -9,12 +8,14 @@ import com.solacesystems.jcsmp.XMLMessageListener;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -23,24 +24,27 @@ import java.util.function.Consumer;
 @Slf4j
 @SuppressWarnings("deprecation")
 public class FlowXMLMessageListener implements XMLMessageListener {
-    private final WatchdogLogger watchdogLogger;
-    private final BlockingQueue<BytesXMLMessage> messageQueue = new LinkedBlockingDeque<>();
-    private final Set<MessageInProgress> activeMessages = new HashSet<>();
+
+    /**
+     * Local queue on the heap to distribute messages to worker threads.
+     * <p>The queue is unbounded, but its effective size is limited by the `maxUnacknowledgedMessages`
+     * (or `max-guaranteed-message-size`) setting on the flow. This creates backpressure towards the broker
+     * and protects the heap from overflow.</p>
+     */
+    private final BlockingQueue<MessageInProgress> messageQueue = new LinkedBlockingDeque<>();
+    private final Set<MessageInProgress> activeMessages = ConcurrentHashMap.newKeySet();
     private final AtomicReference<SolaceMeterAccessor> solaceMeterAccessor = new AtomicReference<>();
     private final AtomicReference<String> bindingName = new AtomicReference<>();
     private final Set<Thread> receiverThreads = new HashSet<>();
     private volatile boolean running = true;
 
-    public FlowXMLMessageListener(WatchdogLogger watchdogLogger) {
-        this.watchdogLogger = watchdogLogger;
-    }
 
     public void setSolaceMeterAccessor(SolaceMeterAccessor solaceMeterAccessor, String bindingName) {
         this.solaceMeterAccessor.set(solaceMeterAccessor);
         this.bindingName.set(bindingName);
     }
 
-    public void startReceiverThreads(int threadCount, String threadNamePrefix, Consumer<BytesXMLMessage> messageConsumer, int urgentWarningMultiplier, int timeBetweenWarningsS, long watchdogTimeoutMs) {
+    public void startReceiverThreads(int threadCount, String threadNamePrefix, Consumer<BytesXMLMessage> messageConsumer, long watchdogTimeoutMs) {
 
         // Check if threads are already running and stop them first (outside synchronized block to avoid deadlock)
         boolean needToStop;
@@ -68,7 +72,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                 thread.start();
                 log.info("Started receiving thread {}", thread.getName());
             }
-            Thread watchdogThread = new Thread(() -> watchdog(threadCount, urgentWarningMultiplier, timeBetweenWarningsS, watchdogTimeoutMs));
+            Thread watchdogThread = new Thread(() -> watchdog(watchdogTimeoutMs));
             watchdogThread.setName(threadNamePrefix + "-watchdog");
             receiverThreads.add(watchdogThread);
             watchdogThread.start();
@@ -108,29 +112,42 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     }
 
     @SuppressWarnings("BusyWait")
-    private void watchdog(int threadCount, int urgentWarningMultiplier, int timeBetweenWarningsS, long watchdogTimeoutMs) {
+    private void watchdog(long watchdogTimeoutMs) {
         while (running) {
             try {
                 if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
                     solaceMeterAccessor.get().recordQueueSize(this.bindingName.get(), messageQueue.size());
                     solaceMeterAccessor.get().recordActiveMessages(this.bindingName.get(), activeMessages.size());
+
+                    // measure backpressure by looking at the oldest message in the queue
+                    MessageInProgress oldestMessage = messageQueue.peek();
+                    long backpressure = oldestMessage != null ? System.currentTimeMillis() - oldestMessage.getReceivedMillis() : 0;
+                    solaceMeterAccessor.get().recordQueueBackpressure(this.bindingName.get(), backpressure);
                 }
 
-                watchdogLogger.warnIfNecessary(timeBetweenWarningsS, urgentWarningMultiplier, threadCount, messageQueue.size());
 
                 long currentTimeMillis = System.currentTimeMillis();
                 long maxTimeInProcessing = Long.MIN_VALUE;
-                synchronized (activeMessages) {
-                    for (MessageInProgress messageInProgress : activeMessages) {
-                        long timeInProcessing = currentTimeMillis - messageInProgress.startMillis;
-                        maxTimeInProcessing = Math.max(maxTimeInProcessing, timeInProcessing);
+                for (MessageInProgress messageInProgress : activeMessages) {
+                    long timeInProcessing = currentTimeMillis - messageInProgress.startMillis;
+                    maxTimeInProcessing = Math.max(maxTimeInProcessing, timeInProcessing);
+
+                    // Deadlock detection: warn once if processing exceeds timeout
+                    if (timeInProcessing > watchdogTimeoutMs && !messageInProgress.isWarned()) {
+                        log.warn("Message processing exceeded {} ms (potential deadlock): thread={}, messageId={}, destination={}",
+                                watchdogTimeoutMs,
+                                messageInProgress.getThreadName(),
+                                messageInProgress.getBytesXMLMessage().getMessageId(),
+                                messageInProgress.getBytesXMLMessage().getDestination().getName());
+                        messageInProgress.setWarned(true);
                     }
                 }
-                if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
-                    solaceMeterAccessor.get().recordQueueBackpressure(this.bindingName.get(), maxTimeInProcessing);
-                }
 
-                Thread.sleep(watchdogTimeoutMs);
+                // Sleep for a short interval to update metrics frequently, but at most watchdogTimeoutMs.
+                // This ensures metrics like queue size and backpressure are updated every 1 second even if the deadlock timeout is large (e.g. 5 minutes).
+                // Ensure sleep time is at least 10ms to avoid IllegalArgumentException and excessive CPU usage if watchdogTimeoutMs is small/zero
+                long sleepTime = Math.max(10, Math.min(watchdogTimeoutMs, 1000));
+                Thread.sleep(sleepTime);
             } catch (Throwable e) {
                 log.error(e.getMessage(), e);
             }
@@ -140,19 +157,25 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     private void loop(String threadName, Consumer<BytesXMLMessage> messageConsumer) {
         while (running) {
             try {
-                BytesXMLMessage polled = messageQueue.poll(1, TimeUnit.SECONDS);
+                MessageInProgress polled = messageQueue.poll(1, TimeUnit.SECONDS);
                 if (polled != null) {
-                    MessageInProgress mip = new MessageInProgress(System.currentTimeMillis(), threadName, polled);
-                    synchronized (activeMessages) {
-                        log.trace("loop add mip={}", mip);
-                        activeMessages.add(mip);
+                    long now = System.currentTimeMillis();
+                    polled.setStartMillis(now);
+                    polled.setThreadName(threadName);
+
+                    if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
+                        solaceMeterAccessor.get().recordMessageQueueWaitTime(bindingName.get(), now - polled.getReceivedMillis());
                     }
+
+                    log.trace("loop add mip={}", polled);
+                    activeMessages.add(polled);
                     try {
-                        messageConsumer.accept(polled);
+                        messageConsumer.accept(polled.getBytesXMLMessage());
                     } finally {
-                        synchronized (activeMessages) {
-                            log.trace("loop remove mip={}", mip);
-                            activeMessages.remove(mip);
+                        log.trace("loop remove mip={}", polled);
+                        activeMessages.remove(polled);
+                        if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
+                            solaceMeterAccessor.get().recordMessageProcessingTimeDuration(bindingName.get(), System.currentTimeMillis() - polled.getStartMillis());
                         }
                     }
                 }
@@ -167,9 +190,13 @@ public class FlowXMLMessageListener implements XMLMessageListener {
         log.debug("Received BytesXMLMessage:{}", bytesXMLMessage);
         try {
             int i = 0;
+            // The messageQueue is a local queue on the heap.
+            // It distributes messages to worker threads and prevents blocking the single Solace dispatcher thread.
+            // This queue should be protected by maxUnacknowledgedMessages (or max-guaranteed-message-size) to prevent heap overflow.
+            // The onReceive method runs on the Solace dispatcher thread and must not block; otherwise, the entire connection is stalled.
             while (i++ < 100) {
                 // since the messageQueue is unbounded this should never happen and is here for paranoia and because the blocking put had strange behaviours
-                if (messageQueue.offer(bytesXMLMessage, 1, TimeUnit.SECONDS)) {
+                if (messageQueue.offer(new MessageInProgress(System.currentTimeMillis(), bytesXMLMessage), 1, TimeUnit.SECONDS)) {
                     return;
                 }
             }
@@ -190,45 +217,40 @@ public class FlowXMLMessageListener implements XMLMessageListener {
 
     @Getter
     @Setter
+    @ToString(exclude = "cachedHashCode")
     @RequiredArgsConstructor
     static class MessageInProgress {
-        private final long startMillis;
-        private final String threadName;
+        private final long receivedMillis;
         private final BytesXMLMessage bytesXMLMessage;
+        private long startMillis;
+        private String threadName;
 
         // Should not be part of hashcode. Because a changing hash or equal will prevent removing from `activeMessages` set.
         private boolean warned = false;
         private boolean errored = false;
 
+        // Lazy-initialized cached hashCode (immutable fields only)
+        private Integer cachedHashCode;
+
         @Override
         public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
             if (!(o instanceof MessageInProgress that)) {
                 return false;
             }
 
-            return startMillis == that.startMillis &&
-                    Objects.equals(threadName, that.threadName) &&
+            return receivedMillis == that.receivedMillis &&
                     Objects.equals(bytesXMLMessage, that.bytesXMLMessage);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(
-                    startMillis,
-                    threadName,
-                    bytesXMLMessage.getDestination().getName(),
-                    bytesXMLMessage.getMessageId()
-            );
-        }
-
-        @Override
-        public String toString() {
-            return "MessageInProgress[threadName=%s, startMillis=%d, bytesXMLMessage.destination=%s, bytesXMLMessage.messageId=%s]".formatted(
-                    threadName,
-                    startMillis,
-                    bytesXMLMessage.getDestination().getName(),
-                    bytesXMLMessage.getMessageId()
-            );
+            if (cachedHashCode == null) {
+                cachedHashCode = Objects.hash(receivedMillis, bytesXMLMessage);
+            }
+            return cachedHashCode;
         }
     }
 }
