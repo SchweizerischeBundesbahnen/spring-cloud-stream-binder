@@ -57,7 +57,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     private final ThreadLocal<XMLMessageMapper> xmlMessageMapper = ThreadLocal.withInitial(XMLMessageMapper::new);
     private final AtomicBoolean paused = new AtomicBoolean(false);
     private final SolaceFlowEventHandler solaceFlowEventHandler = new SolaceFlowEventHandler();
-    private final FlowXMLMessageListener flowXMLMessageListener = new FlowXMLMessageListener(new WatchdogLogger());
+    private final FlowXMLMessageListener flowXMLMessageListener = new FlowXMLMessageListener();
     private final AtomicReference<FlowReceiver> flowReceiver = new AtomicReference<>();
     private final LargeMessageSupport largeMessageSupport = new LargeMessageSupport();
 
@@ -252,8 +252,6 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 consumerProperties.getConcurrency(),
                 consumerDestination.getBindingDestinationName(),
                 this::onReceiveConcurrent,
-                consumerProperties.getExtension().getUrgentWarningMultiplier(),
-                consumerProperties.getExtension().getTimeBetweenWarningsS(),
                 consumerProperties.getExtension().getWatchdogTimeoutMs());
         this.flowReceiver.set(jcsmpSession.createFlow(flowXMLMessageListener, consumerFlowProperties, endpointProperties, solaceFlowEventHandler));
         if (!paused.get()) {
