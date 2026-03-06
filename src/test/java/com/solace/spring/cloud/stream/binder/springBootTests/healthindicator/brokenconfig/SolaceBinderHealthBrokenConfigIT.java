@@ -2,7 +2,6 @@ package com.solace.spring.cloud.stream.binder.springBootTests.healthindicator.br
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solace.spring.cloud.stream.binder.extension.BinderIntegrationTest;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.parallel.Isolated;
@@ -24,7 +23,6 @@ import java.util.regex.Pattern;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@Disabled // STTRS-2869 re-enable when health-page contributors are reliable
 @Isolated
 @BinderIntegrationTest
 @SpringBootTest(classes = {BrokenConfigApp.class, BrokenConfigMessageConsumer.class}, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
