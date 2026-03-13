@@ -477,7 +477,7 @@
                                     <goal>verify</goal>
                                 </goals>
                                 <configuration>
-                                    <forkCount>2.5C</forkCount>
+                                    <forkCount>2C</forkCount>
                                     <reuseForks>false</reuseForks> <!-- new JVM per test class -->
                                     <properties>
                                         <configurationParameters>junit.jupiter.tags=isolated</configurationParameters>
