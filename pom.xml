@@ -459,6 +459,36 @@
                                     <goal>verify</goal>
                                 </goals>
                                 <configuration>
+                                    <excludes>
+                                        <exclude>**/springBootTests/**/*IT.java</exclude>
+                                        <exclude>*IT.java</exclude>
+                                    </excludes>
+                                    <argLine>
+                                        --add-opens java.base/java.lang=ALL-UNNAMED
+                                        --add-opens java.base/java.util=ALL-UNNAMED
+                                        --add-opens java.base/java.net=ALL-UNNAMED
+                                    </argLine>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>integration-test-springboot</id>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                                <configuration>
+                                    <forkCount>2.5C</forkCount>
+                                    <reuseForks>false</reuseForks> <!-- new JVM per test class -->
+                                    <properties>
+                                        <configurationParameters>junit.jupiter.tags=isolated</configurationParameters>
+                                    </properties>
+                                    <includes>
+                                        <include>**/springBootTests/**/*IT.java</include>
+                                        <include>*IT.java</include>
+                                    </includes>
+                                    <parallel>classes</parallel>
+                                    <threadCount>16</threadCount>
+                                    <perCoreThreadCount>false</perCoreThreadCount>
                                     <argLine>
                                         --add-opens java.base/java.lang=ALL-UNNAMED
                                         --add-opens java.base/java.util=ALL-UNNAMED

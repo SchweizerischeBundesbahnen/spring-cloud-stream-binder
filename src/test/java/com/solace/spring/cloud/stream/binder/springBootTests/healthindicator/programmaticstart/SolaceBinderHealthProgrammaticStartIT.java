@@ -2,7 +2,6 @@ package com.solace.spring.cloud.stream.binder.springBootTests.healthindicator.pr
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.solace.spring.cloud.stream.binder.extension.DynamicPropertiesTestContextCustomizerFactory;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -24,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.awaitility.Awaitility.await;
 
-@Disabled // STTRS-2869 re-enable when health-page contributors are reliable
 @Isolated
 public class SolaceBinderHealthProgrammaticStartIT {
 
