@@ -133,13 +133,15 @@ public class SolaceBinderHealthValidButDuplicateSubscriptionIT {
                     return potentialNewTomcatPort != port;
                 });
 
-        //port has changed since restart for this reason we need to pick up the new port:
-        String afterRestart = client.send(HttpRequest.newBuilder()
-                .uri(new URI("http://localhost:%s/actuator/health".formatted(environment.getProperty("local.server.port"))))
-                .headers("Content-Type", "application/json;charset=UTF-8")
-                .GET()
-                .build(), HttpResponse.BodyHandlers.ofString()).body();
-        //first test requirement: UP after initial spring starts
-        assertEquals("UP", objectMapper.readTree(afterRestart).get("status").asText());
+        await().alias("must be stay up after restart, even when previously created subscriptions are already present.")
+                .pollInterval(Duration.ofSeconds(1))
+                .atMost(2, TimeUnit.MINUTES).until(() -> {
+                    String healthPageContent = client.send(HttpRequest.newBuilder()
+                            .uri(new URI("http://localhost:%s/actuator/health".formatted(environment.getProperty("local.server.port"))))
+                            .headers("Content-Type", "application/json;charset=UTF-8")
+                            .GET()
+                            .build(), HttpResponse.BodyHandlers.ofString()).body();
+                    return objectMapper.readTree(healthPageContent).get("status").asText().contentEquals("UP");
+                });
     }
 }
