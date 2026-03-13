@@ -479,7 +479,6 @@
                                 <configuration>
                                     <forkCount>2C</forkCount>
                                     <reuseForks>false</reuseForks> <!-- new JVM per test class -->
-                                    <reportsDirectory>target/failsafe-reports-${surefire.forkNumber}</reportsDirectory>
                                     <properties>
                                         <configurationParameters>junit.jupiter.tags=isolated</configurationParameters>
                                     </properties>
