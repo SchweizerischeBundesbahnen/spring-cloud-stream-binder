@@ -479,6 +479,7 @@
                                 <configuration>
                                     <forkCount>2C</forkCount>
                                     <reuseForks>false</reuseForks> <!-- new JVM per test class -->
+                                    <reportsDirectory>target/failsafe-reports-${surefire.forkNumber}</reportsDirectory>
                                     <properties>
                                         <configurationParameters>junit.jupiter.tags=isolated</configurationParameters>
                                     </properties>
@@ -486,9 +487,6 @@
                                         <include>**/springBootTests/**/*IT.java</include>
                                         <include>*IT.java</include>
                                     </includes>
-                                    <parallel>classes</parallel>
-                                    <threadCount>16</threadCount>
-                                    <perCoreThreadCount>false</perCoreThreadCount>
                                     <argLine>
                                         --add-opens java.base/java.lang=ALL-UNNAMED
                                         --add-opens java.base/java.util=ALL-UNNAMED

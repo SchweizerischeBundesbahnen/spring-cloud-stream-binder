@@ -37,6 +37,8 @@ management:
       exposure:
         include: "prometheus,health,info,restart"
   endpoint:
+    health:
+      show-details: always
     restart:
       access: unrestricted
 
