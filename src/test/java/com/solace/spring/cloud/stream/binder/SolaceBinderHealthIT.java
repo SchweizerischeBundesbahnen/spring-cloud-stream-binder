@@ -2,9 +2,9 @@ package com.solace.spring.cloud.stream.binder;
 
 import com.solace.spring.cloud.stream.binder.config.SolaceHealthIndicatorsConfiguration;
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
+import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.contributors.BindingsHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
-import com.solace.spring.cloud.stream.binder.health.indicators.ProvisioningHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.test.junit.extension.SpringCloudStreamExtension;
@@ -180,7 +180,7 @@ public class SolaceBinderHealthIT {
         SolaceBinderHealthAccessor solaceBinderHealthAccessor = new SolaceBinderHealthAccessor(
                 new SolaceBinderHealthContributor(new SessionHealthIndicator(),
                         bindingsHealthContributor,
-                        new ProvisioningHealthIndicator()));
+                        new SolaceHealthIndicator()));
         Field solaceBinderHealthAccessorField = binder.getBinder().getClass().getDeclaredField("solaceBinderHealthAccessor");
         solaceBinderHealthAccessorField.setAccessible(true);
         solaceBinderHealthAccessorField.set(binder.getBinder(), Optional.of(solaceBinderHealthAccessor));
