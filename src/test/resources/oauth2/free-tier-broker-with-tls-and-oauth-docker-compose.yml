@@ -4,7 +4,6 @@ networks:
 
 services:
   solbroker:
-    image: solace/solace-pubsub-standard:10.25.0
     hostname: solbroker
     networks:
       - solace_msg_net
@@ -16,35 +15,45 @@ services:
       nofile:
         soft: 1048576
         hard: 1048576
-    secrets:
-      - server.pem
-
+    build:
+      no_cache: true
+      # workaround for https://github.com/docker/compose/issues/11867
+      dockerfile_inline: |-
+        FROM solace/solace-pubsub-standard:10.25.0
+        COPY ./certs/broker/solbroker.pem /run/secrets/server.pem
+    ports:
+      - "0:8080"    # HTTP management / PubSub+ Manager / SEMP over HTTP
+      - "0:55443"   # SMF over TLS
+      - "0:55555"   # SMF (plain)
   solaceoauth: # A nginx reverse proxy for enabling SSL access to Keycloak
-    image: nginx:1.21.6
     hostname: solaceoauth
-    volumes:
-      - ./oauth/nginx.conf:/etc/nginx/nginx.conf
-      - ./oauth/www:/data/www
-      - ./certs/keycloak:/etc/sslcerts/
     networks:
       - solace_msg_net
-
+    build:
+      no_cache: true
+      dockerfile_inline: |-
+        FROM nginx:1.21.6
+        COPY ./oauth/nginx.conf /etc/nginx/nginx.conf
+        COPY ./oauth/www /data/www
+        COPY ./certs/keycloak /etc/sslcerts/
+    ports:
+      - "0:10443"
+      - "0:1080"
   keycloak:
-    image: quay.io/keycloak/keycloak:16.1.1
     hostname: keycloak
     networks:
       - solace_msg_net
-    volumes:
-      - ./oauth/keycloak/:/tmp/keycloak/
+    build:
+      no_cache: true
+      dockerfile_inline: |-
+        FROM quay.io/keycloak/keycloak:16.1.1
+        COPY ./oauth/keycloak /tmp/keycloak/
     environment:
       - DB_VENDOR=h2
       - KEYCLOAK_USER=admin
       - KEYCLOAK_PASSWORD=mysecret1!
       - PROXY_ADDRESS_FORWARDING=true  #important for reverse proxy
       - "KEYCLOAK_IMPORT=/tmp/keycloak/solace-oauth-resource-server1-realm-export.json,/tmp/keycloak/solace-oauth-resource-server2-realm-export.json"
-    command:
-      - "-Dkeycloak.migration.strategy=IGNORE_EXISTING"
-
-secrets:
-  server.pem:
-    file: "certs/broker/solbroker.pem"  ## The server certificate for the Solace PubSub+ broker
+      - "JAVA_OPTS=-Djboss.bind.address=0.0.0.0 -Djboss.http.port=8080 -Dkeycloak.migration.strategy=IGNORE_EXISTING"
+    ports:
+      - "0:8080"

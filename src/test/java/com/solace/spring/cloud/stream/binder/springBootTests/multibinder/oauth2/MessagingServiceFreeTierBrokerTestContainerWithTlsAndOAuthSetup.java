@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.ComposeContainer;
 import org.testcontainers.containers.ContainerState;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
 import java.time.Duration;
@@ -24,9 +25,12 @@ public interface MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup
     Logger LOGGER = LoggerFactory.getLogger(
             MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup.class);
 
-    ComposeContainer COMPOSE_CONTAINER = new ComposeContainer(
+    ComposeContainer COMPOSE_CONTAINER = new ComposeContainer( // using constructor with DockerImageName allows using a remote docker-compose by env DOCKER_HOST -> default localCompose=false
+            DockerImageName.parse("docker"),
+            "testcontainernweb",// + new Random().nextInt(100000),
             new File(FULL_DOCKER_COMPOSE_FILE_PATH))
             .withPull(true)
+
             .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 8080)
             .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 55443)
             .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 55555)
@@ -37,12 +41,13 @@ public interface MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup
             .withExposedService(KEYCLOAK_OAUTH_SERVICE_NAME, 8080)
 
             .waitingFor(PUBSUB_BROKER_SERVICE_NAME,
-                    Wait.forHttp("/").forPort(8080).withStartupTimeout(Duration.ofSeconds(120)))
+                    Wait.forHttp("/").forPort(8080).withStartupTimeout(Duration.ofSeconds(220)))
             .waitingFor(NGINX_RPROXY_SERVICE_NAME,
                     Wait.forHttp("/").forPort(10443).allowInsecure().usingTls()
-                            .withStartupTimeout(Duration.ofSeconds(120))).waitingFor(KEYCLOAK_OAUTH_SERVICE_NAME,
-                    Wait.forHttp("/").forPort(8080).allowInsecure()
-                            .withStartupTimeout(Duration.ofSeconds(120)));
+                            .withStartupTimeout(Duration.ofSeconds(220)))
+            .waitingFor(KEYCLOAK_OAUTH_SERVICE_NAME,
+                    Wait.forHttp("/auth/").forPort(8080).allowInsecure()
+                            .withStartupTimeout(Duration.ofSeconds(280)));
 
     @BeforeAll
     static void startContainer() {
