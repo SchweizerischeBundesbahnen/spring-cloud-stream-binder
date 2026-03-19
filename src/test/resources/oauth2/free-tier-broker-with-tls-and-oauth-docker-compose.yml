@@ -4,10 +4,7 @@ networks:
 
 services:
   solbroker:
-    image: solace/solace-pubsub-standard:10.25.0
     hostname: solbroker
-    networks:
-      - solace_msg_net
     env_file:
       - ./solace_tls.env
     shm_size: 2g
@@ -22,13 +19,12 @@ services:
       dockerfile_inline: |-
         FROM solace/solace-pubsub-standard:10.25.0
         COPY ./certs/broker/solbroker.pem /run/secrets/server.pem
-        ENTRYPOINT ["tail", "-f", "/dev/null"]
-
+    ports:
+      - "0:8080"    # HTTP management / PubSub+ Manager / SEMP over HTTP
+      - "0:55443"   # SMF over TLS
+      - "0:55555"   # SMF (plain)
   solaceoauth: # A nginx reverse proxy for enabling SSL access to Keycloak
-    image: nginx:1.21.6
     hostname: solaceoauth
-    networks:
-      - solace_msg_net
     build:
       no_cache: true
       dockerfile_inline: |-
@@ -36,24 +32,22 @@ services:
         COPY ./oauth/nginx.conf /etc/nginx/nginx.conf
         COPY ./oauth/www /data/www
         COPY ./certs/keycloak /etc/sslcerts/
-        ENTRYPOINT ["tail", "-f", "/dev/null"]
-
+    ports:
+      - "0:10443"
+      - "0:1080"
   keycloak:
-    image: quay.io/keycloak/keycloak:16.1.1
     hostname: keycloak
-    networks:
-      - solace_msg_net
     build:
       no_cache: true
       dockerfile_inline: |-
         FROM quay.io/keycloak/keycloak:16.1.1
         COPY ./oauth/keycloak /tmp/keycloak/
-        ENTRYPOINT ["tail", "-f", "/dev/null"]
     environment:
       - DB_VENDOR=h2
       - KEYCLOAK_USER=admin
       - KEYCLOAK_PASSWORD=mysecret1!
       - PROXY_ADDRESS_FORWARDING=true  #important for reverse proxy
       - "KEYCLOAK_IMPORT=/tmp/keycloak/solace-oauth-resource-server1-realm-export.json,/tmp/keycloak/solace-oauth-resource-server2-realm-export.json"
-    command:
-      - "-Dkeycloak.migration.strategy=IGNORE_EXISTING"
+      - "JAVA_OPTS=-Djboss.bind.address=0.0.0.0 -Djboss.http.port=8080 -Dkeycloak.migration.strategy=IGNORE_EXISTING"
+    ports:
+      - "0:8080"
