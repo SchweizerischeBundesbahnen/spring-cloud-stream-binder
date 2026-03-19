@@ -5,6 +5,8 @@ networks:
 services:
   solbroker:
     hostname: solbroker
+    networks:
+      - solace_msg_net
     env_file:
       - ./solace_tls.env
     shm_size: 2g
@@ -25,6 +27,8 @@ services:
       - "0:55555"   # SMF (plain)
   solaceoauth: # A nginx reverse proxy for enabling SSL access to Keycloak
     hostname: solaceoauth
+    networks:
+      - solace_msg_net
     build:
       no_cache: true
       dockerfile_inline: |-
@@ -37,6 +41,8 @@ services:
       - "0:1080"
   keycloak:
     hostname: keycloak
+    networks:
+      - solace_msg_net
     build:
       no_cache: true
       dockerfile_inline: |-
