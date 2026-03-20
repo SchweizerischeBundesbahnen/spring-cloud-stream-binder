@@ -100,6 +100,7 @@ public class JCSMPSessionConfiguration {
         JCSMPProperties solaceJcsmpProperties = (JCSMPProperties) jcsmpProperties.clone();
         solaceJcsmpProperties.setProperty(JCSMPProperties.CLIENT_INFO_PROVIDER, new SolaceBinderClientInfoProvider());
         solaceJcsmpProperties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);
+        solaceJcsmpProperties.setProperty(JCSMPProperties.SSL_VALIDATE_CERTIFICATE_HOST, false);
 
         final JCSMPSessionEventHandler jcsmpSessionEventHandler = new JCSMPSessionEventHandler();
         final SolaceSessionOAuth2TokenProvider solaceSessionOAuth2TokenProviderValue = solaceSessionOAuth2TokenProvider.orElse(null);
@@ -109,6 +110,7 @@ public class JCSMPSessionConfiguration {
             SpringJCSMPFactory springJCSMPFactory = new SpringJCSMPFactory(solaceJcsmpProperties, solaceSessionOAuth2TokenProviderValue);
 
             context = springJCSMPFactory.createContext(new ContextProperties());
+
             jcsmpSession = springJCSMPFactory.createSession(context, jcsmpSessionEventHandler);
             log.info("Connecting JCSMP session {}", jcsmpSession.getSessionName());
             jcsmpSession.connect();
