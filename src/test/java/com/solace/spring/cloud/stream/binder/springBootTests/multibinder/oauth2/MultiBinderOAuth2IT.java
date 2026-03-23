@@ -5,30 +5,22 @@ import com.solace.it.util.semp.config.BrokerConfiguratorBuilder.BrokerConfigurat
 import com.solace.it.util.semp.monitor.BrokerMonitorBuilder;
 import com.solace.it.util.semp.monitor.BrokerMonitorBuilder.BrokerMonitor;
 import com.solace.spring.cloud.stream.binder.config.autoconfigure.JCSMPSessionConfiguration;
-import com.solace.spring.cloud.stream.binder.springBootTests.multibinder.oauth2.noophostcert.OAuth2LoginConfig;
 import com.solace.test.integration.semp.v2.SempV2Api;
 import com.solace.test.integration.semp.v2.action.ApiException;
 import com.solace.test.integration.semp.v2.action.model.ActionMsgVpnClientDisconnect;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnAuthenticationOauthProfile;
 import com.solace.test.integration.semp.v2.config.model.ConfigMsgVpnAuthenticationOauthProfile.OauthRoleEnum;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnClient;
-import com.solacesystems.jcsmp.DefaultSolaceSessionOAuth2TokenProvider;
 import com.solacesystems.jcsmp.JCSMPProperties;
-import com.solacesystems.jcsmp.SolaceSessionOAuth2TokenProvider;
-import community.solace.spring.boot.starter.solaceclientconfig.SolaceOAuthClientConfiguration;
 import org.assertj.core.util.Files;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Isolated;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
-import org.springframework.context.annotation.Import;
 import org.springframework.security.oauth2.client.*;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.test.annotation.DirtiesContext;
@@ -53,19 +45,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @Isolated
-@SpringBootTest(properties = "spring.main.allow-bean-definition-overriding=true")
-@Import({OAuth2SslRemoteHostTestConfg.class, OAuth2LoginConfig.class})
-@ComponentScan(excludeFilters = {
-        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = SolaceOAuthClientConfiguration.class)
-})
-//@ImportAutoConfiguration(exclude = {OAuth2ClientAutoConfiguration.class, SolaceOAuthClientConfiguration.class})
+@SpringBootTest
 @ActiveProfiles("multibinderOAuth2")
 @DirtiesContext //Ensures all listeners are stopped
 class MultiBinderOAuth2IT implements
         MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup {
-
-    @MockitoBean(name = "solaceSessionOAuth2TokenProvider")
-    SolaceSessionOAuth2TokenProvider solaceSessionOAuth2TokenProvider;
 
     private static final Logger logger = LoggerFactory.getLogger(MultiBinderOAuth2IT.class);
     private static BrokerConfigurator solaceConfigUtil;
@@ -122,12 +106,6 @@ class MultiBinderOAuth2IT implements
                 new AuthorizedClientServiceOAuth2AuthorizedClientManager(
                         clientRegistrationRepository, authorizedClientService);
         authorizedClientManager.setAuthorizedClientProvider(authorizedClientProvider);
-
-        DefaultSolaceSessionOAuth2TokenProvider provider = new NoHostVerifyingSolaceSessionOAuth2TokenProvider(this.jcsmpProperties,
-                authorizedClientManager);
-
-        Mockito.when(solaceSessionOAuth2TokenProvider.getAccessToken()).thenReturn(provider.getAccessToken());
-        Mockito.when(jcsmpSessionConfiguration.getSolaceSessionOAuth2TokenProvider()).thenReturn(solaceSessionOAuth2TokenProvider);
     }
 
     @BeforeAll
