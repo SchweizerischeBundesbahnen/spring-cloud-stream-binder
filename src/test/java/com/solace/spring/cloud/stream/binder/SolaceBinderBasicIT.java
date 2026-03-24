@@ -1,6 +1,5 @@
 package com.solace.spring.cloud.stream.binder;
 
-import community.solace.spring.boot.starter.solaceclientconfig.SolaceJavaAutoConfiguration;
 import com.solace.spring.cloud.stream.binder.messaging.SolaceBinderHeaders;
 import com.solace.spring.cloud.stream.binder.messaging.SolaceHeaders;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
@@ -23,6 +22,7 @@ import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueue;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueTxFlow;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.Queue;
+import community.solace.spring.boot.starter.solaceclientconfig.SolaceJavaAutoConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.assertj.core.api.InstanceOfAssertFactories;
@@ -34,8 +34,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.api.parallel.Isolated;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.junitpioneer.jupiter.cartesian.CartesianTest.Values;
-import org.mockito.Mockito;
-import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.cloud.stream.binder.*;
 import org.springframework.cloud.stream.config.BindingProperties;

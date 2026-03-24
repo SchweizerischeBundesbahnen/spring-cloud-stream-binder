@@ -152,7 +152,7 @@ public class SolaceEndpointProvisioner
     private void setHealthDownIfIndicatorPresent(String message, Exception e, String endpointNameLogHint) {
         if (solaceBinderHealthContributor.isPresent()) {
             FlowEventArgs flowEventArgs = new FlowEventArgs(null, message, e, 500);
-            solaceBinderHealthContributor.get().getProvisioningHealthIndicator().down(flowEventArgs);
+            solaceBinderHealthContributor.get().getProvisioningHealthIndicator().healthDown(flowEventArgs);
             log.info("Health endpoint was set down: endpoint={}", endpointNameLogHint);
         } else {
             log.warn("The provisioning has failed for an endpoint. But no solace binder health contributor is present, so the overall health page will not be down. brokenEndpoint={}", endpointNameLogHint);

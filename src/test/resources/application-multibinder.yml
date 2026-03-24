@@ -43,4 +43,4 @@ management:
       enabled: true
 solace:
   java:
-    host:
+    host: null

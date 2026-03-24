@@ -1,10 +1,9 @@
 package com.solace.spring.cloud.stream.binder.health.contributors;
 
-import com.solace.spring.cloud.stream.binder.health.indicators.ProvisioningHealthIndicator;
+import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
 import org.springframework.boot.health.contributor.CompositeHealthContributor;
 import org.springframework.boot.health.contributor.HealthContributor;
-
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,14 +12,14 @@ import java.util.stream.Stream;
 public class SolaceBinderHealthContributor implements CompositeHealthContributor {
     private final SessionHealthIndicator sessionHealthIndicator;
     private final BindingsHealthContributor bindingsHealthContributor;
-    private final ProvisioningHealthIndicator provisioningHealthIndicator;
+    private final SolaceHealthIndicator provisioningHealthIndicator;
     private static final String CONNECTION = "connection";
     private static final String BINDINGS = "bindings";
     private static final String PROVISIONING = "provisioning";
 
     public SolaceBinderHealthContributor(SessionHealthIndicator sessionHealthIndicator,
                                          BindingsHealthContributor bindingsHealthContributor,
-                                         ProvisioningHealthIndicator provisioningHealthIndicator) {
+                                         SolaceHealthIndicator provisioningHealthIndicator) {
         this.sessionHealthIndicator = sessionHealthIndicator;
         this.bindingsHealthContributor = bindingsHealthContributor;
         this.provisioningHealthIndicator = provisioningHealthIndicator;
@@ -44,7 +43,7 @@ public class SolaceBinderHealthContributor implements CompositeHealthContributor
         return bindingsHealthContributor;
     }
 
-    public ProvisioningHealthIndicator getProvisioningHealthIndicator() {
+    public SolaceHealthIndicator getProvisioningHealthIndicator() {
         return provisioningHealthIndicator;
     }
 

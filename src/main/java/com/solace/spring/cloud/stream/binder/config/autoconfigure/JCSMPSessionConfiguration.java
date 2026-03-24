@@ -109,6 +109,7 @@ public class JCSMPSessionConfiguration {
             SpringJCSMPFactory springJCSMPFactory = new SpringJCSMPFactory(solaceJcsmpProperties, solaceSessionOAuth2TokenProviderValue);
 
             context = springJCSMPFactory.createContext(new ContextProperties());
+
             jcsmpSession = springJCSMPFactory.createSession(context, jcsmpSessionEventHandler);
             log.info("Connecting JCSMP session {}", jcsmpSession.getSessionName());
             jcsmpSession.connect();
