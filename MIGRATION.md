@@ -100,6 +100,20 @@ groups:
           description: "Internal queue has {{ $value }} messages waiting"
 ```
 
+> [!IMPORTANT]
+> The `quantile` labels in Prometheus alerts require explicit percentile histogram configuration in your `application.yaml`:
+>
+> ```yaml
+> management:
+>   metrics:
+>     distribution:
+>       percentiles-histogram:
+>         solace.message.queue.backpressure: true
+>         solace.message.processing.time: true
+>       slo:
+>         solace.message.queue.backpressure: 1000,5000,10000,30000,60000
+> ```
+
 ### Key Metrics for Monitoring
 
 After migration, monitor these metrics:

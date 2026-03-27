@@ -91,6 +91,19 @@ public class SampleAppApplication {
 An applicable Solace configuration file may look like:
 
 ```yaml
+solace:
+  java:
+    host: tcp://localhost:55555
+    msgVpn: default
+    clientUsername: default
+    clientPassword: default
+    connectRetries: -1
+    reconnectRetries: -1
+#    apiProperties:
+#      ssl_trust_store: <path_to_trust_store>
+#      ssl_trust_store_password: <trust_store_password>
+#      ssl_validate_certificate: true
+
 spring:
   cloud:
     function:
@@ -100,29 +113,30 @@ spring:
         uppercase-in-0:
           destination: queuename
           group: myconsumergroup
-          binder: solace-broker
         uppercase-out-0:
           destination: uppercase/topic
-          binder: solace-broker
-      binders:
-        solace-broker:
-          type: solace
-          environment:
-            solace: # (1)
-              java:
-                host: tcp://localhost:55555
-                msgVpn: default
-                clientUsername: default
-                clientPassword: default
-                connectRetries: -1
-                reconnectRetries: -1
-#                apiProperties:
-#                  ssl_trust_store: <path_to_trust_store>
-#                  ssl_trust_store_password: <trust_store_password>
-#                  ssl_validate_certificate: true
 ```
 
-1.  The latter half of this configuration where the Solace session is configured actually originates from the [JCSMP Spring Boot Auto-Configuration project](https://github.com/SolaceProducts/solace-spring-boot/tree/master/solace-spring-boot-starters/solace-java-spring-boot-starter#updating-your-application-properties). See [Solace Session Properties](#solace-session-properties) for more info.
+The Solace session properties (`solace.java.*`) originate from the [JCSMP Spring Boot Auto-Configuration project](https://github.com/SolaceProducts/solace-spring-boot/tree/master/solace-spring-boot-starters/solace-java-spring-boot-starter#updating-your-application-properties). See [Solace Session Properties](#solace-session-properties) for more info.
+
+> [!TIP]
+> If you need to configure multiple Solace binders, you can nest the Solace session properties under the binder definition:  
+> ```yaml
+> spring:
+>   cloud:
+>     stream:
+>       binders:
+>         solace-broker:
+>           type: solace
+>           environment:
+>             solace:
+>               java:
+>                 host: tcp://localhost:55555
+>                 msgVpn: default
+>                 clientUsername: default
+>                 clientPassword: default
+> ```
+> This approach allows different binders to connect to different broker instances.
 
 For more samples see [Solace Spring Cloud Samples](https://github.com/SolaceSamples/solace-samples-spring) repository.
 
@@ -165,8 +179,8 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: `true`
 
 `selector`
-:   If specified, enables client applications to choose which messages they are interested in receiving, as determined by the messages’ header field and property values.
-    A selector has a conditional expression syntax that is a subset of SQL92 Selector can be used with Queue or a Topic Endpoint Subscription
+:   **Deprecated.** If specified, enables client applications to choose which messages they are interested in receiving, as determined by the messages' header field and property values.
+    A selector has a conditional expression syntax that is a subset of SQL92. Selector can be used with Queue or a Topic Endpoint Subscription.
     Default: `null`
     See: [https://docs.solace.com/API/Solace-JMS-API/Selectors.htm](https://docs.solace.com/API/Solace-JMS-API/Selectors.htm)
 
@@ -176,6 +190,7 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     See: [Generated Queue Name Syntax](#generated-queue-name-syntax)
     > **WARNING:** Modifying this can cause naming conflicts between the queue names of consumer groups.
     > **WARNING:** While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+    > **CAUTION:** The Solace broker has a maximum queue name length limit (typically ~200 characters). When using the default SpEL expression with long destination names, the generated queue name may exceed this limit and cause provisioning failures. Consider using shorter destination names or a custom `queueNameExpression` if you encounter this issue.
 
 `queueAccessType`
 :   Access type for the consumer group queue.
@@ -388,6 +403,13 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 #### Solace Connection Health-Check Properties
 
 The Solace connection health indicator immediately reports `DOWN` status when the connection is down or reconnecting. This ensures that health checks accurately reflect the current connection state without any delay or threshold configuration.
+
+The following events cause the health indicator to report `DOWN`:
+
+*   **Connection loss**: The TCP connection to the Solace broker is lost and all reconnection attempts have been exhausted.
+*   **Reconnecting**: The binder is actively attempting to reconnect to the broker (transitional state).
+*   **Provisioning failure**: Queue or endpoint provisioning fails during binding setup (e.g., insufficient permissions, broker-side errors).
+*   **Session destruction**: The JCSMP session is explicitly closed or destroyed.
 
 ### Solace Message Headers
 
@@ -819,11 +841,14 @@ Solace binders can report health statuses via the [Spring Boot Actuator health e
 | --- | --- |
 | UP | Status indicating that the binder is functioning as expected. |
 | RECONNECTING | Status indicating that the binder is actively trying to reconnect to the message broker. This is a custom health status. It isn't included in the health severity order list (`management.endpoint.health.status.order`) and returns the default HTTP status code of `200`. To customize these, see [Writing Custom HealthIndicators](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html#actuator.endpoints.health.writing-custom-health-indicators). |
-| DOWN | Status indicating that the binder has suffered an unexpected failure. For instance, the binder may have exhausted all reconnection attempts. User intervention is likely required. |
+| DOWN | Status indicating that the binder has suffered an unexpected failure. This status is reported when: (1) all reconnection attempts to the broker have been exhausted, (2) the JCSMP session has been destroyed, or (3) queue/endpoint provisioning has failed. User intervention is likely required. |
 
 ## Solace Binder Metrics
 
 Leveraging [Spring Metrics](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html#actuator.metrics), the Solace PubSub+ binder exposes the following metrics:
+
+> [!NOTE]
+> Time-based metrics (`backpressure`, `wait.time`, `processing.time`) are registered as `DistributionSummary` with a `milliseconds` base unit, **not** as `Timer`. This means Micrometer does **not** auto-convert the values to seconds. The recorded values are always in milliseconds.
 
 | Name | Type | Tags | Description |
 | --- | --- | --- | --- |
@@ -843,6 +868,20 @@ To monitor backpressure effectively, configure alerts based on the following met
 2.  **solace.message.queue.size** - Alert when consistently higher than `concurrency` setting
 3.  **Broker queue depth** - Monitor via Solace SEMP API or exporter
 
+> [!IMPORTANT]
+> The Prometheus alert examples below use `quantile` labels which are only available if you configure percentile histograms or SLO boundaries in your `application.yaml`. Without this configuration, Prometheus will not expose quantile values.
+>
+> ```yaml
+> management:
+>   metrics:
+>     distribution:
+>       percentiles-histogram:
+>         solace.message.queue.backpressure: true
+>         solace.message.processing.time: true
+>       slo:
+>         solace.message.queue.backpressure: 1000,5000,10000,30000,60000
+> ```
+
 Example Prometheus alert:
 
 ```yaml
@@ -861,23 +900,6 @@ To address backpressure detected via metrics:
 
 *   **Optimize the application**: If possible try to increase the processing speed in the application. This would ease the congestion on the queue, but is the most complex option and might not always be possible.
 *   **Increase concurrency**: Having more worker threads increases throughput because more messages are consumed. This solution is simple to do, but comes at the cost of increased resource usage.
-
-## Micometer Tracing
-
-The binder supports micrometer tracing. To enable ensure the needed Beans are available: Tracer and Propagator.
-
-## Resources
-
-For more information about Spring Cloud Streams try these resources:
-
-*   [Spring Docs - Spring Cloud Stream Reference Documentation](https://docs.spring.io/spring-cloud-stream/docs/4.1.x/reference/html/)
-*   [GitHub Samples - Spring Cloud Stream Sample Applications](https://github.com/spring-cloud/spring-cloud-stream-samples)
-*   [Github Source - Spring Cloud Stream Source Code](https://github.com/spring-cloud/spring-cloud-stream)
-
-For more information about Solace technology in general please visit these resources:
-
-*   The Solace Developer Portal website at: [https://solace.dev](https://solace.dev)
-*   Ask the [Solace community](https://solace.community)
 
 ## Watchdog
 
@@ -912,3 +934,20 @@ To address issues detected by the watchdog:
 
 *   **For deadlocked threads**: Investigate the application code for potential deadlocks, infinite loops, or blocking operations. Check thread dumps to identify what the stuck thread is doing.
 *   **For backpressure** (detected via metrics): See mitigation strategies below in [Backpressure SLO Recommendations](#backpressure-slo-recommendations).
+
+## Micrometer Tracing
+
+The binder supports Micrometer tracing. To enable, ensure the needed Beans are available: Tracer and Propagator.
+
+## Resources
+
+For more information about Spring Cloud Streams try these resources:
+
+*   [Spring Docs - Spring Cloud Stream Reference Documentation](https://docs.spring.io/spring-cloud-stream/docs/4.1.x/reference/html/)
+*   [GitHub Samples - Spring Cloud Stream Sample Applications](https://github.com/spring-cloud/spring-cloud-stream-samples)
+*   [Github Source - Spring Cloud Stream Source Code](https://github.com/spring-cloud/spring-cloud-stream)
+
+For more information about Solace technology in general please visit these resources:
+
+*   The Solace Developer Portal website at: [https://solace.dev](https://solace.dev)
+*   Ask the [Solace community](https://solace.community)

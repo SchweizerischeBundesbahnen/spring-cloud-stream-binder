@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 @Slf4j
-@SuppressWarnings("deprecation")
 public class FlowXMLMessageListener implements XMLMessageListener {
 
     /**
@@ -115,22 +114,26 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     private void watchdog(long watchdogTimeoutMs) {
         while (running) {
             try {
-                if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
-                    solaceMeterAccessor.get().recordQueueSize(this.bindingName.get(), messageQueue.size());
-                    solaceMeterAccessor.get().recordActiveMessages(this.bindingName.get(), activeMessages.size());
+                SolaceMeterAccessor meter = solaceMeterAccessor.get();
+                String binding = bindingName.get();
+                if (meter != null && binding != null) {
+                    meter.recordQueueSize(binding, messageQueue.size());
+                    meter.recordActiveMessages(binding, activeMessages.size());
 
                     // measure backpressure by looking at the oldest message in the queue
                     MessageInProgress oldestMessage = messageQueue.peek();
                     long backpressure = oldestMessage != null ? System.currentTimeMillis() - oldestMessage.getReceivedMillis() : 0;
-                    solaceMeterAccessor.get().recordQueueBackpressure(this.bindingName.get(), backpressure);
+                    meter.recordQueueBackpressure(binding, backpressure);
                 }
 
-
                 long currentTimeMillis = System.currentTimeMillis();
-                long maxTimeInProcessing = Long.MIN_VALUE;
                 for (MessageInProgress messageInProgress : activeMessages) {
-                    long timeInProcessing = currentTimeMillis - messageInProgress.startMillis;
-                    maxTimeInProcessing = Math.max(maxTimeInProcessing, timeInProcessing);
+                    // startMillis is set before adding to activeMessages (happens-before via ConcurrentHashMap),
+                    // but guard defensively against seeing a zero value
+                    if (messageInProgress.getStartMillis() == 0) {
+                        continue;
+                    }
+                    long timeInProcessing = currentTimeMillis - messageInProgress.getStartMillis();
 
                     // Deadlock detection: warn once if processing exceeds timeout
                     if (timeInProcessing > watchdogTimeoutMs && !messageInProgress.isWarned()) {
@@ -148,7 +151,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                 // Ensure sleep time is at least 10ms to avoid IllegalArgumentException and excessive CPU usage if watchdogTimeoutMs is small/zero
                 long sleepTime = Math.max(10, Math.min(watchdogTimeoutMs, 1000));
                 Thread.sleep(sleepTime);
-            } catch (Throwable e) {
+            } catch (Exception e) {
                 log.error(e.getMessage(), e);
             }
         }
@@ -163,8 +166,10 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                     polled.setStartMillis(now);
                     polled.setThreadName(threadName);
 
-                    if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
-                        solaceMeterAccessor.get().recordMessageQueueWaitTime(bindingName.get(), now - polled.getReceivedMillis());
+                    SolaceMeterAccessor meter = solaceMeterAccessor.get();
+                    String binding = bindingName.get();
+                    if (meter != null && binding != null) {
+                        meter.recordMessageQueueWaitTime(binding, now - polled.getReceivedMillis());
                     }
 
                     log.trace("loop add mip={}", polled);
@@ -174,12 +179,12 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                     } finally {
                         log.trace("loop remove mip={}", polled);
                         activeMessages.remove(polled);
-                        if (solaceMeterAccessor.get() != null && bindingName.get() != null) {
-                            solaceMeterAccessor.get().recordMessageProcessingTimeDuration(bindingName.get(), System.currentTimeMillis() - polled.getStartMillis());
+                        if (meter != null && binding != null) {
+                            meter.recordMessageProcessingTimeDuration(binding, System.currentTimeMillis() - polled.getStartMillis());
                         }
                     }
                 }
-            } catch (Throwable e) {
+            } catch (Exception e) {
                 log.error("Error was not properly handled in JCSMPInboundQueueMessageProducer", e);
             }
         }
@@ -200,13 +205,20 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                     return;
                 }
             }
+            // All offer attempts failed — this should never happen with an unbounded queue
+            log.error("Failed to enqueue message after 100 attempts, message will be rejected: {}", bytesXMLMessage);
+            settleMessageAsFailed(bytesXMLMessage);
         } catch (InterruptedException e) {
-            log.warn("unable to add message:{}", bytesXMLMessage);
-            try {
-                bytesXMLMessage.settle(XMLMessage.Outcome.FAILED);
-            } catch (JCSMPException ex) {
-                log.error(ex.getMessage(), ex);
-            }
+            log.warn("Interrupted while enqueuing message, message will be rejected: {}", bytesXMLMessage);
+            settleMessageAsFailed(bytesXMLMessage);
+        }
+    }
+
+    private void settleMessageAsFailed(BytesXMLMessage bytesXMLMessage) {
+        try {
+            bytesXMLMessage.settle(XMLMessage.Outcome.FAILED);
+        } catch (JCSMPException ex) {
+            log.error("Failed to settle message as FAILED: {}", ex.getMessage(), ex);
         }
     }
 
@@ -227,9 +239,10 @@ public class FlowXMLMessageListener implements XMLMessageListener {
 
         // Should not be part of hashcode. Because a changing hash or equal will prevent removing from `activeMessages` set.
         private boolean warned = false;
-        private boolean errored = false;
 
-        // Lazy-initialized cached hashCode (immutable fields only)
+        // Lazy-initialized cached hashCode (immutable fields only).
+        // Intentionally NOT synchronized: worst case is computing hashCode twice,
+        // which is cheaper than paying synchronization cost on every access.
         private Integer cachedHashCode;
 
         @Override

@@ -44,8 +44,8 @@ class FlowXMLMessageListenerTest {
                 }
             });
 
-            // Verify that the expected number of threads were created
-            assert runningThreads.get() == threadCount + 1; // Include watchdog thread
+            // Verify that the expected number of threads were created (workers + watchdog)
+            assertThat(runningThreads.get()).isEqualTo(threadCount + 1);
         } finally {
             listener.stopReceiverThreads();
         }
@@ -288,7 +288,6 @@ class FlowXMLMessageListenerTest {
         mip.setStartMillis(67890L);
         mip.setThreadName("test-thread");
         mip.setWarned(true);
-        mip.setErrored(false);
 
         String toString = mip.toString();
 
@@ -296,7 +295,6 @@ class FlowXMLMessageListenerTest {
         assertThat(toString).contains("67890"); // startMillis
         assertThat(toString).contains("test-thread"); // threadName
         assertThat(toString).contains("warned"); // warned field
-        assertThat(toString).contains("errored"); // errored field
     }
 
     @Test
@@ -372,8 +370,8 @@ class FlowXMLMessageListenerTest {
             int threadCount = 100;
             int messageCount = 500;
             CountDownLatch allMessagesProcessed = new CountDownLatch(messageCount);
-            AtomicInteger addFailures = new AtomicInteger(0);
-            AtomicInteger removeFailures = new AtomicInteger(0);
+            AtomicInteger processedCount = new AtomicInteger(0);
+            Set<String> processedThreadNames = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
             // Access activeMessages via reflection to verify integrity
             Field activeMessagesField = FlowXMLMessageListener.class.getDeclaredField("activeMessages");
@@ -383,11 +381,13 @@ class FlowXMLMessageListenerTest {
                     (Set<FlowXMLMessageListener.MessageInProgress>) activeMessagesField.get(listener);
 
             Consumer<BytesXMLMessage> messageConsumer = message -> {
+                processedThreadNames.add(Thread.currentThread().getName());
                 // Simulate some processing with varying times to create contention
                 try {
                     Thread.sleep((long) (Math.random() * 20));
                 } catch (InterruptedException ignored) {
                 }
+                processedCount.incrementAndGet();
                 allMessagesProcessed.countDown();
             };
 
@@ -412,16 +412,22 @@ class FlowXMLMessageListenerTest {
 
             assertThat(completed).as("All messages should be processed").isTrue();
 
+            // Verify all messages were processed
+            assertThat(processedCount.get())
+                    .as("All messages should have been processed")
+                    .isEqualTo(messageCount);
+
+            // Verify parallelization occurred (at least 50% of threads should have processed something)
+            assertThat(processedThreadNames.size())
+                    .as("Multiple threads should have been used for processing")
+                    .isGreaterThanOrEqualTo(threadCount / 2);
+
             // After all messages are processed, activeMessages should be empty
             await().atMost(5, TimeUnit.SECONDS).until(activeMessages::isEmpty);
 
             assertThat(activeMessages)
                     .as("Active messages set should be empty after all processing completes")
                     .isEmpty();
-
-            // No add/remove failures should have occurred
-            assertThat(addFailures.get()).isZero();
-            assertThat(removeFailures.get()).isZero();
 
         } finally {
             listener.stopReceiverThreads();

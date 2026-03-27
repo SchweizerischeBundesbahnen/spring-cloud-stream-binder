@@ -101,11 +101,6 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * Indicated if messages should be consumed using a queue or directly via topic.
      */
     private QualityOfService qualityOfService = QualityOfService.AT_LEAST_ONCE;
-    /**
-     * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
-     */
-    @Deprecated
-    private long maxProcessingTimeMs = 2000;
 
 
     /**
