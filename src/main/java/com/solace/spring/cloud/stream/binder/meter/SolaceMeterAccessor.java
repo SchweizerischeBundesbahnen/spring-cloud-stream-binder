@@ -30,6 +30,10 @@ public class SolaceMeterAccessor {
         solaceMessageMeterBinder.recordQueueBackpressure(bindingName, oldestMessagesWaitingForMs);
     }
 
+    public void recordMessageQueueWaitTime(String bindingName, long waitTimeMs) {
+        solaceMessageMeterBinder.recordMessageQueueWaitTime(bindingName, waitTimeMs);
+    }
+
     public void recordMessageProcessingTimeDuration(String bindingName, long processingDurationMs) {
         solaceMessageMeterBinder.recordMessageProcessingTimeDuration(bindingName, processingDurationMs);
     }

@@ -31,11 +31,7 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      */
     private String queueNameExpression = "'scst/' + (isAnonymous ? 'an/' : 'wk/') + (group?.trim() + '/') + 'plain/' + destination.trim().replaceAll('[*>]', '_')";
 
-    /**
-     * A SQL-92 selector expression to use for selection of messages for consumption. Max of 2000 characters.
-     */
-    @Deprecated
-    private String selector = null;
+
 
     // Error Queue Properties ---------
     /**
@@ -101,30 +97,43 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * Indicated if messages should be consumed using a queue or directly via topic.
      */
     private QualityOfService qualityOfService = QualityOfService.AT_LEAST_ONCE;
-    /**
-     * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
-     */
-    @Deprecated
-    private long maxProcessingTimeMs = 2000;
+
 
     /**
-     * When the message queue size exceeds concurrency*urgentWarningMultiplier, a more urgent warning is logged, defaults to 3
+     * Time in milliseconds before a long-running message processing thread is logged as a warning.
+     * This is used to detect potential deadlocks or stuck threads.
+     * A warning is logged once per message when processing time exceeds this threshold.
+     * Default: 300000 (5 minutes)
      */
-    private Integer urgentWarningMultiplier = 3;
-
-    /**
-     * Time in seconds between warning of queue congestion, defaults to 300 s.
-     */
-    private Integer timeBetweenWarningsS = 300;
-
-    /**
-     * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
-     */
-    private long watchdogTimeoutMs = 2000;
+    private long watchdogTimeoutMs = 300000;
     // ------------------------
 
     /**
      * The list of headers to exclude when converting consumed Solace message to Spring message.
      */
     private List<String> headerExclusions = new ArrayList<>();
+
+    /**
+     * The maximum number of unacknowledged messages that can be outstanding on the flow.
+     * Use this to limit the number of messages in the locally buffered "messageQueue"
+     * and protect the heap from overflow.
+     * Default: null (Use JCSMP default, typically -1/unlimited)
+     */
+    private Integer maxUnacknowledgedMessages;
+
+    /**
+     * The Ack timer in milliseconds for the consumer flow.
+     * Used for grouping acknowledgements.
+     */
+    private Integer flowAckTimerInMsecs;
+
+    /**
+     * The Ack threshold for the consumer flow.
+     */
+    private Integer flowAckThreshold;
+
+    /**
+     * The windowed Ack max size for the consumer flow.
+     */
+    private Integer flowWindowedAckMaxSize;
 }

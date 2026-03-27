@@ -1295,107 +1295,39 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     }
 
 
-    /**
-     * Tests if selected message is received and other message is not
-     */
+
+
     @Test
-    public void testConsumerWithSelectorMismatch(
-            JCSMPProperties jcsmpProperties,
+    public void testConsumerFlowPropertiesCustomization(
+            JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
             SoftAssertions softly,
             TestInfo testInfo) throws Exception {
         SolaceTestBinder binder = getBinder();
         var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
-
-        DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
         var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
 
         String destination0 = RandomStringUtils.randomAlphanumeric(10);
+        String group0 = RandomStringUtils.randomAlphanumeric(10);
 
-        Binding<MessageChannel> producerBinding = binder.bindProducer(
-                destination0, moduleOutputChannel, createProducerProperties(testInfo));
         ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setSelector("uProperty= 'willBeReceived'");
+        consumerProperties.getExtension().setMaxUnacknowledgedMessages(100);
 
         var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
-                destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
-
-        Message<?> badMessage = MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
-                .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
-                .setHeader("uProperty", "willNotBeDispatched")
-                .build();
-
-        Message<?> goodMessage = MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
-                .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
-                .setHeader("uProperty", "willBeReceived")
-                .build();
-        List<Message<?>> messages = List.of(badMessage, goodMessage);
+                destination0, group0, moduleInputChannel, consumerProperties);
 
         binderBindUnbindLatency();
+        String vpnName = (String) jcsmpSession.getProperty(JCSMPProperties.VPN_NAME);
+        String queueName = binder.getConsumerQueueName(consumerBinding);
 
-        String endpointName = binder.getConsumerQueueName(consumerBinding);
-        // except only the good message
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, 1,
-                () -> messages.forEach(moduleOutputChannel::send),
-                // receiving only good message
-                msg -> softly.assertThat(msg).satisfies(isValidMessage(consumerProperties, goodMessage)));
+        List<MonitorMsgVpnQueueTxFlow> txFlows = getQueueTxFlows(sempV2Api, vpnName, queueName, 1);
+        softly.assertThat(txFlows)
+                .hasSize(1)
+                .first()
+                .satisfies(flow -> {
+                    assertThat(flow.getWindowSize()).isEqualTo(100);
+                });
 
-        retryAssert(() -> assertThat(getQueueTxFlows(sempV2Api, jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME), endpointName, 1).get(0).getSelector())
-                .as("Selector not found for endpoint subscription %s", endpointName)
-                // all variants of blank selectors will be defaulted to ""
-                .isEqualTo("uProperty= 'willBeReceived'"));
-
-        producerBinding.unbind();
-        consumerBinding.unbind();
-    }
-
-
-    /**
-     * Tests if selectors are added to queue or durable topic endpoint when connector subscribes for messages
-     */
-    @CartesianTest(name = "[{index}] selector=[{0}]")
-    @Execution(ExecutionMode.CONCURRENT)
-    public void testConsumerWithSelector(
-            @Values(strings = {"", " ", "uProperty= 'selectorTest'"}) String selector,
-            JCSMPProperties jcsmpProperties,
-            SempV2Api sempV2Api,
-            SoftAssertions softly,
-            TestInfo testInfo) throws Exception {
-        SolaceTestBinder binder = getBinder();
-        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
-
-        DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
-        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
-
-        String destination0 = RandomStringUtils.randomAlphanumeric(10);
-
-        Binding<MessageChannel> producerBinding = binder.bindProducer(
-                destination0, moduleOutputChannel, createProducerProperties(testInfo));
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
-        consumerProperties.getExtension().setSelector(selector);
-
-        var consumerBinding = consumerInfrastructureUtil.createBinding(binder,
-                destination0, RandomStringUtils.randomAlphanumeric(10), moduleInputChannel, consumerProperties);
-
-        List<Message<?>> messages = IntStream.range(0, 1)
-                .mapToObj(i -> MessageBuilder.withPayload(UUID.randomUUID().toString().getBytes())
-                        .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
-                        .setHeader("uProperty", "selectorTest")
-                        .build())
-                .collect(Collectors.toList());
-        binderBindUnbindLatency();
-
-        String endpointName = binder.getConsumerQueueName(consumerBinding);
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, 1,
-                () -> messages.forEach(moduleOutputChannel::send),
-                msg -> softly.assertThat(msg).satisfies(isValidMessage(consumerProperties, messages)));
-
-        retryAssert(() -> assertThat(getQueueTxFlows(sempV2Api, jcsmpProperties.getStringProperty(JCSMPProperties.VPN_NAME), endpointName, 1).get(0).getSelector()
-        ).as("Selector not found for endpoint subscription %s", endpointName)
-                // all variants of blank selectors will be defaulted to ""
-                .isEqualTo((selector == null || selector.isBlank()) ? "" : selector));
-
-        producerBinding.unbind();
         consumerBinding.unbind();
     }
 
