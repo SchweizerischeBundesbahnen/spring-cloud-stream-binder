@@ -116,4 +116,28 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * The list of headers to exclude when converting consumed Solace message to Spring message.
      */
     private List<String> headerExclusions = new ArrayList<>();
+
+    /**
+     * The maximum number of unacknowledged messages that can be outstanding on the flow.
+     * Use this to limit the number of messages in the locally buffered "messageQueue"
+     * and protect the heap from overflow.
+     * Default: null (Use JCSMP default, typically -1/unlimited)
+     */
+    private Integer maxUnacknowledgedMessages;
+
+    /**
+     * The Ack timer in milliseconds for the consumer flow.
+     * Used for grouping acknowledgements.
+     */
+    private Integer flowAckTimerInMsecs;
+
+    /**
+     * The Ack threshold for the consumer flow.
+     */
+    private Integer flowAckThreshold;
+
+    /**
+     * The windowed Ack max size for the consumer flow.
+     */
+    private Integer flowWindowedAckMaxSize;
 }

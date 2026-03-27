@@ -64,6 +64,18 @@ public class SolaceProvisioningUtil {
         ConsumerFlowProperties consumerFlowProperties = new ConsumerFlowProperties();
         final String selector = properties.getExtension().getSelector();
         consumerFlowProperties.setSelector((selector == null || selector.isBlank()) ? null : selector);
+        if (properties.getExtension().getMaxUnacknowledgedMessages() != null) {
+            consumerFlowProperties.setTransportWindowSize(properties.getExtension().getMaxUnacknowledgedMessages());
+        }
+        if (properties.getExtension().getFlowAckTimerInMsecs() != null) {
+            consumerFlowProperties.setAckTimerInMsecs(properties.getExtension().getFlowAckTimerInMsecs());
+        }
+        if (properties.getExtension().getFlowAckThreshold() != null) {
+            consumerFlowProperties.setAckThreshold(properties.getExtension().getFlowAckThreshold());
+        }
+        if (properties.getExtension().getFlowWindowedAckMaxSize() != null) {
+            consumerFlowProperties.setWindowedAckMaxSize(properties.getExtension().getFlowWindowedAckMaxSize());
+        }
         return consumerFlowProperties;
     }
 

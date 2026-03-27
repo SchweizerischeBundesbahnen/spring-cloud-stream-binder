@@ -14,6 +14,7 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - Work with Solace session management (`JCSMPSessionEventHandler`, `JCSMPSessionProducerManager`)
 - Implement message mapping (`XMLMessageMapper`)
 - Handle acknowledgment logic (`inbound/acknowledge/`)
+- Maintain watchdog logic and thread concurrency components
 
 **Key Files:**
 - `src/main/java/com/solace/spring/cloud/stream/binder/SolaceMessageChannelBinder.java`
@@ -21,15 +22,11 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - `src/main/java/com/solace/spring/cloud/stream/binder/outbound/*.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/util/XMLMessageMapper.java`
 
-**Testing Requirements:**
-- Run unit tests: `mvn test`
-- Run integration tests: `mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml`
-- Requires Docker for PubSub+ broker or external broker configuration
-
 **Constraints:**
 - Must maintain backwards compatibility with existing bindings
 - Must support both persistent (queue) and non-persistent (topic) messaging
 - Must handle client acknowledgment modes correctly
+- **CRITICAL:** The Solace JCSMP dispatcher thread MUST remain non-blocking. Synchronous operations must be offloaded to worker threads.
 
 ---
 
@@ -48,22 +45,17 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - `src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceProducerProperties.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceCommonProperties.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/config/*.java`
-- `API.md` (property documentation sections)
-
-**Testing Requirements:**
-- Run `SolaceBinderConfigIT` and `SolaceConsumerPropertiesTest`
-- Verify property binding with Spring Boot context
 
 **Constraints:**
 - All properties must be documented in `API.md`
-- Property names must follow Spring conventions
-- Breaking changes require deprecation period
+- Property names must follow Spring Boot conventions
+- Breaking changes require a deprecation period and must be documented in `MIGRATION.md`
 
 ---
 
 ## Agent: Metrics & Monitoring Developer
 
-**Description:** Implements and maintains Micrometer metrics, health indicators, and observability features.
+**Description:** Implements and maintains Micrometer metrics, health indicators, watchdog deadlock detection, and observability features.
 
 **Capabilities:**
 - Add/modify Micrometer meters (counters, gauges, distribution summaries)
@@ -77,15 +69,10 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - `src/main/java/com/solace/spring/cloud/stream/binder/health/**/*.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/tracing/*.java`
 
-**Testing Requirements:**
-- Run `SolaceBinderMeterIT` and `SolaceBinderHealthIT`
-- Verify metrics registration and recording
-- Test health indicator state transitions
-
 **Constraints:**
 - Micrometer is optional - code must work without it
+- Time-based distribution summaries must clearly document their base units (e.g. milliseconds)
 - Metrics must be documented in `API.md` (Solace Binder Metrics section)
-- Health indicators must follow Spring Boot Actuator conventions
 
 ---
 
@@ -103,48 +90,33 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/SolaceEndpointProvisioner.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/SolaceProvisioningUtil.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/QueueNameDestinationEncoding.java`
-- `src/main/java/com/solace/spring/cloud/stream/binder/util/ErrorQueueInfrastructure.java`
-
-**Testing Requirements:**
-- Run `SolaceBinderProvisioningLifecycleIT` and `SolaceBinderSubscriptionsIT`
-- Verify queue name generation with `SolaceProvisioningUtilQueueNameTest`
 
 **Constraints:**
 - Must handle pre-provisioned queues (`provisionDurableQueue=false`)
-- Queue naming must follow documented syntax
-- Must support both consumer groups and anonymous consumers
+- Queue naming must follow documented syntax, supporting maximum queue name length limits reliably
 
 ---
 
 ## Agent: Documentation Writer
 
-**Description:** Maintains API documentation, README, changelog, and creates user guides.
+**Description:** Maintains API documentation, README, changelog, migration guides, and creates user guides.
 
 **Capabilities:**
-- Update `API.md` with property documentation
+- Update `API.md` with property documentation, descriptions, and defaults
 - Maintain `README.md` version compatibility table
-- Document new features and migration guides
+- Document new features and migration guides (`MIGRATION.md`)
 - Create example configurations and dashboards
 
 **Key Files:**
 - `API.md` (main API documentation)
 - `README.md` (overview and version table)
 - `CHANGELOG.md` (release notes)
-- `COMPARE_WITH_SOLACE.md` (fork differences)
-- `doc/` (additional documentation)
-
-**Documentation Sections in API.md:**
-- Lines 1-100: Overview and getting started
-- Lines 250-400: Consumer/Producer properties
-- Lines 1180-1220: Publisher confirmations
-- Lines 1220-1240: Health indicators
-- Lines 1241-1270: Metrics documentation
-- Lines 1290-1314: Watchdog explanation
+- `MIGRATION.md` (breaking changes guide)
 
 **Constraints:**
-- Use Markdown format for `API.md`
-- Keep version table in `README.md` up to date
-- All properties must have descriptions and defaults documented
+- Use Markdown format natively and concisely for guides
+- Keep version table in `README.md` up-to-date
+- Ensure backward compatibility breaks strictly require `MIGRATION.md` updates
 
 ---
 
@@ -156,39 +128,29 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - Write JUnit 5 unit tests
 - Write integration tests with PubSubPlusExtension
 - Create test utilities and mocks
-- Work with Spring test context
+- Validate concurrency by asserting strict test leak cleanup (e.g. stopping receiver threads)
 
 **Key Files:**
 - `src/test/java/com/solace/spring/cloud/stream/binder/*IT.java` (integration tests)
 - `src/test/java/com/solace/spring/cloud/stream/binder/**/*Test.java` (unit tests)
-- `src/test/java/com/solace/spring/cloud/stream/binder/test/**/*.java` (test utilities)
-
-**Test Categories:**
-| Test File | Description |
-|-----------|-------------|
-| `SolaceBinderBasicIT` | Core messaging functionality |
-| `SolaceBinderClientAckIT` | Acknowledgment handling |
-| `SolaceBinderHealthIT` | Health indicator tests |
-| `SolaceBinderMeterIT` | Metrics tests |
-| `SolaceBinderTracingIT` | Distributed tracing tests |
-| `SolaceBinderProvisioningLifecycleIT` | Queue provisioning |
-| `FlowXMLMessageListenerTest` | Message listener unit tests |
-| `XMLMessageMapperTest` | Message mapping unit tests |
 
 **Testing Commands:**
 ```shell
-# Unit tests only
-mvn test
+# Unit tests only (skip ITs but enforce test compilation using the correct profile to fetch API dependencies)
+# Output is redirected to prevent huge logs from crashing the IDE
+mvn test-compile -P it_tests
+mvn test -DskipITs -P it_tests > maven_tests.log 2>&1
 
 # Integration tests (requires Docker)
-mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml
+# Output MUST be redirected to prevent huge test logs from crashing the IDE
+mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml > maven_it_tests.log 2>&1
 
 # With external broker
-SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests
+SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests > maven_it_tests.log 2>&1
 ```
 
 **Constraints:**
-- Integration tests require PubSub+ broker (Docker or external)
+- Integration tests require a PubSub+ broker (Docker or external)
 - Use `@ExtendWith(PubSubPlusExtension.class)` for broker access
 - Follow naming convention: `*Test.java` for unit, `*IT.java` for integration
 
@@ -196,7 +158,7 @@ SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests
 
 ## Agent: Error Handling Developer
 
-**Description:** Implements error handling, retry logic, and dead letter queue functionality.
+**Description:** Implements error handling, retry logic, and dead letter queue (DLQ) functionality.
 
 **Capabilities:**
 - Implement error message handlers
@@ -207,39 +169,11 @@ SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests
 **Key Files:**
 - `src/main/java/com/solace/spring/cloud/stream/binder/util/SolaceErrorMessageHandler.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/util/ErrorQueueInfrastructure.java`
-- `src/main/java/com/solace/spring/cloud/stream/binder/util/ErrorChannelSendingCorrelationKey.java`
-- `src/main/java/com/solace/spring/cloud/stream/binder/util/ErrorQueueRepublishCorrelationKey.java`
-
-**Testing Requirements:**
-- Run `SolaceBinderCustomErrorMessageHandlerIT`
-- Test error queue republishing scenarios
 
 **Constraints:**
 - Must support `autoBindErrorQueue` configuration
-- Must handle republish failures gracefully
-- Error messages must include original message context
-
----
-
-## Agent: Large Message Developer
-
-**Description:** Implements large message support and message chunking functionality.
-
-**Capabilities:**
-- Handle messages exceeding broker limits
-- Implement message chunking/reassembly
-- Optimize payload handling
-
-**Key Files:**
-- `src/main/java/com/solace/spring/cloud/stream/binder/util/LargeMessageSupport.java`
-
-**Testing Requirements:**
-- Run `SolaceBinderLargeMessagingIT`
-- Test with messages of various sizes
-
-**Constraints:**
-- Must maintain message ordering
-- Must handle chunk reassembly failures
+- Must handle republish failures gracefully without risking a message drop
+- Error messages must include original message context and correlation metrics
 
 ---
 
@@ -247,12 +181,7 @@ SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests
 
 **Build Command:**
 ```shell
-mvn package
-```
-
-**Test Command:**
-```shell
-mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml
+mvn clean package
 ```
 
 **Required Environment:**
@@ -275,8 +204,8 @@ TEST_SOLACE_MGMT_PASSWORD=admin
 
 ## Code Style & Conventions
 
-- Use Lombok annotations (`@Getter`, `@Setter`, `@Slf4j`, `@RequiredArgsConstructor`)
-- Follow Spring Boot conventions for configuration properties
-- Use Spring Integration patterns for message channels
-- Prefer Optional over null checks
-- Use `@Deprecated` annotation with JavaDoc explanation for deprecations
+- **Dispatcher Thread Safety:** NEVER block the Solace dispatcher thread. Hand off messages to local worker threads immediately.
+- Use Lombok annotations (`@Getter`, `@Setter`, `@Slf4j`, `@RequiredArgsConstructor`) to minimize boilerplate.
+- Follow Spring Boot conventions for configuration properties and integration semantics.
+- Prefer `Optional` wrappers over raw `null` checks where appropriate.
+- Deprecations: Use `@Deprecated` annotation combined with thorough JavaDoc highlighting the newly-recommended replacement.

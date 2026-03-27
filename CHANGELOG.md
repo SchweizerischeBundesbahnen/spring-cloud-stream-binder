@@ -8,6 +8,9 @@ All notable changes to this project will be documented in this file.
 - **Watchdog**: Removed queue-size-based warnings (`urgentWarningMultiplier`, `timeBetweenWarningsS` properties removed)
 - **Migration Required**: Users must switch to metrics-based backpressure monitoring
 
+### Added
+- **Configuration**: Natively mapped JCSMP `ConsumerFlowProperties` (`maxUnacknowledgedMessages`, `flowAckTimerInMsecs`, `flowAckThreshold`, `flowWindowedAckMaxSize`) to binding-level `SolaceConsumerProperties`.
+
 ### Changed
 - **Watchdog**: Changed default `watchdogTimeoutMs` from 2000ms (2 seconds) to 300000ms (5 minutes)
 - **Metrics**: Decoupled metric updates from deadlock detection timeout; metrics now update every 1 second

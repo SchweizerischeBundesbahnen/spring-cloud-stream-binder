@@ -194,12 +194,12 @@ class FlowXMLMessageListenerTest {
         mip1.setStartMillis(1000L);
         mip1.setThreadName("thread-1");
         mip1.setWarned(true);
-        mip1.setErrored(true);
+
 
         mip2.setStartMillis(2000L);
         mip2.setThreadName("thread-2");
         mip2.setWarned(false);
-        mip2.setErrored(false);
+
 
         // Still equal because only receivedMillis and bytesXMLMessage are used
         assertThat(mip1).isEqualTo(mip2);
@@ -239,7 +239,7 @@ class FlowXMLMessageListenerTest {
         mip.setStartMillis(1000L);
         mip.setThreadName("thread-1");
         mip.setWarned(true);
-        mip.setErrored(true);
+
 
         // Should still be in the set and removable
         assertThat(set).contains(mip);

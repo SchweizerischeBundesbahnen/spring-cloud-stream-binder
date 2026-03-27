@@ -195,32 +195,37 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 `queueAccessType`
 :   Access type for the consumer group queue.
     Default: `0` (ACCESSTYPE_NONEXCLUSIVE)
-    See: [The `ACCESSTYPE_` prefixed constants for other possible values](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/constant-values.html#com.solacesystems.jcsmp.EndpointProperties.ACCESSTYPE_EXCLUSIVE)
+    See: [EndpointProperties.setAccessType(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setAccessType(int))
 
 `queuePermission`
 :   Permissions for the consumer group queue.
     Default: `2` (PERMISSION_CONSUME)
-    See: [The `PERMISSION_` prefixed constants for other possible values](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/constant-values.html#com.solacesystems.jcsmp.EndpointProperties.ACCESSTYPE_EXCLUSIVE)
+    See: [EndpointProperties.setPermission(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setPermission(int))
 
 `queueDiscardBehaviour`
 :   If specified, whether to notify sender if a message fails to be enqueued to the consumer group queue.
     Default: `null`
+    See: [EndpointProperties.setDiscardBehavior(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setDiscardBehavior(int))
 
 `queueMaxMsgRedelivery`
 :   Sets the maximum message redelivery count on consumer group queue. (Zero means retry forever).
     Default: `null`
+    See: [EndpointProperties.setMaxMsgRedelivery(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setMaxMsgRedelivery(int))
 
 `queueMaxMsgSize`
 :   Maximum message size for the consumer group queue.
     Default: `null`
+    See: [EndpointProperties.setMaxMsgSize(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setMaxMsgSize(int))
 
 `queueQuota`
 :   Message spool quota for the consumer group queue.
     Default: `null`
+    See: [EndpointProperties.setQuota(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setQuota(int))
 
 `queueRespectsMsgTtl`
 :   Whether the consumer group queue respects Message TTL.
     Default: `null`
+    See: [EndpointProperties.setRespectsMsgTTL(boolean)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setRespectsMsgTTL(boolean))
 
 `queueAdditionalSubscriptions`
 :   An array of additional topic subscriptions to be applied on the consumer group queue. These subscriptions may also contain wildcards.
@@ -229,7 +234,23 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 
 `maxUnacknowledgedMessages`
 :   The maximum number of unacknowledged messages that can be outstanding on the flow. Use this to limit the number of messages in the locally buffered "messageQueue" and protect the heap from overflow.
-    Default: `null` (Use JCSMP default, typically -1/unlimited)
+    Default: `null` (If unconfigured, the flow falls back to inheriting the global JCSMPSession property `SUB_ACK_WINDOW_SIZE` or `spring.solace.java.properties.sub_ack_window_size`).
+    See: [ConsumerFlowProperties.setTransportWindowSize(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/ConsumerFlowProperties.html#setTransportWindowSize(int))
+
+`flowAckTimerInMsecs`
+:   The Ack timer in milliseconds for the consumer flow. Used for grouping acknowledgements.
+    Default: `null` (If unconfigured, inherits from global JCSMPSession property `spring.solace.java.properties.sub_ack_time`).
+    See: [ConsumerFlowProperties.setAckTimerInMsecs(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/ConsumerFlowProperties.html#setAckTimerInMsecs(int))
+
+`flowAckThreshold`
+:   The Ack threshold for the consumer flow.
+    Default: `null` (If unconfigured, falls back to the JCSMP default threshold).
+    See: [ConsumerFlowProperties.setAckThreshold(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/ConsumerFlowProperties.html#setAckThreshold(int))
+
+`flowWindowedAckMaxSize`
+:   The windowed Ack max size for the consumer flow.
+    Default: `null` (If unconfigured, falls back to the JCSMP default).
+    See: [ConsumerFlowProperties.setWindowedAckMaxSize(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/ConsumerFlowProperties.html#setWindowedAckMaxSize(int))
 
 `autoBindErrorQueue`
 :   Whether to automatically create a durable error queue to which messages will be republished when message processing failures are encountered. Only applies once all internal retries have been exhausted.
@@ -255,32 +276,37 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 `errorQueueAccessType`
 :   Access type for the error queue.
     Default: `0` (ACCESSTYPE_NONEXCLUSIVE)
-    See: [The `ACCESSTYPE_` prefixed constants for other possible values](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/constant-values.html#com.solacesystems.jcsmp.EndpointProperties.ACCESSTYPE_EXCLUSIVE)
+    See: [EndpointProperties.setAccessType(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setAccessType(int))
 
 `errorQueuePermission`
 :   Permissions for the error queue.
     Default: `2` (PERMISSION_CONSUME)
-    See: [The `PERMISSION_` prefixed constants for other possible values](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/constant-values.html#com.solacesystems.jcsmp.EndpointProperties.ACCESSTYPE_EXCLUSIVE)
+    See: [EndpointProperties.setPermission(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setPermission(int))
 
 `errorQueueDiscardBehaviour`
 :   If specified, whether to notify sender if a message fails to be enqueued to the error queue.
     Default: `null`
+    See: [EndpointProperties.setDiscardBehavior(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setDiscardBehavior(int))
 
 `errorQueueMaxMsgRedelivery`
 :   Sets the maximum message redelivery count on the error queue. (Zero means retry forever).
     Default: `null`
+    See: [EndpointProperties.setMaxMsgRedelivery(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setMaxMsgRedelivery(int))
 
 `errorQueueMaxMsgSize`
 :   Maximum message size for the error queue.
     Default: `null`
+    See: [EndpointProperties.setMaxMsgSize(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setMaxMsgSize(int))
 
 `errorQueueQuota`
 :   Message spool quota for the error queue.
     Default: `null`
+    See: [EndpointProperties.setQuota(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setQuota(int))
 
 `errorQueueRespectsMsgTtl`
 :   Whether the error queue respects Message TTL.
     Default: `null`
+    See: [EndpointProperties.setRespectsMsgTTL(boolean)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/EndpointProperties.html#setRespectsMsgTTL(boolean))
 
 `errorMsgDmqEligible`
 :   The eligibility for republished messages to be moved to a Dead Message Queue.

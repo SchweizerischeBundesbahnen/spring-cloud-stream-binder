@@ -43,6 +43,26 @@ spring:
                 watchdogTimeoutMs: 60000  # 1 minute instead of 5 minutes
 ```
 
+#### JCSMP ConsumerFlowProperties Mapping
+Previously, tuning Solace JCSMP consumer flow performance (such as the transport acknowledgement window size) required passing global session properties via `spring.solace.java.properties.sub_ack_window_size` which affected all bindings equally.
+This generic fallback behavior **still works entirely unchanged**, but you can now explicitly configure these flow properties natively per-binding. 
+
+**Action Required:** (Optional) Transition global flow tuning properties to native binding extensions if you want fine-grained control over individual consumer flows:
+```yaml
+spring:
+  cloud:
+    stream:
+      solace:
+        bindings:
+          <binding-name>:
+            consumer:
+              extension:
+                maxUnacknowledgedMessages: 50 # replaces global SUB_ACK_WINDOW_SIZE
+                flowAckTimerInMsecs: 1000
+                flowAckThreshold: 60
+                flowWindowedAckMaxSize: 255
+```
+
 ### Migrating to Metrics-Based Monitoring
 
 #### Step 1: Expose Metrics Endpoint
