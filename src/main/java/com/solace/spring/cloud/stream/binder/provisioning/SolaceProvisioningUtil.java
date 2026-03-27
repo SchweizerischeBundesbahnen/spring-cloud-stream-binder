@@ -62,8 +62,7 @@ public class SolaceProvisioningUtil {
 
     public static ConsumerFlowProperties getConsumerFlowProperties(String destinationName, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         ConsumerFlowProperties consumerFlowProperties = new ConsumerFlowProperties();
-        final String selector = properties.getExtension().getSelector();
-        consumerFlowProperties.setSelector((selector == null || selector.isBlank()) ? null : selector);
+
         if (properties.getExtension().getMaxUnacknowledgedMessages() != null) {
             consumerFlowProperties.setTransportWindowSize(properties.getExtension().getMaxUnacknowledgedMessages());
         }

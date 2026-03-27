@@ -20,6 +20,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 @Slf4j
 public class FlowXMLMessageListener implements XMLMessageListener {
@@ -33,14 +34,14 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     private final BlockingQueue<MessageInProgress> messageQueue = new LinkedBlockingDeque<>();
     private final Set<MessageInProgress> activeMessages = ConcurrentHashMap.newKeySet();
     private final AtomicReference<SolaceMeterAccessor> solaceMeterAccessor = new AtomicReference<>();
-    private final AtomicReference<String> bindingName = new AtomicReference<>();
+    private final AtomicReference<Supplier<String>> bindingNameSupplier = new AtomicReference<>();
     private final Set<Thread> receiverThreads = new HashSet<>();
     private volatile boolean running = true;
 
 
-    public void setSolaceMeterAccessor(SolaceMeterAccessor solaceMeterAccessor, String bindingName) {
+    public void setSolaceMeterAccessor(SolaceMeterAccessor solaceMeterAccessor, Supplier<String> bindingNameSupplier) {
         this.solaceMeterAccessor.set(solaceMeterAccessor);
-        this.bindingName.set(bindingName);
+        this.bindingNameSupplier.set(bindingNameSupplier);
     }
 
     public void startReceiverThreads(int threadCount, String threadNamePrefix, Consumer<BytesXMLMessage> messageConsumer, long watchdogTimeoutMs) {
@@ -115,7 +116,8 @@ public class FlowXMLMessageListener implements XMLMessageListener {
         while (running) {
             try {
                 SolaceMeterAccessor meter = solaceMeterAccessor.get();
-                String binding = bindingName.get();
+                Supplier<String> bindingSupplier = bindingNameSupplier.get();
+                String binding = bindingSupplier != null ? bindingSupplier.get() : null;
                 if (meter != null && binding != null) {
                     meter.recordQueueSize(binding, messageQueue.size());
                     meter.recordActiveMessages(binding, activeMessages.size());
@@ -167,7 +169,8 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                     polled.setThreadName(threadName);
 
                     SolaceMeterAccessor meter = solaceMeterAccessor.get();
-                    String binding = bindingName.get();
+                    Supplier<String> bindingSupplier = bindingNameSupplier.get();
+                    String binding = bindingSupplier != null ? bindingSupplier.get() : null;
                     if (meter != null && binding != null) {
                         meter.recordMessageQueueWaitTime(binding, now - polled.getReceivedMillis());
                     }

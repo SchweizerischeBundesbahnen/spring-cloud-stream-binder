@@ -18,8 +18,9 @@ The following configuration properties have been removed:
 *   `spring.cloud.stream.solace.bindings.<binding>.consumer.extension.urgent-warning-multiplier`
 *   `spring.cloud.stream.solace.bindings.<binding>.consumer.extension.time-between-warnings-s`
 *   `spring.cloud.stream.solace.bindings.<binding>.consumer.extension.max-processing-time-ms`
+*   `spring.cloud.stream.solace.bindings.<binding>.consumer.extension.selector` (JMS selector syntax is unsupported in native JCSMP consumer flows)
 
-**Action Required:** Remove these properties from your configuration files.
+**Action Required:** Remove these properties from your configuration files. If you relied on `selector`, you must re-architect your conditional message filtering.
 
 #### Watchdog Behavior Changed
 

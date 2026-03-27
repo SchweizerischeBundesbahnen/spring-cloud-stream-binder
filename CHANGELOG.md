@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 ### Removed
 - **Configuration**: Removed `urgentWarningMultiplier` property (no longer used)
 - **Configuration**: Removed `timeBetweenWarningsS` property (no longer used)
+- **Configuration**: Removed `selector` property (JMS selector syntax is no longer natively supported via JCSMP consumer flows)
 
 ### Migration Guide
 Users upgrading from 8.0.x must:

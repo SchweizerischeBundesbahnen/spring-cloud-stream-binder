@@ -243,7 +243,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         checkPropertiesAndBroker();
         setupFlowEventHandler();
         ConsumerFlowProperties consumerFlowProperties = getConsumerFlowProperties(endpointName);
-        this.solaceMeterAccessor.ifPresent(ma -> this.flowXMLMessageListener.setSolaceMeterAccessor(ma, consumerProperties.getBindingName()));
+        this.solaceMeterAccessor.ifPresent(ma -> this.flowXMLMessageListener.setSolaceMeterAccessor(ma, consumerProperties::getBindingName));
         this.flowXMLMessageListener.startReceiverThreads(
                 consumerProperties.getConcurrency(),
                 consumerDestination.getBindingDestinationName(),

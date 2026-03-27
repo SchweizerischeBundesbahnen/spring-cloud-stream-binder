@@ -31,11 +31,7 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      */
     private String queueNameExpression = "'scst/' + (isAnonymous ? 'an/' : 'wk/') + (group?.trim() + '/') + 'plain/' + destination.trim().replaceAll('[*>]', '_')";
 
-    /**
-     * A SQL-92 selector expression to use for selection of messages for consumption. Max of 2000 characters.
-     */
-    @Deprecated
-    private String selector = null;
+
 
     // Error Queue Properties ---------
     /**

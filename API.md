@@ -178,12 +178,6 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 :   Whether to add the Destination as a subscription to queue during provisioning.
     Default: `true`
 
-`selector`
-:   **Deprecated.** If specified, enables client applications to choose which messages they are interested in receiving, as determined by the messages' header field and property values.
-    A selector has a conditional expression syntax that is a subset of SQL92. Selector can be used with Queue or a Topic Endpoint Subscription.
-    Default: `null`
-    See: [https://docs.solace.com/API/Solace-JMS-API/Selectors.htm](https://docs.solace.com/API/Solace-JMS-API/Selectors.htm)
-
 `queueNameExpression`
 :   A SpEL expression for creating the consumer group’s queue name.
     Default: `"'scst/' + (isAnonymous ? 'an/' : 'wk/') + (group?.trim() + '/') + 'plain/' + destination.trim().replaceAll('[*>]', '_')"`
@@ -729,22 +723,23 @@ Spring Cloud Stream has a reserved message header called `scst_targetDestination
 For this binder's implementation of this header, the target destination defines the *exact* Solace topic or queue to which a message will be sent. i.e. No post-processing is done.
 
 This binder also adds a reserved message header called `solace_scst_targetDestinationType` (retrievable via `SolaceBinderHeaders.TARGET_DESTINATION_TYPE`), which allows to override the configured producer `destination-type`.
+Possible values are `topic` or `queue`. If not specified, the system defaults to sending to a `topic`.
 
 ```java
 public class MyMessageBuilder {
     public Message<String> buildMeAMessage() {
         return MessageBuilder.withPayload("payload")
             .setHeader(BinderHeaders.TARGET_DESTINATION, "some-dynamic-destination") // (1)
-            .setHeader(SolaceBinderHeaders.TARGET_DESTINATION_TYPE, "topic")         // (2)
+            // .setHeader(SolaceBinderHeaders.TARGET_DESTINATION_TYPE, "queue")      // (2)
             .build();
     }
 }
 ```
 
 1.  This message will be sent to the `some-dynamic-destination` topic, ignoring the producer's configured destination.
-2.  Optionally, the configured producer `destination-type` can be overridden.
+2.  Optionally, the configured producer `destination-type` can be overridden (e.g., to "queue"). By default, dynamic destinations are assumed to be topics.
 
-> **NOTE:** Those 2 headers are cleared from the message before it is sent off to the message broker. So you should attach that information to your message payload if you want to get that information on the consumer-side.
+> **NOTE:** Those headers are cleared from the message before it is sent off to the message broker. So you should attach that information to your message payload if you want to get that information on the consumer-side.
 
 > [!NOTE]
 > **Dynamic Producer Destinations with StreamBridge**
