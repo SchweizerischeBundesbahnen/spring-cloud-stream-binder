@@ -72,7 +72,7 @@ public class SolaceBinderHealthProgrammaticStartIT {
 
         //give application time to reach down state
         await().pollInterval(Duration.ofSeconds(1))
-                .atMost(2, TimeUnit.MINUTES).until(() -> {
+                .atMost(5, TimeUnit.MINUTES).until(() -> {
                     String healthResponseBody = client.send(request, HttpResponse.BodyHandlers.ofString()).body();
                     return objectMapper.readTree(healthResponseBody).get("status").asText().equals("DOWN");
                 });

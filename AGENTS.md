@@ -145,6 +145,9 @@ mvn test -DskipITs -P it_tests > maven_tests.log 2>&1
 # Output MUST be redirected to prevent huge test logs from crashing the IDE
 mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml > maven_it_tests.log 2>&1
 
+# Run specific Integration test
+mvn verify -P it_tests -Dit.test=MultiBinderOAuth2IT
+
 # With external broker
 SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests > maven_it_tests.log 2>&1
 ```
