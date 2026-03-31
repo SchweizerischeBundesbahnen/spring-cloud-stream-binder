@@ -189,7 +189,7 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 > Modifying this can cause naming conflicts between the queue names of consumer groups.
 
 > [!WARNING]
-> While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+> While the default SpEL expression consistently returns a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly configuring this SpEL expression string as your custom default is not supported. The default value for this config option is subject to change without notice.
 
 > [!CAUTION]
 > The Solace broker has a maximum queue name length limit (typically ~200 characters). When using the default SpEL expression with long destination names, the generated queue name may exceed this limit and cause provisioning failures. Consider using shorter destination names or a custom `queueNameExpression` if you encounter this issue.
@@ -275,7 +275,7 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 > Modifying this can cause naming conflicts between the error queue names.
 
 > [!WARNING]
-> While the default SpEL expression will consistently return a value adhering to [Generated Error Queue Name Syntax](#generated-error-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+> While the default SpEL expression consistently returns a value adhering to [Generated Error Queue Name Syntax](#generated-error-queue-name-syntax), directly configuring this SpEL expression string as your custom default is not supported. The default value for this config option is subject to change without notice.
 
 `errorQueueMaxDeliveryAttempts`
 :   Maximum number of attempts to send a failed message to the error queue. When all delivery attempts have been exhausted, the failed message will be requeued.
@@ -333,8 +333,8 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     *   `AT_MOST_ONCE`
         *   QoS=0
         *   Using topics: Messages may be lost or discarded.
-        *   This mode improves performance and reduces latency
-        *   When using `AT_MOST_ONCE` make sure the publisher uses deliveryMode=`DIRECT` to avoid having the messages persisted on publish.
+        *   This mode improves performance and reduces latency.
+        *   When using `AT_MOST_ONCE` make sure the publisher uses `deliveryMode=DIRECT` to avoid having the messages persisted on publish.
     *   `AT_LEAST_ONCE`
         *   QoS=1
         *   Using a persistent queue: It is guaranteed that the message arrives at least once.
@@ -389,7 +389,7 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 > Modifying this can cause naming conflicts between the queue names of consumer groups.
 
 > [!WARNING]
-> While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+> While the default SpEL expression consistently returns a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly configuring this SpEL expression string as your custom default is not supported. The default value for this config option is subject to change without notice.
 
 `queueNameExpressionsForRequiredGroups`
 :   A mapping of required consumer groups to queue name SpEL expressions.
@@ -401,7 +401,7 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 > Modifying this can cause naming conflicts between the queue names of consumer groups.
 
 > [!WARNING]
-> While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+> While the default SpEL expression consistently returns a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly configuring this SpEL expression string as your custom default is not supported. The default value for this config option is subject to change without notice.
 
 `queueAccessType`
 :   Access type for binder provisioned queues.
@@ -442,10 +442,10 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 > Does not apply when `destinationType=queue`.
 
 `deliveryMode`
-:   See [https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm](https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm) for documentation. The deliveryMode on the producer will be used to send messages on the configured binder. Possible values:
+:   See [https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm](https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm) for documentation. The `deliveryMode` on the producer will be used to send messages on the configured binder. Possible values:
     *   `PERSISTENT`
     *   `DIRECT`
-        *   If using qualityOfService=`AT_MOST_ONCE` to reduce latency it is suggested to set the deliveryMode to `DIRECT` to avoid having the messages persisted on publish.
+        *   If using `qualityOfService: AT_MOST_ONCE` to reduce latency it is suggested to set the `deliveryMode` to `DIRECT` to avoid having the messages persisted on publish.
     Default: `PERSISTENT`
 
 #### Solace Connection Health-Check Properties
@@ -518,15 +518,18 @@ These can be used for:
 
 | Header Name | Type | Access | Default Value | Description |
 | --- | --- | --- | --- | --- |
-| `solace_scst_confirmCorrelation` | CorrelationData | Write | | A CorrelationData instance for messaging confirmations. Only work with qualityOfService: AT_LEAST_ONCE (Default) |
+| `solace_scst_chunkCount` | Integer | Internal Binder Use Only | | The length of the array of chunks. |
+| `solace_scst_chunkId` | Long | Internal Binder Use Only | | The unique identifier of the chunk sequence. |
+| `solace_scst_chunkIndex` | Integer | Internal Binder Use Only | | The zero-based index of the current message in the array of chunks. |
+| `solace_scst_confirmCorrelation` | CorrelationData | Write | | A CorrelationData instance for messaging confirmations. Only works with `qualityOfService: AT_LEAST_ONCE` (Default). |
+| `solace_scst_largeMessageSupport` | Boolean | Write | | Set to `true` to enable sending of large messages (only on producer side). Default is `false`. If using groups only partitioned queues are supported; otherwise, the message chunks may get delivered to the wrong consumer. |
 | `solace_scst_messageVersion` | Integer | Read | 1 | A static number set by the publisher to indicate the Spring Cloud Stream Solace message version. |
 | `solace_scst_nullPayload` | Boolean | Read | | Present and true to indicate when the PubSub+ message payload was null. |
 | `solace_scst_partitionKey` | String | Write | | The partition key for PubSub+ partitioned queues. |
-| `solace_scst_serializedPayload` | Boolean | Internal Binder Use Only | | Is `true` if a Solace Spring Cloud Stream binder has serialized the payload before publishing it to a broker. Is undefined otherwise. |
 | `solace_scst_serializedHeaders` | String | Internal Binder Use Only | | A JSON String array of header names where each entry indicates that that header’s value was serialized by a Solace Spring Cloud Stream binder before publishing it to a broker. |
 | `solace_scst_serializedHeadersEncoding` | String | Internal Binder Use Only | "base64" | The encoding algorithm used to encode the headers indicated by `solace_scst_serializedHeaders`. |
+| `solace_scst_serializedPayload` | Boolean | Internal Binder Use Only | | Is `true` if a Solace Spring Cloud Stream binder has serialized the payload before publishing it to a broker. Is undefined otherwise. |
 | `solace_scst_targetDestinationType` | String | Write | | Only applicable when `scst_targetDestination` is set.<br>`topic`: the dynamic destination is a topic.<br>`queue`: the dynamic destination is a queue.<br>When absent, the binding's configured destination-type is used. |
-| `solace_scst_largeMessageSupport` | Boolean | Write | | Set to 'true' to enable sending of large messages (only on producer side). Default is 'false'. If using groups only partitioned queues are supported. Otherwise the message chunks get delivered to the wrong consumer. |
 
 ## Native Payload Types
 
@@ -673,7 +676,7 @@ The Solace binder uses a specific threading model to handle inbound messages eff
 
 > [!NOTE]
 > The Solace PubSub+ broker supports partitioning natively.
-> Only work with qualityOfService: AT_LEAST_ONCE (Default)
+> This only works with `qualityOfService: AT_LEAST_ONCE` (Default).
 > The partitioning abstraction as described in the [Spring Cloud Stream documentation](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#partitioning) is not supported.
 
 To publish messages that are intended for partitioned queues, you must provide a partition key by setting the `solace_scst_partitionKey` message header (accessible through the `SolaceBinderHeaders.PARTITION_KEY` constant).
