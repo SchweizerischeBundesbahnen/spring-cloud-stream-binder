@@ -24,8 +24,8 @@ In Solace, the above setup is called topic-to-queue mapping. So a typical messag
 2.  Each consumer groups' queue receives the messages published to their destination topic
 3.  The PubSub+ broker distributes messages in a round-robin fashion to each consumer binding for a particular consumer group
 
-    > [!NOTE]
-    > Round-robin distribution only occurs if the consumer group's queue is configured for non-exclusive access. If the queue has exclusive access, then only one consumer will receive messages.
+> [!NOTE]
+> Round-robin distribution only occurs if the consumer group's queue is configured for non-exclusive access. If the queue has exclusive access, then only one consumer will receive messages.
 
 > [!IMPORTANT]
 > Since consumer bindings always consumes from queues it is required that Assured Delivery is enabled on the Solace PubSub+ Message VPN being used (Assured Delivery is automatically enabled if using Solace Cloud). Additionally, the client username's client profile must be allowed to send and receive guaranteed messages.
@@ -55,7 +55,7 @@ Here is how to include the spring cloud stream starter in your project using Gra
 
 ```groovy
 // Solace Spring Cloud Stream Binder
-compile("ch.sbb:spring-cloud-stream-binder-solace:9.0.0")
+implementation("ch.sbb:spring-cloud-stream-binder-solace:9.0.0")
 ```
 
 #### Using it with Maven
@@ -185,14 +185,14 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: `"'scst/' + (isAnonymous ? 'an/' : 'wk/') + (group?.trim() + '/') + 'plain/' + destination.trim().replaceAll('[*>]', '_')"`
     See: [Generated Queue Name Syntax](#generated-queue-name-syntax)
 
-    > [!WARNING]
-    > Modifying this can cause naming conflicts between the queue names of consumer groups.
+> [!WARNING]
+> Modifying this can cause naming conflicts between the queue names of consumer groups.
 
-    > [!WARNING]
-    > While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+> [!WARNING]
+> While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
 
-    > [!CAUTION]
-    > The Solace broker has a maximum queue name length limit (typically ~200 characters). When using the default SpEL expression with long destination names, the generated queue name may exceed this limit and cause provisioning failures. Consider using shorter destination names or a custom `queueNameExpression` if you encounter this issue.
+> [!CAUTION]
+> The Solace broker has a maximum queue name length limit (typically ~200 characters). When using the default SpEL expression with long destination names, the generated queue name may exceed this limit and cause provisioning failures. Consider using shorter destination names or a custom `queueNameExpression` if you encounter this issue.
 
 `queueAccessType`
 :   Access type for the consumer group queue.
@@ -258,8 +258,8 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 :   Whether to automatically create a durable error queue to which messages will be republished when message processing failures are encountered. Only applies once all internal retries have been exhausted.
     Default: `false`
 
-    > [!TIP]
-    > Your ACL Profile must allow for publishing to this queue if you decide to use `autoBindErrorQueue`.
+> [!TIP]
+> Your ACL Profile must allow for publishing to this queue if you decide to use `autoBindErrorQueue`.
 
 `provisionErrorQueue`
 :   Whether to provision durable queues for error queues when `autoBindErrorQueue` is `true`. This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
@@ -271,11 +271,11 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: `"'scst/error/' + (isAnonymous ? 'an/' : 'wk/') + (group?.trim() + '/') + 'plain/' + destination.trim().replaceAll('[*>]', '_')"`
     See: [Generated Error Queue Name Syntax](#generated-error-queue-name-syntax)
 
-    > [!WARNING]
-    > Modifying this can cause naming conflicts between the error queue names.
+> [!WARNING]
+> Modifying this can cause naming conflicts between the error queue names.
 
-    > [!WARNING]
-    > While the default SpEL expression will consistently return a value adhering to [Generated Error Queue Name Syntax](#generated-error-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+> [!WARNING]
+> While the default SpEL expression will consistently return a value adhering to [Generated Error Queue Name Syntax](#generated-error-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
 
 `errorQueueMaxDeliveryAttempts`
 :   Maximum number of attempts to send a failed message to the error queue. When all delivery attempts have been exhausted, the failed message will be requeued.
@@ -365,8 +365,8 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 :   When set to `true`, irreversibly convert non-serializable headers to strings. An exception is thrown otherwise.
     Default: `false`
 
-    > [!IMPORTANT]
-    > Non-serializable headers should have a meaningful `toString()` implementation. Otherwise enabling this feature may result in potential data loss.
+> [!IMPORTANT]
+> Non-serializable headers should have a meaningful `toString()` implementation. Otherwise enabling this feature may result in potential data loss.
 
 `provisionDurableQueue`
 :   Whether to provision durable queues for non-anonymous consumer groups or queue destinations. This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
@@ -377,8 +377,8 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 :   Whether to add the Destination as a subscription to queue during provisioning.
     Default: `true`
 
-    > [!NOTE]
-    > Does not apply when `destinationType=queue`.
+> [!NOTE]
+> Does not apply when `destinationType=queue`.
 
 `queueNameExpression`
 :   A SpEL expression for creating the consumer group’s queue name.
@@ -438,8 +438,8 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: Empty `Map<String,String[]>`
     See: [Overview](#overview) for more info on how this binder uses topic-to-queue mapping to implement Spring Cloud Streams consumer groups.
 
-    > [!NOTE]
-    > Does not apply when `destinationType=queue`.
+> [!NOTE]
+> Does not apply when `destinationType=queue`.
 
 `deliveryMode`
 :   See [https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm](https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm) for documentation. The deliveryMode on the producer will be used to send messages on the configured binder. Possible values:
@@ -525,8 +525,8 @@ These can be used for:
 | `solace_scst_serializedPayload` | Boolean | Internal Binder Use Only | | Is `true` if a Solace Spring Cloud Stream binder has serialized the payload before publishing it to a broker. Is undefined otherwise. |
 | `solace_scst_serializedHeaders` | String | Internal Binder Use Only | | A JSON String array of header names where each entry indicates that that header’s value was serialized by a Solace Spring Cloud Stream binder before publishing it to a broker. |
 | `solace_scst_serializedHeadersEncoding` | String | Internal Binder Use Only | "base64" | The encoding algorithm used to encode the headers indicated by `solace_scst_serializedHeaders`. |
-| `solace_scst_targetDestinationType` | String | Write | | Only applicable when `scst_targetDestination` is set. *topic* Specifies that the dynamic destination is a topic *queue* Specifies that the dynamic destination is a queue When absent, the binding’s configured destination-type is used. |
-| `solace_scst_largeMessageSupport` | Boolean | Write | | Set to 'true' to enable sending of large messages (only on producer side). Default is 'false'. If using groups only partitioned queues are supported. Otherwhise the message chunks get delivered to the wrong consumer. |
+| `solace_scst_targetDestinationType` | String | Write | | Only applicable when `scst_targetDestination` is set.<br>`topic`: the dynamic destination is a topic.<br>`queue`: the dynamic destination is a queue.<br>When absent, the binding's configured destination-type is used. |
+| `solace_scst_largeMessageSupport` | Boolean | Write | | Set to 'true' to enable sending of large messages (only on producer side). Default is 'false'. If using groups only partitioned queues are supported. Otherwise the message chunks get delivered to the wrong consumer. |
 
 ## Native Payload Types
 
@@ -557,7 +557,9 @@ Spring messages can't contain null payloads, however, message handlers can diffe
 
 By default, generated consumer group queue names have the following form:
 
-    <prefix>/<familiarity-modifier>/<group>/<destination-encoding>/<encoded-destination>
+```
+<prefix>/<familiarity-modifier>/<group>/<destination-encoding>/<encoded-destination>
+```
 
 `prefix`
 :   A static prefix `scst`.
@@ -588,15 +590,17 @@ The `queueNameExpression` property's default SpEL expression conforms to the abo
 
 By default, generated error queue names have the following form:
 
-    <prefix>/error/<familiarity-modifier>/<group>/<destination-encoding>/<encoded-destination>
+```
+<prefix>/error/<familiarity-modifier>/<group>/<destination-encoding>/<encoded-destination>
+```
 
 The definitions of each segment of the error queue matches that from [Generated Queue Name Syntax](#generated-queue-name-syntax), with the following exceptions:
 
 `group`
 :   The consumer `group` name.
 
-    > [!TIP]
-    > As a workaround since its impossible to configure a non-durable queue with programmatic start there is the "group: non-durable" magic word to declare the queue as non-durable.
+> [!TIP]
+> As a workaround since it's impossible to configure a non-durable queue with programmatic start there is the "group: non-durable" magic word to declare the queue as non-durable.
 
 The `errorQueueNameExpression` property's default SpEL expression conforms to the above format. Users can provide any valid SpEL expression in order to generate custom error queue names using the same evaluation context as described in [Generated Queue Name Syntax](#generated-queue-name-syntax).
 
@@ -608,14 +612,15 @@ Configure Spring Cloud Stream's [concurrency consumer property](https://docs.spr
 *   This enables higher throughput when you cannot or do not want to use non-exclusive queues.
 *   There will be no guarantee of ordering any more when concurrent processing is used.
 
-Notes and limitations: 1. Setting `provisionDurableQueue` to `false` disables endpoint configuration validation. In this scenario, it is the developer's responsibility to ensure queue settings meet your expectations.
+> [!NOTE]
+> Setting `provisionDurableQueue` to `false` disables endpoint configuration validation. In this scenario, it is the developer's responsibility to ensure queue settings meet your expectations.
 
-How to enable
+#### How to Enable
 
 *   Simply set the Spring Cloud Stream consumer property `concurrency` to a value > 1 on your binding.
 *   Works for both well-known (durable) groups and anonymous (temporary queue) consumers, regardless of queue access type.
 
-Example (application.yml)
+#### Example
 
 ```yaml
 spring:
@@ -629,13 +634,13 @@ spring:
             concurrency: 4
 ```
 
-Caveats specific to exclusive queues
+#### Caveats Specific to Exclusive Queues
 
 *   With exclusive access type, the broker still delivers to a single flow, but the binder now dispatches messages to multiple processing threads, allowing parallel handling within the same consumer instance.
 *   Ensure your message handling logic is thread-safe.
 *   There will be no guarantee of ordering any more.
 
-Caveats specific to anonymous groups
+#### Caveats Specific to Anonymous Groups
 
 *   Anonymous groups use temporary queues; multiple processing threads will share the same underlying flow.
 *   Make sure any stateful components are safe for concurrent use.
@@ -739,7 +744,7 @@ For each acknowledgement status, the binder will perform the following actions:
 | Status | Action |
 | --- | --- |
 | ACCEPT | **Positive Acknowledgment (ACK)**. The message is removed from the broker's queue. |
-| REJECT | **Negative Acknowledgment (NACK) - Failed**. *   If `autoBindErrorQueue` is `true`: The binder republishes the message to the error queue and then `ACCEPT`s the original message to remove it from the source queue. *   If `autoBindErrorQueue` is `false`: The binder sends a `REJECTED` settlement outcome to the broker. The broker will then discard the message or move it to the DMQ (if configured). Refer to [Failed Consumer Message Error Handling](#failed-consumer-message-error-handling) for more info. |
+| REJECT | **Negative Acknowledgment (NACK) - Failed**.<br>• If `autoBindErrorQueue` is `true`: The binder republishes the message to the error queue and then `ACCEPT`s the original message to remove it from the source queue.<br>• If `autoBindErrorQueue` is `false`: The binder sends a `REJECTED` settlement outcome to the broker. The broker will then discard the message or move it to the DMQ (if configured). Refer to [Failed Consumer Message Error Handling](#failed-consumer-message-error-handling) for more info. |
 | REQUEUE | **Negative Acknowledgment (NACK) - Redeliver**. The binder sends a `FAILED` settlement outcome to the broker. The broker will redeliver the message to the consumer flow. Redelivery continues until the message is `ACCEPT`ed or the queue's max redelivery count is exceeded (at which point it moves to DMQ). Refer to [Message Redelivery](#message-redelivery) for more info. |
 
 > [!IMPORTANT]
@@ -819,7 +824,9 @@ A simple error handling strategy in which failed messages are redelivered from t
 > 2.  The Solace Broker will redeliver all messages starting with the one tagged as 'REQUEUE', if the message's max redelivery count is not exceeded.
 > The redelivery may result in message duplication, and the application should be designed to handle this.
 
-### Error Queue Republishing First, it must be noted that an Error Queue is different from a [Dead Message Queue (DMQ)](https://docs.solace.com/Configuring-and-Managing/Setting-Dead-Msg-Queues.htm). In particular, a DMQ is used to capture re-routed failed messages as a consequence of Solace PubSub+ messaging features such as TTL expiration or exceeding a message's max redelivery count. Whereas the purpose of an Error Queue is to capture re-routed messages which have been successfully consumed from the message broker, yet cannot be processed by the application.
+### Error Queue Republishing
+
+First, it must be noted that an Error Queue is different from a [Dead Message Queue (DMQ)](https://docs.solace.com/Configuring-and-Managing/Setting-Dead-Msg-Queues.htm). In particular, a DMQ is used to capture re-routed failed messages as a consequence of Solace PubSub+ messaging features such as TTL expiration or exceeding a message's max redelivery count. Whereas the purpose of an Error Queue is to capture re-routed messages which have been successfully consumed from the message broker, yet cannot be processed by the application.
 
 An Error Queue can be provisioned for a particular consumer group by setting the `autoBindErrorQueue` consumer config option to `true`. This Error Queue is simply another durable queue which is named as per the [Generated Error Queue Name Syntax](#generated-error-queue-name-syntax) section. And like the queues used for consumer groups, its endpoint properties can be configured by means of any consumer properties whose names begin with "errorQueue".
 
@@ -986,8 +993,8 @@ This indicates a thread may be stuck and requires investigation.
 :   Time in milliseconds before a long-running message processing thread triggers a warning. Used to detect potential deadlocks or stuck threads.
     Default: `300000` (5 minutes)
 
-    > [!NOTE]
-    > Set this higher than your expected maximum message processing time.
+> [!NOTE]
+> Set this higher than your expected maximum message processing time.
 
 ### Backpressure Monitoring
 
