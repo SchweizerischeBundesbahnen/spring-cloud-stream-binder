@@ -89,17 +89,15 @@ public class MultiBinderIT {
 
     @Test
     public void checkSolaceMetricsAreExposed(@Autowired MockMvc mvc) throws Exception {
-        //Send a message to activate metrics
-        producer.send(JCSMPFactory.onlyInstance().createBytesXMLMessage(),
-                JCSMPFactory.onlyInstance().createQueue(QUEUE_NAME_PREFIX + QUEUE_NAME_1));
+        await().untilAsserted(() -> {
+            // Send each iteration — early messages may arrive before the consumer binding is active
+            producer.send(JCSMPFactory.onlyInstance().createBytesXMLMessage(),
+                    JCSMPFactory.onlyInstance().createQueue(QUEUE_NAME_PREFIX + QUEUE_NAME_1));
 
-        await().until(() -> {
-                    mvc.perform(get("/actuator/metrics"))
-                            .andExpectAll(
-                                    jsonPath("names", Matchers.hasItem("solace.message.size.payload")),
-                                    jsonPath("names", Matchers.hasItem("solace.message.size.total")));
-                    return true;
-                }
-        );
+            mvc.perform(get("/actuator/metrics"))
+                    .andExpectAll(
+                            jsonPath("names", Matchers.hasItem("solace.message.size.payload")),
+                            jsonPath("names", Matchers.hasItem("solace.message.size.total")));
+        });
     }
 }

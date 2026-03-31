@@ -467,9 +467,6 @@
                                     <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary.xml</summaryFile>
                                     <forkCount>2C</forkCount>
                                     <reuseForks>false</reuseForks> <!-- new JVM per test class, enables parallel across @Isolated tests -->
-                                    <properties>
-                                        <configurationParameters>junit.jupiter.tags=isolated</configurationParameters>
-                                    </properties>
                                     <argLine>
                                         --add-opens java.base/java.lang=ALL-UNNAMED
                                         --add-opens java.base/java.util=ALL-UNNAMED
