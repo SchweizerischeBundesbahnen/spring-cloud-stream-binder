@@ -26,6 +26,7 @@
         <java.version>17</java.version>
         <spring-cloud.version>2025.1.1</spring-cloud.version>
         <maven.test.skip>true</maven.test.skip>
+        <failsafe.forkCount>1C</failsafe.forkCount>
         <build.timestamp>${maven.build.timestamp}</build.timestamp>
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm:ss</maven.build.timestamp.format>
     </properties>
@@ -465,7 +466,7 @@
                                 <configuration>
                                     <reportsDirectory>${project.build.directory}/failsafe-reports-${surefire.forkNumber}</reportsDirectory>
                                     <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary.xml</summaryFile>
-                                    <forkCount>2C</forkCount>
+                                    <forkCount>${failsafe.forkCount}</forkCount>
                                     <reuseForks>false</reuseForks> <!-- new JVM per test class, enables parallel across @Isolated tests -->
                                     <argLine>
                                         --add-opens java.base/java.lang=ALL-UNNAMED
