@@ -2,6 +2,8 @@
 
 This document describes specialized AI agents that can work on this codebase. Each agent is designed for specific tasks and has defined capabilities and constraints.
 
+**Project versions:** Spring Boot 4.0.4, Spring Cloud 2025.1.1, Binder 9.0.0, Java 17+.
+
 ---
 
 ## Agent: Binder Core Developer
@@ -9,42 +11,62 @@ This document describes specialized AI agents that can work on this codebase. Ea
 **Description:** Implements and modifies core binder functionality including message flow, bindings, and Solace JCSMP integration.
 
 **Capabilities:**
-- Modify inbound message handling (`FlowXMLMessageListener`, `JCSMPInboundQueueMessageProducer`)
+- Modify **queue-based** inbound message handling (`FlowXMLMessageListener`, `JCSMPInboundQueueMessageProducer`, `SolaceFlowEventHandler`)
+- Modify **topic-based** inbound message handling (`JCSMPInboundTopicMessageProducer`, `JCSMPInboundTopicMessageMultiplexer`, `TopicFilterTree`)
 - Modify outbound message handling (`JCSMPOutboundMessageHandler`)
-- Work with Solace session management (`JCSMPSessionEventHandler`, `JCSMPSessionProducerManager`)
-- Implement message mapping (`XMLMessageMapper`)
-- Handle acknowledgment logic (`inbound/acknowledge/`)
-- Maintain watchdog logic and thread concurrency components
+- Work with Solace session management (`JCSMPSessionEventHandler`, `JCSMPSessionProducerManager`, `SharedResourceManager`)
+- Implement message mapping (`XMLMessageMapper`) and header metadata (`SolaceHeaders`, `SolaceBinderHeaders`, `HeaderMeta`, `SolaceHeaderMeta`, `SolaceBinderHeaderMeta`)
+- Handle acknowledgment logic (`JCSMPAcknowledgementCallback`, `NestedAcknowledgementCallback`, `SolaceAckUtil`)
+- Maintain watchdog deadlock detection and thread concurrency in `FlowXMLMessageListener`
+- Work with retry logic (`RetryTemplate` integration in `JCSMPInboundQueueMessageProducer`)
+- Implement large message chunking support (`LargeMessageSupport`)
 
 **Key Files:**
 - `src/main/java/com/solace/spring/cloud/stream/binder/SolaceMessageChannelBinder.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/inbound/queue/*.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/inbound/topic/*.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/inbound/acknowledge/*.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/outbound/*.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/messaging/*.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/util/XMLMessageMapper.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/SharedResourceManager.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/LargeMessageSupport.java`
 
 **Constraints:**
 - Must maintain backwards compatibility with existing bindings
 - Must support both persistent (queue) and non-persistent (topic) messaging
 - Must handle client acknowledgment modes correctly
 - **CRITICAL:** The Solace JCSMP dispatcher thread MUST remain non-blocking. Synchronous operations must be offloaded to worker threads.
+- Topic-based `JCSMPInboundTopicMessageMultiplexer.LivecycleHooks` interface must be respected when implementing lifecycle changes
+- `SharedResourceManager<T>` subclasses must correctly implement caching and explicit cleanup
 
 ---
 
 ## Agent: Configuration & Properties Developer
 
-**Description:** Manages configuration properties, Spring Boot auto-configuration, and binding properties.
+**Description:** Manages configuration properties, Spring Boot auto-configuration, binding properties, and optional OAuth2 integration.
 
 **Capabilities:**
 - Add/modify consumer and producer properties
-- Update auto-configuration classes
-- Work with SpEL expressions for queue naming
+- Update auto-configuration classes (session, meter, tracing, binding handler mappings)
+- Work with SpEL expressions for queue naming (`ExpressionContextRoot`)
 - Manage default values and validation
+- Configure optional OAuth2 token provider integration (`SolaceSessionOAuth2TokenProvider` in `JCSMPSessionConfiguration`)
+- Work with `@ConditionalOn...` annotations for optional dependencies (Micrometer, tracing, OAuth2)
 
 **Key Files:**
 - `src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceConsumerProperties.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceProducerProperties.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceCommonProperties.java`
-- `src/main/java/com/solace/spring/cloud/stream/binder/config/*.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceBindingProperties.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/properties/SolaceExtendedBindingProperties.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/config/SolaceMessageChannelBinderConfiguration.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/config/SolaceServiceAutoConfiguration.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/config/SolaceHealthIndicatorsConfiguration.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/config/autoconfigure/JCSMPSessionConfiguration.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/config/autoconfigure/SolaceMeterConfiguration.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/config/autoconfigure/SolaceTracerConfiguration.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/config/autoconfigure/ExtendedBindingHandlerMappingsProviderConfiguration.java`
 
 **Constraints:**
 - All properties must be documented in `API.md`
@@ -59,15 +81,21 @@ This document describes specialized AI agents that can work on this codebase. Ea
 
 **Capabilities:**
 - Add/modify Micrometer meters (counters, gauges, distribution summaries)
-- Implement health indicators for actuator
-- Work with tracing integration
+- Implement health indicators for actuator (`SessionHealthIndicator`, `SolaceBinderHealthContributor`, `BindingsHealthContributor`)
+- Manage health accessor patterns (`SolaceBinderHealthAccessor`, `SolaceSessionEventHandler`)
+- Work with distributed tracing integration (`TracingImpl`, `TracingProxy`)
 - Create monitoring documentation and dashboards
 
 **Key Files:**
 - `src/main/java/com/solace/spring/cloud/stream/binder/meter/SolaceMessageMeterBinder.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/meter/SolaceMeterAccessor.java`
-- `src/main/java/com/solace/spring/cloud/stream/binder/health/**/*.java`
-- `src/main/java/com/solace/spring/cloud/stream/binder/tracing/*.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/health/SolaceBinderHealthAccessor.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/health/base/SolaceHealthIndicator.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/health/handlers/SolaceSessionEventHandler.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/health/contributors/*.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/health/indicators/SessionHealthIndicator.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/tracing/TracingImpl.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/tracing/TracingProxy.java`
 
 **Constraints:**
 - Micrometer is optional - code must work without it
@@ -85,11 +113,16 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - Handle subscription management
 - Work with endpoint properties
 - Manage error queue infrastructure
+- Implement consumer and producer destination construction (`SolaceConsumerDestination`, `SolaceProducerDestination`)
+- Configure SpEL expression context for dynamic queue naming (`ExpressionContextRoot`)
 
 **Key Files:**
 - `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/SolaceEndpointProvisioner.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/SolaceProvisioningUtil.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/QueueNameDestinationEncoding.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/SolaceConsumerDestination.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/SolaceProducerDestination.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/provisioning/ExpressionContextRoot.java`
 
 **Constraints:**
 - Must handle pre-provisioned queues (`provisionDurableQueue=false`)
@@ -106,12 +139,17 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - Maintain `README.md` version compatibility table
 - Document new features and migration guides (`MIGRATION.md`)
 - Create example configurations and dashboards
+- Maintain developer guides (`DEVELOPER.md`, `COMPARE_WITH_SOLACE.md`)
+- Document special header handling (`doc/SPECIAL_HEADER.md`)
 
 **Key Files:**
 - `API.md` (main API documentation)
 - `README.md` (overview and version table)
 - `CHANGELOG.md` (release notes)
 - `MIGRATION.md` (breaking changes guide)
+- `DEVELOPER.md` (developer setup and contribution guide)
+- `COMPARE_WITH_SOLACE.md` (comparison document)
+- `doc/SPECIAL_HEADER.md` (special header documentation)
 
 **Constraints:**
 - Use Markdown format natively and concisely for guides
@@ -152,6 +190,13 @@ mvn verify -P it_tests -Dit.test=MultiBinderOAuth2IT
 SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests > maven_it_tests.log 2>&1
 ```
 
+**Test Execution Architecture (2 failsafe executions + surefire):**
+- **Unit tests (surefire):** Shared JVM, JUnit 5 parallel with 8-thread fixed pool (`junit-platform.properties`)
+- **`integration-test`:** All non-springBoot ITs run with `forkCount=2C, reuseForks=false` — each test class gets its own JVM and its own Docker broker via TestContainers. This means `@Isolated` tests and regular tests all run in parallel across separate forks.
+- **`integration-test-springboot`:** Spring Boot ITs (`springBootTests/`) run with `forkCount=2C, reuseForks=false` and tagged `junit.jupiter.tags=isolated`.
+
+**Why `@Isolated` + `forkCount`:** `@Isolated` tells JUnit 5 to run a test class alone (not concurrently with other classes in the same JVM). By giving each class its own JVM fork via `forkCount=2C, reuseForks=false`, all test classes — including `@Isolated` ones — run in parallel across forks while remaining isolated within each fork. Each fork starts its own Docker broker via TestContainers.
+
 **Constraints:**
 - Integration tests require a PubSub+ broker (Docker or external)
 - Use `@ExtendWith(PubSubPlusExtension.class)` for broker access
@@ -172,6 +217,13 @@ SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests > maven_it_tests.l
 **Key Files:**
 - `src/main/java/com/solace/spring/cloud/stream/binder/util/SolaceErrorMessageHandler.java`
 - `src/main/java/com/solace/spring/cloud/stream/binder/util/ErrorQueueInfrastructure.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/CorrelationData.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/ErrorChannelSendingCorrelationKey.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/ErrorQueueRepublishCorrelationKey.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/SolaceMessageHeaderErrorMessageStrategy.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/SolaceAcknowledgmentException.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/SolaceMessageConversionException.java`
+- `src/main/java/com/solace/spring/cloud/stream/binder/util/ClosedChannelBindingException.java`
 
 **Constraints:**
 - Must support `autoBindErrorQueue` configuration

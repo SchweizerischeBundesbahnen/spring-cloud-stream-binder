@@ -7,10 +7,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -85,12 +85,10 @@ class FlowXMLMessageListenerTest {
         FlowXMLMessageListener listener = new FlowXMLMessageListener();
         try {
             Consumer<BytesXMLMessage> messageConsumer = Mockito.mock(Consumer.class);
-            List<BytesXMLMessage> results = new ArrayList<>();
+            List<BytesXMLMessage> results = new CopyOnWriteArrayList<>();
             doAnswer(invocation -> {
                 Thread.sleep(1000);
-                synchronized (results) {
-                    results.add(invocation.getArgument(0));
-                }
+                results.add(invocation.getArgument(0));
                 return null;
             })
                     .when(messageConsumer)
@@ -181,27 +179,27 @@ class FlowXMLMessageListenerTest {
         when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
-        long receivedMillis = System.currentTimeMillis();
+        long receivedNanos = System.nanoTime();
 
-        FlowXMLMessageListener.MessageInProgress mip1 = new FlowXMLMessageListener.MessageInProgress(receivedMillis, mockMessage);
-        FlowXMLMessageListener.MessageInProgress mip2 = new FlowXMLMessageListener.MessageInProgress(receivedMillis, mockMessage);
+        FlowXMLMessageListener.MessageInProgress mip1 = new FlowXMLMessageListener.MessageInProgress(receivedNanos, mockMessage);
+        FlowXMLMessageListener.MessageInProgress mip2 = new FlowXMLMessageListener.MessageInProgress(receivedNanos, mockMessage);
 
         // Initially equal
         assertThat(mip1).isEqualTo(mip2);
         assertThat(mip1.hashCode()).isEqualTo(mip2.hashCode());
 
         // Modify mutable fields - should still be equal
-        mip1.setStartMillis(1000L);
+        mip1.setStartNanos(1000L);
         mip1.setThreadName("thread-1");
         mip1.setWarned(true);
 
 
-        mip2.setStartMillis(2000L);
+        mip2.setStartNanos(2000L);
         mip2.setThreadName("thread-2");
         mip2.setWarned(false);
 
 
-        // Still equal because only receivedMillis and bytesXMLMessage are used
+        // Still equal because only receivedNanos and bytesXMLMessage are used
         assertThat(mip1).isEqualTo(mip2);
         assertThat(mip1.hashCode()).isEqualTo(mip2.hashCode());
     }
@@ -212,7 +210,7 @@ class FlowXMLMessageListenerTest {
         when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
-        FlowXMLMessageListener.MessageInProgress mip = new FlowXMLMessageListener.MessageInProgress(System.currentTimeMillis(), mockMessage);
+        FlowXMLMessageListener.MessageInProgress mip = new FlowXMLMessageListener.MessageInProgress(System.nanoTime(), mockMessage);
 
         int hash1 = mip.hashCode();
         int hash2 = mip.hashCode();
@@ -228,7 +226,7 @@ class FlowXMLMessageListenerTest {
         when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
-        FlowXMLMessageListener.MessageInProgress mip = new FlowXMLMessageListener.MessageInProgress(System.currentTimeMillis(), mockMessage);
+        FlowXMLMessageListener.MessageInProgress mip = new FlowXMLMessageListener.MessageInProgress(System.nanoTime(), mockMessage);
 
         Set<FlowXMLMessageListener.MessageInProgress> set = new HashSet<>();
         set.add(mip);
@@ -236,7 +234,7 @@ class FlowXMLMessageListenerTest {
         assertThat(set).contains(mip);
 
         // Modify mutable fields
-        mip.setStartMillis(1000L);
+        mip.setStartNanos(1000L);
         mip.setThreadName("thread-1");
         mip.setWarned(true);
 
@@ -258,16 +256,16 @@ class FlowXMLMessageListenerTest {
         when(mockMessage2.getMessageId()).thenReturn("TestMessageId2");
         when(mockMessage2.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
-        long receivedMillis = System.currentTimeMillis();
+        long receivedNanos = System.nanoTime();
 
-        FlowXMLMessageListener.MessageInProgress mip1 = new FlowXMLMessageListener.MessageInProgress(receivedMillis, mockMessage1);
-        FlowXMLMessageListener.MessageInProgress mip2 = new FlowXMLMessageListener.MessageInProgress(receivedMillis, mockMessage2);
+        FlowXMLMessageListener.MessageInProgress mip1 = new FlowXMLMessageListener.MessageInProgress(receivedNanos, mockMessage1);
+        FlowXMLMessageListener.MessageInProgress mip2 = new FlowXMLMessageListener.MessageInProgress(receivedNanos, mockMessage2);
 
         assertThat(mip1).isNotEqualTo(mip2);
     }
 
     @Test
-    void testMessageInProgress_DifferentReceivedMillisAreNotEqual() {
+    void testMessageInProgress_DifferentReceivedNanosAreNotEqual() {
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
         when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
@@ -285,14 +283,14 @@ class FlowXMLMessageListenerTest {
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
         FlowXMLMessageListener.MessageInProgress mip = new FlowXMLMessageListener.MessageInProgress(12345L, mockMessage);
-        mip.setStartMillis(67890L);
+        mip.setStartNanos(67890L);
         mip.setThreadName("test-thread");
         mip.setWarned(true);
 
         String toString = mip.toString();
 
-        assertThat(toString).contains("12345"); // receivedMillis
-        assertThat(toString).contains("67890"); // startMillis
+        assertThat(toString).contains("12345"); // receivedNanos
+        assertThat(toString).contains("67890"); // startNanos
         assertThat(toString).contains("test-thread"); // threadName
         assertThat(toString).contains("warned"); // warned field
     }

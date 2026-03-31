@@ -124,18 +124,18 @@ public class FlowXMLMessageListener implements XMLMessageListener {
 
                     // measure backpressure by looking at the oldest message in the queue
                     MessageInProgress oldestMessage = messageQueue.peek();
-                    long backpressure = oldestMessage != null ? System.currentTimeMillis() - oldestMessage.getReceivedMillis() : 0;
+                    long backpressure = oldestMessage != null ? (System.nanoTime() - oldestMessage.getReceivedNanos()) / 1_000_000L : 0;
                     meter.recordQueueBackpressure(binding, backpressure);
                 }
 
-                long currentTimeMillis = System.currentTimeMillis();
+                long currentTimeNanos = System.nanoTime();
                 for (MessageInProgress messageInProgress : activeMessages) {
-                    // startMillis is set before adding to activeMessages (happens-before via ConcurrentHashMap),
+                    // startNanos is set before adding to activeMessages (happens-before via ConcurrentHashMap),
                     // but guard defensively against seeing a zero value
-                    if (messageInProgress.getStartMillis() == 0) {
+                    if (messageInProgress.getStartNanos() == 0) {
                         continue;
                     }
-                    long timeInProcessing = currentTimeMillis - messageInProgress.getStartMillis();
+                    long timeInProcessing = (currentTimeNanos - messageInProgress.getStartNanos()) / 1_000_000L;
 
                     // Deadlock detection: warn once if processing exceeds timeout
                     if (timeInProcessing > watchdogTimeoutMs && !messageInProgress.isWarned()) {
@@ -164,15 +164,15 @@ public class FlowXMLMessageListener implements XMLMessageListener {
             try {
                 MessageInProgress polled = messageQueue.poll(1, TimeUnit.SECONDS);
                 if (polled != null) {
-                    long now = System.currentTimeMillis();
-                    polled.setStartMillis(now);
+                    long now = System.nanoTime();
+                    polled.setStartNanos(now);
                     polled.setThreadName(threadName);
 
                     SolaceMeterAccessor meter = solaceMeterAccessor.get();
                     Supplier<String> bindingSupplier = bindingNameSupplier.get();
                     String binding = bindingSupplier != null ? bindingSupplier.get() : null;
                     if (meter != null && binding != null) {
-                        meter.recordMessageQueueWaitTime(binding, now - polled.getReceivedMillis());
+                        meter.recordMessageQueueWaitTime(binding, (now - polled.getReceivedNanos()) / 1_000_000L);
                     }
 
                     log.trace("loop add mip={}", polled);
@@ -183,7 +183,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                         log.trace("loop remove mip={}", polled);
                         activeMessages.remove(polled);
                         if (meter != null && binding != null) {
-                            meter.recordMessageProcessingTimeDuration(binding, System.currentTimeMillis() - polled.getStartMillis());
+                            meter.recordMessageProcessingTimeDuration(binding, (System.nanoTime() - polled.getStartNanos()) / 1_000_000L);
                         }
                     }
                 }
@@ -196,23 +196,14 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     @Override
     public void onReceive(BytesXMLMessage bytesXMLMessage) {
         log.debug("Received BytesXMLMessage:{}", bytesXMLMessage);
-        try {
-            int i = 0;
-            // The messageQueue is a local queue on the heap.
-            // It distributes messages to worker threads and prevents blocking the single Solace dispatcher thread.
-            // This queue should be protected by maxUnacknowledgedMessages (or max-guaranteed-message-size) to prevent heap overflow.
-            // The onReceive method runs on the Solace dispatcher thread and must not block; otherwise, the entire connection is stalled.
-            while (i++ < 100) {
-                // since the messageQueue is unbounded this should never happen and is here for paranoia and because the blocking put had strange behaviours
-                if (messageQueue.offer(new MessageInProgress(System.currentTimeMillis(), bytesXMLMessage), 1, TimeUnit.SECONDS)) {
-                    return;
-                }
-            }
-            // All offer attempts failed — this should never happen with an unbounded queue
-            log.error("Failed to enqueue message after 100 attempts, message will be rejected: {}", bytesXMLMessage);
-            settleMessageAsFailed(bytesXMLMessage);
-        } catch (InterruptedException e) {
-            log.warn("Interrupted while enqueuing message, message will be rejected: {}", bytesXMLMessage);
+        // The messageQueue is a local queue on the heap.
+        // It distributes messages to worker threads and prevents blocking the single Solace dispatcher thread.
+        // This queue should be protected by maxUnacknowledgedMessages (or max-guaranteed-message-size) to prevent heap overflow.
+        // The onReceive method runs on the Solace dispatcher thread and must not block; otherwise, the entire connection is stalled.
+        // Use non-blocking offer since the queue is unbounded and blocking the dispatcher must be avoided.
+        if (!messageQueue.offer(new MessageInProgress(System.nanoTime(), bytesXMLMessage))) {
+            // This should never happen with an unbounded queue
+            log.error("Failed to enqueue message, message will be rejected: {}", bytesXMLMessage);
             settleMessageAsFailed(bytesXMLMessage);
         }
     }
@@ -235,13 +226,13 @@ public class FlowXMLMessageListener implements XMLMessageListener {
     @ToString(exclude = "cachedHashCode")
     @RequiredArgsConstructor
     static class MessageInProgress {
-        private final long receivedMillis;
+        private final long receivedNanos;
         private final BytesXMLMessage bytesXMLMessage;
-        private long startMillis;
+        private long startNanos;
         private String threadName;
 
         // Should not be part of hashcode. Because a changing hash or equal will prevent removing from `activeMessages` set.
-        private boolean warned = false;
+        private volatile boolean warned = false;
 
         // Lazy-initialized cached hashCode (immutable fields only).
         // Intentionally NOT synchronized: worst case is computing hashCode twice,
@@ -257,14 +248,14 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                 return false;
             }
 
-            return receivedMillis == that.receivedMillis &&
+            return receivedNanos == that.receivedNanos &&
                     Objects.equals(bytesXMLMessage, that.bytesXMLMessage);
         }
 
         @Override
         public int hashCode() {
             if (cachedHashCode == null) {
-                cachedHashCode = Objects.hash(receivedMillis, bytesXMLMessage);
+                cachedHashCode = Objects.hash(receivedNanos, bytesXMLMessage);
             }
             return cachedHashCode;
         }
