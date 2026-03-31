@@ -441,11 +441,10 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 > [!NOTE]
 > Does not apply when `destinationType=queue`.
 
+
 `deliveryMode`
-:   See [https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm](https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm) for documentation. The `deliveryMode` on the producer will be used to send messages on the configured binder. Possible values:
-    *   `PERSISTENT`
-    *   `DIRECT`
-        *   If using `qualityOfService: AT_MOST_ONCE` to reduce latency it is suggested to set the `deliveryMode` to `DIRECT` to avoid having the messages persisted on publish.
+:   See [https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm](https://docs.solace.com/API/API-Developer-Guide/Message-Delivery-Modes.htm) for documentation. The `deliveryMode` on the producer will be used to send messages on the configured binder. Possible values: `PERSISTENT`, `DIRECT`.
+    If using `qualityOfService: AT_MOST_ONCE` to reduce latency it is suggested to set the `deliveryMode` to `DIRECT` to avoid having the messages persisted on publish.
     Default: `PERSISTENT`
 
 #### Solace Connection Health-Check Properties

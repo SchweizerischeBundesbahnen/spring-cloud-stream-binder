@@ -13,6 +13,7 @@ A Spring Cloud Stream Binder for Solace
     - [Fork vs Original](#fork-vs-original)
     - [Using it with Maven](#using-it-with-maven)
     - [Documentation](#documentation)
+    - [Local Development](#local-development)
     - [Contributing](#contributing)
     - [Authors](#authors)
     - [License](#license)
@@ -93,6 +94,14 @@ Check out the difference between this fork and the original solace spring cloud 
 *   **[API Documentation](API.md)**: Detailed description of properties, configuration options, and API usage.
 *   **[Migration Guide](MIGRATION.md)**: Steps for upgrading between major versions.
 *   **[Changelog](CHANGELOG.md)**: List of all notable changes for each release.
+
+## Local Development
+
+To speed up local build time when running integration tests, you can adjust the `failsafe.forkCount` parameter to run tests concurrently across multiple JVM forks. For example, to run 4 forks per CPU core:
+```shell
+mvn -B verify -P it_tests -Dfailsafe.forkCount=4C
+```
+See [DEVELOPER.md](DEVELOPER.md) for more details on building and testing locally.
 
 ## Contributing
 

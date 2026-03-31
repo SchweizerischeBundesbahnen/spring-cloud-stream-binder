@@ -497,8 +497,11 @@ public class SolaceBinderRestartIT extends SpringCloudStreamContext {
         AtomicInteger receivedCount = new AtomicInteger(0);
 
         // Use the BiConsumer variant so we only count down the latch for messages
-        // matching the current phase. Leftover messages from previous stop/start
-        // cycles may arrive first and must be tolerated.
+        // matching the current phase. Because consumerBinding.stop() in this test
+        // might be called immediately after the latch counts down, it can interrupt 
+        // the asynchronous message acknowledgment process. This causes the broker to 
+        // redeliver those unacknowledged messages from the previous phase when the 
+        // binding is restarted. We must tolerate and skip these redelivered messages.
         consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, numMessages, () -> messages.forEach(moduleOutputChannel::send), (msg, callback) -> {
             String payload = new String((byte[]) msg.getPayload());
             log.info("[DEBUG_LOG] Received message during {}: {}", phase, payload);
