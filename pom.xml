@@ -464,7 +464,7 @@
                                 </goals>
                                 <configuration>
                                     <reportsDirectory>${project.build.directory}/failsafe-reports-${surefire.forkNumber}</reportsDirectory>
-                                    <summaryFile>${project.build.directory}/failsafe-reports-${surefire.forkNumber}/failsafe-summary.xml</summaryFile>
+                                    <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary.xml</summaryFile>
                                     <forkCount>2C</forkCount>
                                     <reuseForks>false</reuseForks> <!-- new JVM per test class, enables parallel across @Isolated tests -->
                                     <properties>
