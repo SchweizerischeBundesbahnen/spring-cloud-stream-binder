@@ -468,6 +468,10 @@
                                     <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary.xml</summaryFile>
                                     <forkCount>${failsafe.forkCount}</forkCount>
                                     <reuseForks>false</reuseForks> <!-- new JVM per test class, enables parallel across @Isolated tests -->
+                                    <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                                    <systemPropertyVariables>
+                                        <surefire.forkNumber>${surefire.forkNumber}</surefire.forkNumber>
+                                    </systemPropertyVariables>
                                     <argLine>
                                         --add-opens java.base/java.lang=ALL-UNNAMED
                                         --add-opens java.base/java.util=ALL-UNNAMED
