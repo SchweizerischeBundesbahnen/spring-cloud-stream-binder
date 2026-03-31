@@ -385,11 +385,11 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: `"'scst/' + (isAnonymous ? 'an/' : 'wk/') + (group?.trim() + '/') + 'plain/' + destination.trim().replaceAll('[*>]', '_')"`
     See: [Generated Queue Name Syntax](#generated-queue-name-syntax)
 
-    > [!WARNING]
-    > Modifying this can cause naming conflicts between the queue names of consumer groups.
+> [!WARNING]
+> Modifying this can cause naming conflicts between the queue names of consumer groups.
 
-    > [!WARNING]
-    > While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+> [!WARNING]
+> While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
 
 `queueNameExpressionsForRequiredGroups`
 :   A mapping of required consumer groups to queue name SpEL expressions.
@@ -397,11 +397,11 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: `Empty Map<String, String>`
     See: [Generated Queue Name Syntax](#generated-queue-name-syntax)
 
-    > [!WARNING]
-    > Modifying this can cause naming conflicts between the queue names of consumer groups.
+> [!WARNING]
+> Modifying this can cause naming conflicts between the queue names of consumer groups.
 
-    > [!WARNING]
-    > While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
+> [!WARNING]
+> While the default SpEL expression will consistently return a value adhering to [Generated Queue Name Syntax](#generated-queue-name-syntax), directly using the SpEL expression string is not supported. The default value for this config option is subject to change without notice.
 
 `queueAccessType`
 :   Access type for binder provisioned queues.
