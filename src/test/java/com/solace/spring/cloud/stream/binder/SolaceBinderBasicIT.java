@@ -1324,9 +1324,9 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
         softly.assertThat(txFlows)
                 .hasSize(1)
                 .first()
-                .satisfies(flow -> {
-                    assertThat(flow.getWindowSize()).isEqualTo(100);
-                });
+                .satisfies(flow ->
+                    softly.assertThat(flow.getWindowSize()).isEqualTo(100)
+                );
 
         consumerBinding.unbind();
     }
