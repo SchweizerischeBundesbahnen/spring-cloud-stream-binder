@@ -28,7 +28,7 @@ public class SolaceMessageMeterBinder implements MeterBinder {
     public static final String METER_DESCRIPTION_QUEUE_WAIT_TIME = "Time a message spent in the queue before processing started.";
     public static final String TAG_NAME = "name";
 
-    public final Map<String, DistributionSummary> meterCache = new ConcurrentHashMap<>();
+    final Map<String, DistributionSummary> meterCache = new ConcurrentHashMap<>();
 
     @Override
     public void bindTo(MeterRegistry registry) {

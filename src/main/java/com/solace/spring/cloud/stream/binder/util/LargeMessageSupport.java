@@ -12,6 +12,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ public class LargeMessageSupport {
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<Long, MessageContextBytes[]> context = new HashMap<>();
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private volatile ScheduledExecutorService housekeepingExecutor;
 
     public void startHousekeeping() {
         synchronized (running) {
@@ -30,7 +32,25 @@ public class LargeMessageSupport {
                 return;
             }
             running.set(true);
-            Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(this::housekeeping, 60, 30, TimeUnit.SECONDS);
+            housekeepingExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "large-msg-housekeeping");
+                t.setDaemon(true);
+                return t;
+            });
+            housekeepingExecutor.scheduleAtFixedRate(this::housekeeping, 60, 30, TimeUnit.SECONDS);
+        }
+    }
+
+    public void stopHousekeeping() {
+        synchronized (running) {
+            if (!running.get()) {
+                return;
+            }
+            running.set(false);
+            if (housekeepingExecutor != null) {
+                housekeepingExecutor.shutdownNow();
+                housekeepingExecutor = null;
+            }
         }
     }
 
