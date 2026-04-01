@@ -18,7 +18,8 @@ import java.util.function.Consumer;
 @EnableScheduling
 public class ConsumerGroupsApp {
     private static final Logger log = LoggerFactory.getLogger(ConsumerGroupsApp.class);
-    public static final BlockingQueue<String> RECEIVED = new LinkedBlockingQueue<>();
+    public static final BlockingQueue<String> DURABLE = new LinkedBlockingQueue<>();
+    public static final BlockingQueue<String> ANON = new LinkedBlockingQueue<>();
     private final AtomicInteger count = new AtomicInteger(1);
     private final StreamBridge streamBridge;
 
@@ -39,12 +40,15 @@ public class ConsumerGroupsApp {
     public Consumer<String> queuedConsumer() {
         return msg -> {
             log.info("Durable consumer received: {}", msg);
-            RECEIVED.offer(msg);
+            DURABLE.offer(msg);
         };
     }
 
     @Bean
     public Consumer<String> anonConsumer() {
-        return msg -> log.info("Anonymous consumer received: {}", msg);
+        return msg -> {
+            log.info("Anonymous consumer received: {}", msg);
+            ANON.offer(msg);
+        };
     }
 }

@@ -82,7 +82,7 @@ Publishes a message every 2 seconds to `example/groups/topic` cleanly using a sc
 public Consumer<String> queuedConsumer() {
     return msg -> {
         log.info("Durable consumer received: {}", msg);
-        RECEIVED.offer(msg);
+        DURABLE.offer(msg);
     };
 }
 ```
@@ -92,7 +92,10 @@ This consumer is bound to the **durable queue** `scst/wk/durable-group/plain/exa
 ```java
 @Bean
 public Consumer<String> anonConsumer() {
-    return msg -> log.info("Anonymous consumer received: {}", msg);
+    return msg -> {
+        log.info("Anonymous consumer received: {}", msg);
+        ANON.offer(msg);
+    };
 }
 ```
 

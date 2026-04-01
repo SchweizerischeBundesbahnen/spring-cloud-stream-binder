@@ -31,7 +31,7 @@ class ConsumerGroupsIT {
 
     @Test
     void bothConsumerGroupsReceiveMessages() throws InterruptedException {
-        assertThat(ConsumerGroupsApp.DURABLE.poll(30, TimeUnit.SECONDS)).isNotNull().contains("group-test-");
-        assertThat(ConsumerGroupsApp.ANON.poll(30, TimeUnit.SECONDS)).isNotNull().contains("group-test-");
+        assertThat(ConsumerGroupsApp.DURABLE.poll(30, TimeUnit.SECONDS)).isNotNull().contains("group-msg-");
+        assertThat(ConsumerGroupsApp.ANON.poll(30, TimeUnit.SECONDS)).isNotNull().contains("group-msg-");
     }
 }
