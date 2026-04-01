@@ -13,7 +13,7 @@
 
     <groupId>ch.sbb.solace.examples</groupId>
     <artifactId>solace-example-consumer-concurrency</artifactId>
-    <version>8.1.0</version>
+    <version>9.0.0</version>
     <name>Solace Example - Consumer Concurrency</name>
 
     <properties>
