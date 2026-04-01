@@ -13,6 +13,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-examples-version:
+    name: Sync Examples Version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Update Examples Versions
+        run: |
+          BINDER_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout --file pom.xml)
+          echo "Syncing examples to Binder Version: $BINDER_VERSION"
+          mvn versions:set -DgenerateBackupPoms=false -DprocessAllModules=true -DnewVersion=$BINDER_VERSION --file examples/pom.xml
+          mvn versions:set-property -Dproperty=solace-binder.version -DgenerateBackupPoms=false -DnewVersion=$BINDER_VERSION --file examples/pom.xml
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: sync examples versions with binder"
+
   build:
     name: Build and Package
     runs-on: ubuntu-latest
@@ -72,9 +95,50 @@ jobs:
           name: test-reports
           retention-days: 14
           path: |
-            target/failsafe-reports/consolidated-report.txt
-            target/failsafe-reports/consolidated-report.xml
-            target/failsafe-reports/failsafe-summary.xml
-            target/logs/it-fork-*.log
-            target/failsafe-reports-*/TEST-*.xml
-            target/failsafe-reports-*/*.txt
+            **/target/failsafe-reports/consolidated-report.txt
+            **/target/failsafe-reports/consolidated-report.xml
+            **/target/failsafe-reports/failsafe-summary.xml
+            **/target/logs/it-fork-*.log
+            **/target/failsafe-reports-*/TEST-*.xml
+            **/target/failsafe-reports-*/*.txt
+
+  examples-tests:
+    name: Run Examples Integration Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Restore Maven cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: Install Local Binder Snapshot
+        run: mvn -B install -DskipTests --file pom.xml --no-transfer-progress
+      - name: IT-Tests with Maven for Examples
+        run: mvn -B verify -Dmaven.test.skip=false -P it_tests --file examples/pom.xml --no-transfer-progress
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: 'true'
+      - name: Publish Test Report
+        uses: mikepenz/action-junit-report@v6
+        if: always()
+        with:
+          report_paths: |
+            **/target/failsafe-reports-*/TEST-*.xml
+      - name: Upload Test Reports & Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: examples-test-reports
+          retention-days: 14
+          path: |
+            **/target/logs/it-fork-*.log
+            **/target/failsafe-reports-*/TEST-*.xml
+            **/target/failsafe-reports-*/*.txt
