@@ -1,0 +1,15 @@
+spring:
+  cloud:
+    function:
+      definition: fastPublisher;concurrentConsumer
+    stream:
+      bindings:
+        fastPublisher-out-0:
+          destination: example/concurrency/topic
+        concurrentConsumer-in-0:
+          destination: example/concurrency/topic
+          group: concurrent-group
+          consumer:
+            concurrency: 4
+      poller:
+        fixed-delay: 100

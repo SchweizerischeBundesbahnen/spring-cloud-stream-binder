@@ -1,0 +1,7 @@
+spring:
+  cloud:
+    function:
+      definition: source|uppercase|sink
+    stream:
+      poller:
+        fixed-delay: 2000

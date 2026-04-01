@@ -1,0 +1,12 @@
+spring:
+  cloud:
+    function:
+      definition: chunkedPublisher;chunkedConsumer
+    stream:
+      bindings:
+        chunkedPublisher-out-0:
+          destination: example/chunk/topic
+        chunkedConsumer-in-0:
+          destination: example/chunk/topic
+          group: chunk-group
+

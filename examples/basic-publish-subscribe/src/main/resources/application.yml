@@ -1,0 +1,13 @@
+spring:
+  cloud:
+    function:
+      definition: source;sink
+    stream:
+      bindings:
+        source-out-0:
+          destination: example/basic/topic
+        sink-in-0:
+          destination: example/basic/topic
+          group: basic-group
+      poller:
+        fixed-delay: 2000

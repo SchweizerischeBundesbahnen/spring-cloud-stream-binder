@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ch.sbb.solace.examples</groupId>
+    <artifactId>solace-binder-examples</artifactId>
+    <version>9.0.0</version>
+    <packaging>pom</packaging>
+    <name>Solace Binder Examples</name>
+    <description>Runnable examples for all features of the Spring Cloud Stream Binder for Solace PubSub+</description>
+
+    <modules>
+        <module>basic-publish-subscribe</module>
+        <module>processor-pipeline</module>
+        <module>consumer-groups</module>
+        <module>consumer-concurrency</module>
+        <module>manual-acknowledgment</module>
+        <module>error-handling-error-queue</module>
+        <module>error-handling-redelivery</module>
+        <module>dynamic-destinations</module>
+        <module>publisher-confirms</module>
+        <module>partitioned-queues</module>
+        <module>nonpersistent-messaging</module>
+        <module>solace-headers</module>
+        <module>large-message-chunking</module>
+        <module>health-indicator</module>
+        <module>metrics-monitoring</module>
+        <module>micrometer-tracing</module>
+        <module>multi-binder</module>
+        <module>queue-provisioning-options</module>
+        <module>pause-resume-bindings</module>
+        <module>oauth2-authentication</module>
+    </modules>
+</project>

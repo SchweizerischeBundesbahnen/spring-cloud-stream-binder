@@ -1,0 +1,20 @@
+spring:
+  cloud:
+    function:
+      definition: healthConsumer
+    stream:
+      bindings:
+        healthConsumer-in-0:
+          destination: example/health/topic
+          group: health-group
+management:
+  health:
+    binders:
+      enabled: true
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health

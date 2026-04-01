@@ -1,0 +1,22 @@
+spring:
+  cloud:
+    function:
+      definition: metricsPublisher;metricsConsumer
+    stream:
+      bindings:
+        metricsPublisher-out-0:
+          destination: example/metrics/topic
+        metricsConsumer-in-0:
+          destination: example/metrics/topic
+          group: metrics-group
+      poller:
+        fixed-delay: 1000
+management:
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: prometheus

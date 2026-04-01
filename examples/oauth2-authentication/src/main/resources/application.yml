@@ -1,0 +1,27 @@
+spring:
+  cloud:
+    function:
+      definition: oauthPublisher;oauthConsumer
+    stream:
+      bindings:
+        oauthPublisher-out-0:
+          destination: example/oauth/topic
+        oauthConsumer-in-0:
+          destination: example/oauth/topic
+          group: oauth-group
+      poller:
+        fixed-delay: 500
+
+  security:
+    oauth2:
+      client:
+        registration:
+          solace-broker:
+            provider: mock-oauth
+            client-id: test-client
+            client-secret: test-secret
+            authorization-grant-type: client_credentials
+        provider:
+          mock-oauth:
+            # We don't define the token-uri here because it's dynamic in tests based on the mock server port
+            token-uri: http://localhost:8081/solace/token

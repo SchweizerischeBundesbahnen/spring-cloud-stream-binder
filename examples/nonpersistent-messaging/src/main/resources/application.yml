@@ -1,0 +1,20 @@
+spring:
+  cloud:
+    function:
+      definition: directPublisher;directConsumer
+    stream:
+      bindings:
+        directPublisher-out-0:
+          destination: example/direct/topic
+        directConsumer-in-0:
+          destination: example/direct/topic
+      solace:
+        bindings:
+          directPublisher-out-0:
+            producer:
+              deliveryMode: DIRECT
+          directConsumer-in-0:
+            consumer:
+              qualityOfService: AT_MOST_ONCE
+      poller:
+        fixed-delay: 500

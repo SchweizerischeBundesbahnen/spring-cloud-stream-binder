@@ -1,0 +1,18 @@
+spring:
+  cloud:
+    function:
+      definition: producer;manualAckConsumer
+    stream:
+      bindings:
+        producer-out-0:
+          destination: example/ack/topic
+        manualAckConsumer-in-0:
+          destination: example/ack/topic
+          group: ack-group
+      solace:
+        bindings:
+          manualAckConsumer-in-0:
+            consumer:
+              auto-bind-error-queue: true
+      poller:
+        fixed-delay: 500

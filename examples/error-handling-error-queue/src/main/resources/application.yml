@@ -1,0 +1,20 @@
+spring:
+  cloud:
+    function:
+      definition: errorProducer;failingConsumer
+    stream:
+      bindings:
+        errorProducer-out-0:
+          destination: example/error/topic
+        failingConsumer-in-0:
+          destination: example/error/topic
+          group: error-group
+          consumer:
+            max-attempts: 1
+      solace:
+        bindings:
+          failingConsumer-in-0:
+            consumer:
+              auto-bind-error-queue: true
+      poller:
+        fixed-delay: 5000

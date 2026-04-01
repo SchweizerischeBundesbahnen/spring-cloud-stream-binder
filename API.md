@@ -694,6 +694,9 @@ public class MyMessageBuilder {
 
 As for consuming messages from partitioned queues, this is handled transparently by the PubSub+ broker. That is to say, consuming messages from a partitioned queue is no different from consuming messages from any other queue.
 
+> [!WARNING]
+> **Note on Message Ordering:** Solace Partitioned Queues guarantee that all messages with the same partition key are delivered in order to the exact same consumer flow. However, strict message ordering is *only* guaranteed if your consumer process is single-threaded. **Setting `concurrency` > 1 may break the message order per partition.** Additionally, if your application logic offloads processing to asynchronous threads (e.g., using `CompletableFuture`, `@Async`, or manually managed thread pools), the processing order may become non-deterministic despite the broker delivering them in order.
+
 See [Partitioned Queues](https://docs.solace.com/Messaging/Guaranteed-Msg/Queues.htm#partitioned-queues) for more.
 
 ## Manual Message Acknowledgment
