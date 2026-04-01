@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   check-examples-version:
     name: Sync Examples Version
@@ -37,11 +41,25 @@ jobs:
         with:
           commit_message: "chore: sync examples versions with binder"
 
-      - name: Abort if changes were committed
+      - name: Trigger new workflow run
+        if: steps.auto_commit.outputs.changes_detected == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const ref = '${{ github.head_ref || github.ref_name }}';
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build.yml',
+              ref
+            });
+
+      - name: Abort current run after dispatch
         if: steps.auto_commit.outputs.changes_detected == 'true'
         run: |
           echo "::warning::Changes were committed to sync examples version."
-          echo "Aborting current workflow. The new commit will trigger a fresh build."
+          echo "Triggered a fresh workflow run via workflow_dispatch."
+          echo "Aborting current workflow to avoid duplicate work."
           exit 1
 
   build:
