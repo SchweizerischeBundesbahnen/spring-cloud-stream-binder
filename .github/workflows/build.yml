@@ -32,12 +32,21 @@ jobs:
           mvn versions:set -DgenerateBackupPoms=false -DprocessAllModules=true -DnewVersion=$BINDER_VERSION --file examples/pom.xml
           mvn versions:set-property -Dproperty=solace-binder.version -DgenerateBackupPoms=false -DnewVersion=$BINDER_VERSION --file examples/pom.xml
       - name: Commit changes
+        id: auto_commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: sync examples versions with binder"
 
+      - name: Abort if changes were committed
+        if: steps.auto_commit.outputs.changes_detected == 'true'
+        run: |
+          echo "::warning::Changes were committed to sync examples version."
+          echo "Aborting current workflow. The new commit will trigger a fresh build."
+          exit 1
+
   build:
     name: Build and Package
+    needs: check-examples-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
