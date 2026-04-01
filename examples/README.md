@@ -24,7 +24,7 @@ docker run -d -p 8080:8080 -p 55555:55555 --shm-size=2g \
 ## Example Index
 
 ### Messaging Basics
-* [**basic-publish-subscribe**](./basic-publish-subscribe/README.md): The simplest introduction to binding a Publisher (`Supplier`) and a Consumer to a Solace Topic.
+* [**basic-publish-subscribe**](./basic-publish-subscribe/README.md): The simplest introduction to binding a Publisher and a Consumer to a Solace Topic.
 * [**nonpersistent-messaging**](./nonpersistent-messaging/README.md): Demonstrates Quality of Service (QoS) by sending and receiving strictly Direct (At-Most-Once) non-persistent messages.
 
 ### Reliability & Resiliency

@@ -1,7 +1,7 @@
 spring:
   cloud:
     function:
-      definition: retryProducer;retryConsumer
+      definition: retryConsumer
     stream:
       bindings:
         retryProducer-out-0:
@@ -13,5 +13,3 @@ spring:
             max-attempts: 5
             back-off-initial-interval: 100
             back-off-max-interval: 500
-      poller:
-        fixed-delay: 10000

@@ -1,7 +1,7 @@
 spring:
   cloud:
     function:
-      definition: metricsPublisher;metricsConsumer
+      definition: metricsConsumer
     stream:
       bindings:
         metricsPublisher-out-0:
@@ -9,8 +9,6 @@ spring:
         metricsConsumer-in-0:
           destination: example/metrics/topic
           group: metrics-group
-      poller:
-        fixed-delay: 1000
 management:
   metrics:
     export:

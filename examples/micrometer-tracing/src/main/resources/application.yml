@@ -1,7 +1,7 @@
 spring:
   cloud:
     function:
-      definition: tracingPublisher;tracingConsumer
+      definition: tracingConsumer
     stream:
       bindings:
         tracingPublisher-out-0:
@@ -9,8 +9,6 @@ spring:
         tracingConsumer-in-0:
           destination: example/tracing/topic
           group: tracing-group
-      poller:
-        fixed-delay: 500
 management:
   tracing:
     enabled: true

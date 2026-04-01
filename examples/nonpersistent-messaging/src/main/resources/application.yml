@@ -1,7 +1,7 @@
 spring:
   cloud:
     function:
-      definition: directPublisher;directConsumer
+      definition: directConsumer
     stream:
       bindings:
         directPublisher-out-0:
@@ -16,5 +16,3 @@ spring:
           directConsumer-in-0:
             consumer:
               qualityOfService: AT_MOST_ONCE
-      poller:
-        fixed-delay: 500

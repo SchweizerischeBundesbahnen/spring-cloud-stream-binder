@@ -1,19 +1,116 @@
 # Publisher Confirmations
 
-## Overview
-Intercept Solace JCSMP native producer Correlation IDs to track internally whether explicitly sent messages successfully arrived onto the Solace Broker instance inherently natively.
+Demonstrates how to get explicit acknowledgment from the Solace broker that a published message was successfully persisted. By attaching a `CorrelationData` object to the message, you can use a `Future` to wait for (or asynchronously receive) the broker's confirmation.
 
-## Key Properties (`application.yml`)
-- Set `ErrorChannelSendingCorrelationKey` or utilize `SolaceBinderHeaders.CONFIRM_CORRELATION` alongside `CorrelationData`. 
-- Observe internal `correlationData.getFuture().get()` to block sequentially for exact completion acknowledgments synchronously from the server-side Broker.
+## Features Demonstrated
 
-## Running Locally
-In the `examples/publisher-confirms` directory run:
+- Creating and attaching a `CorrelationData` instance to outbound messages
+- Using `SolaceBinderHeaders.CONFIRM_CORRELATION` to enable publisher confirmations
+- Waiting synchronously for broker acknowledgment with `correlationData.getFuture().get()`
+- Handling publish failures and timeouts
+
+## Prerequisites
+
+- Java 17+
+- Docker (for a local Solace broker, or an existing broker)
+
+## How to Run
+
+**Option A — Automated test:**
+
+```bash
+mvn verify
+```
+
+**Option B — Interactive with a local broker:**
 
 ```bash
 mvn spring-boot:run \
--Dspring-boot.run.arguments="--solace.java.host=tcp://localhost:55555 --solace.java.msgVpn=default --solace.java.client-username=default --solace.java.client-password=default"
+  -Dspring-boot.run.arguments="--solace.java.host=tcp://localhost:55555 --solace.java.msgVpn=default --solace.java.client-username=default --solace.java.client-password=default"
 ```
 
-## Expected Behavior
-Explicit assertions successfully confirming delivery track the inner Future objects native to the Solace APIs asynchronously! Any publisher timeouts are transparently handled.
+## Configuration Explained
+
+```yaml
+spring:
+  cloud:
+    function:
+      definition: confirmConsumer
+    stream:
+      bindings:
+        confirmPublisher-out-0:                    # (1)
+          destination: example/confirm/topic
+        confirmConsumer-in-0:
+          destination: example/confirm/topic
+          group: confirm-group
+```
+
+1. **`confirmPublisher-out-0`** — The output binding used by `StreamBridge` to publish messages. The binding name follows the convention `<beanName>-out-<index>`, but since publishing is done via `StreamBridge`, the binding name is just a configuration key.
+
+> **Note:** Publisher confirmations only work with the default `qualityOfService: AT_LEAST_ONCE` (persistent messages). Direct/non-persistent messages do not support broker confirmations.
+
+## Code Walkthrough
+
+```java
+@Service
+class PublishService {
+    private final StreamBridge streamBridge;
+
+    public boolean publishAndWait(String payload) throws Exception {
+        CorrelationData correlationData = new CorrelationData();         // (1)
+        Message<String> msg = MessageBuilder.withPayload(payload)
+                .setHeader(SolaceBinderHeaders.CONFIRM_CORRELATION,
+                           correlationData)                              // (2)
+                .build();
+
+        streamBridge.send("confirmPublisher-out-0", msg);                // (3)
+
+        try {
+            correlationData.getFuture().get(5, TimeUnit.SECONDS);        // (4)
+            return true;  // Broker confirmed receipt
+        } catch (TimeoutException e) {
+            return false; // Broker did not confirm in time
+        }
+    }
+}
+```
+
+1. **Create `CorrelationData`** — Each message gets its own `CorrelationData` instance. This object holds a `CompletableFuture` that will be completed when the broker responds.
+2. **Attach to header** — The `SolaceBinderHeaders.CONFIRM_CORRELATION` header tells the binder to track this message's delivery status. This header is **not** sent to the broker — it is consumed internally by the binder.
+3. **Publish** — The message is sent via `StreamBridge`. At this point, the message is transmitted to the broker but not yet confirmed.
+4. **Wait for confirmation** — `getFuture().get(5, TimeUnit.SECONDS)` blocks until the broker sends an acknowledgment or the timeout expires. If the publish failed, the Future throws an `ExecutionException`.
+
+```java
+@Bean
+public Consumer<String> confirmConsumer() {
+    return msg -> {
+        log.info("Received: {}", msg);
+        RECEIVED.offer(msg);
+    };
+}
+```
+
+A standard consumer that receives the confirmed messages from the queue.
+
+## What to Observe
+
+```
+INFO  Published and confirmed: test-payload
+INFO  Received: test-payload
+```
+
+The `publishAndWait` method returns `true` after the broker confirms receipt of the persistent message. The consumer then processes it from the queue.
+
+**Failure scenario:** If the broker is unreachable or the destination is misconfigured, `getFuture().get()` will either throw an `ExecutionException` (publish NACK) or a `TimeoutException` (no response in time).
+
+## When to Use This Pattern
+
+- Financial transactions or other critical messages where you must know the message reached the broker
+- Synchronous publish-and-confirm workflows
+- Building reliable at-least-once publishing guarantees at the application level
+
+## Related API Documentation
+
+- [Publisher Confirmations](../../API.md#publisher-confirmations) — Full documentation with code examples
+- [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling) — Error channels and producer error handling
+- [Solace Binder Headers](../../API.md#solace-binder-headers) — `solace_scst_confirmCorrelation` header reference

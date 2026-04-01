@@ -1,17 +1,11 @@
-spring:
-  cloud:
-    function:
-      definition: oauthPublisher;oauthConsumer
-    stream:
-      bindings:
-        oauthPublisher-out-0:
-          destination: example/oauth/topic
-        oauthConsumer-in-0:
-          destination: example/oauth/topic
-          group: oauth-group
-      poller:
-        fixed-delay: 500
+solace:
+  java:
+    host: tcps://localhost:55443
+    msgVpn: default
+    apiProperties:
+      ssl_validate_certificate: false
 
+spring:
   security:
     oauth2:
       client:
@@ -25,3 +19,14 @@ spring:
           mock-oauth:
             # We don't define the token-uri here because it's dynamic in tests based on the mock server port
             token-uri: http://localhost:8081/solace/token
+            
+  cloud:
+    function:
+      definition: oauthConsumer
+    stream:
+      bindings:
+        oauthPublisher-out-0:
+          destination: example/oauth/topic
+        oauthConsumer-in-0:
+          destination: example/oauth/topic
+          group: oauth-group

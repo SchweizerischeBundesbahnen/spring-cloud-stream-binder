@@ -1,7 +1,7 @@
 spring:
   cloud:
     function:
-      definition: fastPublisher;concurrentConsumer
+      definition: concurrentConsumer
     stream:
       bindings:
         fastPublisher-out-0:
@@ -11,5 +11,3 @@ spring:
           group: concurrent-group
           consumer:
             concurrency: 4
-      poller:
-        fixed-delay: 100

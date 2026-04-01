@@ -7,8 +7,6 @@ spring:
         pausableConsumer-in-0:
           destination: example/pausable/topic
           group: pausable-group
-      poller:
-        fixed-delay: 1000
 management:
   endpoints:
     web:

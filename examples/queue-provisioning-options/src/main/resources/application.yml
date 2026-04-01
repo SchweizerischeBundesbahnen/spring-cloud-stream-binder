@@ -14,5 +14,3 @@ spring:
               queueNameExpression: "'custom-prefix.' + group + '.v1'"
               queueAccessType: EXCLUSIVE
               queueAdditionalSubscriptions: "example/extra/>,example/more"
-      poller:
-        fixed-delay: 500

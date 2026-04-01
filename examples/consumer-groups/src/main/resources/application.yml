@@ -1,15 +1,13 @@
 spring:
   cloud:
     function:
-      definition: publisher;durableConsumer;anonConsumer
+      definition: queuedConsumer;anonConsumer
     stream:
       bindings:
         publisher-out-0:
           destination: example/groups/topic
-        durableConsumer-in-0:
+        queuedConsumer-in-0:
           destination: example/groups/topic
           group: durable-group
         anonConsumer-in-0:
           destination: example/groups/topic
-      poller:
-        fixed-delay: 2000

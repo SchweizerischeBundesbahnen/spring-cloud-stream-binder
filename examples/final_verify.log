@@ -1,0 +1,407 @@
+[INFO] Scanning for projects...
+[WARNING] The requested profile "it_tests" could not be activated because it does not exist.
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] Solace Example - Basic Publish Subscribe                           [jar]
+[INFO] Solace Example - Processor Pipeline                                [jar]
+[INFO] Solace Example - Consumer Groups                                   [jar]
+[INFO] Solace Example - Consumer Concurrency                              [jar]
+[INFO] Solace Example - Manual Acknowledgment                             [jar]
+[INFO] Solace Example - Error Handling Error Queue                        [jar]
+[INFO] Solace Example - Error Handling Redelivery                         [jar]
+[INFO] Solace Example - Dynamic Destinations                              [jar]
+[INFO] Solace Example - Publisher Confirms                                [jar]
+[INFO] Solace Example - Partitioned Queues                                [jar]
+[INFO] Solace Example - Non-Persistent Messaging                          [jar]
+[INFO] Solace Example - Solace Headers                                    [jar]
+[INFO] Solace Example - Large Message Chunking                            [jar]
+[INFO] Solace Example - Health Indicator                                  [jar]
+[INFO] Solace Example - Metrics Monitoring                                [jar]
+[INFO] Solace Example - Micrometer Tracing                                [jar]
+[INFO] Solace Example - Multi-Binder                                      [jar]
+[INFO] Solace Example - Queue Provisioning Options                        [jar]
+[INFO] Solace Example - Pause Resume Bindings                             [jar]
+[INFO] Solace Example - OAuth2 Authentication                             [jar]
+[INFO] Solace Binder Examples                                             [pom]
+[INFO] 
+[INFO] ---< ch.sbb.solace.examples:solace-example-basic-publish-subscribe >----
+[INFO] Building Solace Example - Basic Publish Subscribe 9.0.0           [1/21]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:3.5.0:clean (default-clean) @ solace-example-basic-publish-subscribe ---
+[INFO] Deleting /home/ubuntu/workspace/spring-cloud-stream-binder/examples/basic-publish-subscribe/target
+[INFO] 
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ solace-example-basic-publish-subscribe ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.14.1:compile (default-compile) @ solace-example-basic-publish-subscribe ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 1 source file with javac [debug parameters release 17] to target/classes
+[INFO] 
+[INFO] --- maven-resources-plugin:3.3.1:testResources (default-testResources) @ solace-example-basic-publish-subscribe ---
+[INFO] Copying 0 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.14.1:testCompile (default-testCompile) @ solace-example-basic-publish-subscribe ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 1 source file with javac [debug parameters release 17] to target/test-classes
+[INFO] 
+[INFO] --- maven-surefire-plugin:3.5.5:test (default-test) @ solace-example-basic-publish-subscribe ---
+[INFO] 
+[INFO] --- maven-jar-plugin:3.4.2:jar (default-jar) @ solace-example-basic-publish-subscribe ---
+[INFO] Building jar: /home/ubuntu/workspace/spring-cloud-stream-binder/examples/basic-publish-subscribe/target/solace-example-basic-publish-subscribe-9.0.0.jar
+[INFO] 
+[INFO] --- spring-boot-maven-plugin:4.0.4:repackage (repackage) @ solace-example-basic-publish-subscribe ---
+[INFO] Replacing main artifact /home/ubuntu/workspace/spring-cloud-stream-binder/examples/basic-publish-subscribe/target/solace-example-basic-publish-subscribe-9.0.0.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to /home/ubuntu/workspace/spring-cloud-stream-binder/examples/basic-publish-subscribe/target/solace-example-basic-publish-subscribe-9.0.0.jar.original
+[INFO] 
+[INFO] --- maven-failsafe-plugin:3.5.3:integration-test (default) @ solace-example-basic-publish-subscribe ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running ch.sbb.example.BasicAppIT
+08:33:30.546 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [ch.sbb.example.BasicAppIT]: BasicAppIT does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+08:33:30.606 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration ch.sbb.example.BasicApp for test class ch.sbb.example.BasicAppIT
+08:33:30.647 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [ch.sbb.example.BasicAppIT]: BasicAppIT does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+08:33:30.649 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration ch.sbb.example.BasicApp for test class ch.sbb.example.BasicAppIT
+08:33:30.672 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+08:33:30.673 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+08:33:30.691 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 2.0.4
+08:33:30.806 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+08:33:31.078 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+08:33:31.079 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+08:33:31.092 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 28.2.2
+  API Version: 1.50
+  Operating System: Ubuntu 24.04.4 LTS
+  Total Memory: 126754 MB
+08:33:31.105 [main] INFO tc.testcontainers/ryuk:0.14.0 -- Creating container for image: testcontainers/ryuk:0.14.0
+08:33:31.107 [main] INFO org.testcontainers.utility.RegistryAuthLocator -- Failure when attempting to lookup auth config. Please ignore if you don't have images in an authenticated registry. Details: (dockerImageName: testcontainers/ryuk:0.14.0, configFile: /home/ubuntu/.docker/config.json, configEnv: DOCKER_AUTH_CONFIG). Falling back to docker-java default behaviour. Exception message: Status 404: No config supplied. Checked in order: /home/ubuntu/.docker/config.json (file not found), DOCKER_AUTH_CONFIG (not set)
+08:33:31.255 [main] INFO tc.testcontainers/ryuk:0.14.0 -- Container testcontainers/ryuk:0.14.0 is starting: 174fda11ac53b47ef7c12cf1422ee04a3c870ddf56fa4e35c8725db65342b2d4
+08:33:31.566 [main] INFO tc.testcontainers/ryuk:0.14.0 -- Container testcontainers/ryuk:0.14.0 started in PT0.461572687S
+08:33:31.570 [main] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+08:33:31.570 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+08:33:31.570 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+08:33:31.572 [main] INFO tc.solace/solace-pubsub-standard:latest -- Creating container for image: solace/solace-pubsub-standard:latest
+08:33:31.632 [main] INFO tc.solace/solace-pubsub-standard:latest -- Container solace/solace-pubsub-standard:latest is starting: fca0c3873ff727bc083b6b87ad84a883e798fb069ff5ab49e4fb06883418ff64
+08:33:44.813 [main] INFO tc.solace/solace-pubsub-standard:latest -- Container solace/solace-pubsub-standard:latest started in PT13.240768991S
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ 
+ :: Spring Boot ::   v4.0.4
+ :: Spring Cloud Stream ::   v5.0.1
+ :: Spring Cloud Function ::   v5.0.1
+2026-04-01T08:33:57.682Z  INFO 992901 --- [           main] [                                                 ] ch.sbb.example.BasicAppIT                : Starting BasicAppIT using Java 21.0.10 with PID 992901 (started by ubuntu in /home/ubuntu/workspace/spring-cloud-stream-binder/examples/basic-publish-subscribe)
+2026-04-01T08:33:57.683Z  INFO 992901 --- [           main] [                                                 ] ch.sbb.example.BasicAppIT                : No active profile set, falling back to 1 default profile: "default"
+2026-04-01T08:33:58.080Z  INFO 992901 --- [           main] [                                                 ] faultConfiguringBeanFactoryPostProcessor : No bean named 'errorChannel' has been explicitly defined. Therefore, a default PublishSubscribeChannel will be created.
+2026-04-01T08:33:58.084Z  INFO 992901 --- [           main] [                                                 ] faultConfiguringBeanFactoryPostProcessor : No bean named 'integrationHeaderChannelRegistry' has been explicitly defined. Therefore, a default DefaultHeaderChannelRegistry will be created.
+2026-04-01T08:33:58.472Z  INFO 992901 --- [           main] [                                                 ] o.s.c.s.m.DirectWithAttributesChannel    : Channel 'application.sink-in-0' has 1 subscriber(s).
+2026-04-01T08:33:58.640Z  INFO 992901 --- [           main] [                                                 ] o.s.i.endpoint.EventDrivenConsumer       : Adding {logging-channel-adapter:_org.springframework.integration.errorLogger} as a subscriber to the 'errorChannel' channel
+2026-04-01T08:33:58.640Z  INFO 992901 --- [           main] [                                                 ] o.s.i.channel.PublishSubscribeChannel    : Channel 'application.errorChannel' has 1 subscriber(s).
+2026-04-01T08:33:58.640Z  INFO 992901 --- [           main] [                                                 ] o.s.i.endpoint.EventDrivenConsumer       : started bean '_org.springframework.integration.errorLogger'
+2026-04-01T08:33:58.641Z  INFO 992901 --- [           main] [                                                 ] o.s.c.s.binder.DefaultBinderFactory      : Creating binder: solace
+2026-04-01T08:33:58.641Z  INFO 992901 --- [           main] [                                                 ] o.s.c.s.binder.DefaultBinderFactory      : Constructing binder child context for solace
+2026-04-01T08:33:58.678Z  INFO 992901 --- [           main] [                                                 ] .s.s.c.s.b.c.a.JCSMPSessionConfiguration : Connect to host tcp://localhost:36748
+2026-04-01T08:33:58.706Z  INFO 992901 --- [           main] [                                                 ] c.s.t.i.n.NettyTransportExecutorService  : Epoll is enabled; Netty 4.2.10.Final
+2026-04-01T08:33:58.742Z  INFO 992901 --- [           main] [                                                 ] .s.s.c.s.b.c.a.JCSMPSessionConfiguration : Connecting JCSMP session JCSMPSession
+2026-04-01T08:33:58.755Z  INFO 992901 --- [           main] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 1, this_host_attempt: 1 of 21)
+2026-04-01T08:33:58.843Z  INFO 992901 --- [           main] [                                                 ] c.s.jcsmp.impl.JCSMPBasicSession         : Client-1: AdCtrl version changes: 2->4
+2026-04-01T08:33:58.845Z  INFO 992901 --- [           main] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connected to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (smfclient 1) local(/127.0.0.1:50262) remote(localhost/127.0.0.1:36748)
+2026-04-01T08:33:58.859Z  INFO 992901 --- [           main] [                                                 ] .s.s.c.s.b.c.a.JCSMPSessionConfiguration : Connect to host tcp://localhost:36748
+2026-04-01T08:33:58.862Z  INFO 992901 --- [           main] [                                                 ] .s.s.c.s.b.c.a.JCSMPSessionConfiguration : Connect to host tcp://localhost:36748
+2026-04-01T08:33:58.878Z  INFO 992901 --- [           main] [                                                 ] o.s.c.s.binder.DefaultBinderFactory      : Caching the binder: solace
+2026-04-01T08:33:58.895Z  INFO 992901 --- [           main] [                                                 ] c.s.s.c.s.b.p.SolaceEndpointProvisioner  : Creating queue durable scst/wk/basic-group/plain/example/basic/topic for consumer group basic-group
+2026-04-01T08:33:58.903Z  INFO 992901 --- [           main] [                                                 ] o.s.c.stream.binder.BinderErrorChannel   : Channel 'solace-783300872.sink-in-0.errors' has 1 subscriber(s).
+2026-04-01T08:33:58.904Z  INFO 992901 --- [           main] [                                                 ] o.s.c.stream.binder.BinderErrorChannel   : Channel 'solace-783300872.sink-in-0.errors' has 2 subscriber(s).
+2026-04-01T08:33:58.912Z  INFO 992901 --- [           main] [                                                 ] s.b.i.q.JCSMPInboundQueueMessageProducer : Creating 1 threads for binding=scst/wk/basic-group/plain/example/basic/topic <inbound adapter>
+2026-04-01T08:33:58.912Z  INFO 992901 --- [           main] [                                                 ] s.b.i.q.JCSMPInboundQueueMessageProducer : Flow receiver binding=scst/wk/basic-group/plain/example/basic/topic started in state 'Running'
+2026-04-01T08:33:58.914Z  INFO 992901 --- [           main] [                                                 ] c.s.s.c.s.b.i.q.FlowXMLMessageListener   : Started receiving thread example/basic/topic-0
+2026-04-01T08:33:58.924Z  INFO 992901 --- [sumerDispatcher] [                                                 ] c.s.s.c.s.b.i.q.SolaceFlowEventHandler   : FlowEvent binding=sink-in-0 flowId=0 event=FLOW_ACTIVE
+2026-04-01T08:33:58.925Z  INFO 992901 --- [           main] [                                                 ] c.s.s.c.s.b.p.SolaceEndpointProvisioner  : Subscribing queue scst/wk/basic-group/plain/example/basic/topic to topic example/basic/topic
+2026-04-01T08:33:58.927Z  INFO 992901 --- [           main] [                                                 ] s.b.i.q.JCSMPInboundQueueMessageProducer : started com.solace.spring.cloud.stream.binder.inbound.queue.JCSMPInboundQueueMessageProducer@5e643402
+2026-04-01T08:33:58.936Z  INFO 992901 --- [           main] [                                                 ] ch.sbb.example.BasicAppIT                : Started BasicAppIT in 1.43 seconds (process running for 28.905)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+2026-04-01T08:33:58.957Z  INFO 992901 --- [   scheduling-1] [                                                 ] .s.s.c.s.b.o.JCSMPOutboundMessageHandler : Creating producer to TOPIC example/basic/topic <message handler ID: ba00bc98-6d4a-4683-8042-0459db9df1f3>
+2026-04-01T08:33:58.958Z  INFO 992901 --- [   scheduling-1] [                                                 ] c.s.s.c.s.b.util.SharedResourceManager   : No producer exists, a new one will be created
+2026-04-01T08:33:58.964Z  INFO 992901 --- [   scheduling-1] [                                                 ] .s.s.c.s.b.o.JCSMPOutboundMessageHandler : created producer for binding=source-out-0 flowId=2 destination=example/basic/topic deliveryMode=PERSISTENT
+2026-04-01T08:33:58.965Z  INFO 992901 --- [   scheduling-1] [                                                 ] o.s.c.s.m.DirectWithAttributesChannel    : Channel 'application.source-out-0' has 1 subscriber(s).
+2026-04-01T08:33:58.984Z  INFO 992901 --- [   scheduling-1] [                                                 ] ch.sbb.example.BasicApp                  : Published: Hello from Solace #1
+2026-04-01T08:33:58.995Z  INFO 992901 --- [e/basic/topic-0] [                                                 ] ch.sbb.example.BasicApp                  : Received: Hello from Solace #1
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/home/ubuntu/.m2/repository/net/bytebuddy/byte-buddy-agent/1.17.8/byte-buddy-agent-1.17.8.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+2026-04-01T08:33:59.401Z  INFO 992901 --- [actorThread-1-1] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: handleException(): Channel Closed Event (smfclient 1) with exception: Channel is closed by peer
+2026-04-01T08:33:59.401Z  INFO 992901 --- [actorThread-1-1] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:50262) remote(localhost/127.0.0.1:36748)) - startReconnect(): Channel Closed Event (smfclient 1); exception: Channel is closed by peer cur_stack=Thread: "Context_1_ReactorThread-1-1" daemon  id=96, prio=5: 	com.solacesystems.jcsmp.protocol.impl.TcpClientChannel.startReconnect(TcpClientChannel.java:1410) 	com.solacesystems.jcsmp.protocol.impl.TcpClientChannel.handleException(TcpClientChannel.java:1480) 	com.solacesystems.jcsmp.protocol.impl.TcpClientChannel.handleException(TcpClientChannel.java:1395) 	com.solacesystems.jcsmp.protocol.impl.TcpClientChannel.onEvent(TcpClientChannel.java:2835) 	com.solace.transport.impl.netty.NettyTransportEventExceptionHandler.channelInactive(NettyTransportEventExceptionHandler.java:43) 	io.netty.channel.AbstractChannelHandlerContext.fireChannelInactive(AbstractChannelHandlerContext.java:251) 	io.netty.handler.codec.ByteToMessageDecoder.channelInputClosed(ByteToMessageDecoder.java:427) 	io.netty.handler.codec.ByteToMessageDecoder.channelInactive(ByteToMessageDecoder.java:392) 	io.netty.channel.AbstractChannelHandlerContext.fireChannelInactive(AbstractChannelHandlerContext.java:251) 	io.netty.channel.ChannelInboundHandlerAdapter.channelInactive(ChannelInboundHandlerAdapter.java:81) 	io.netty.handler.timeout.IdleStateHandler.channelInactive(IdleStateHandler.java:279) 	io.netty.channel.AbstractChannelHandlerContext.fireChannelInactive(AbstractChannelHandlerContext.java:251) 	io.netty.channel.DefaultChannelPipeline$HeadContext.channelInactive(DefaultChannelPipeline.java:1424) 	io.netty.channel.DefaultChannelPipeline.fireChannelInactive(DefaultChannelPipeline.java:876) 	io.netty.channel.AbstractChannel$AbstractUnsafe$6.run(AbstractChannel.java:676) 	io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:148) 	io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:141) 	io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:535) 	io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:201) 	io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195) 	io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74) 	io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30) 	java.base/java.lang.Thread.run(Thread.java:1583) 
+2026-04-01T08:33:59.402Z  INFO 992901 --- [sumerDispatcher] [                                                 ] c.s.s.c.s.b.i.q.SolaceFlowEventHandler   : FlowEvent binding=sink-in-0 flowId=0 event=FLOW_INACTIVE
+2026-04-01T08:33:59.402Z  INFO 992901 --- [sumerDispatcher] [                                                 ] c.s.s.c.s.b.i.q.SolaceFlowEventHandler   : FlowEvent binding=sink-in-0 flowId=0 event=FLOW_DOWN
+2026-04-01T08:33:59.404Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 1 of 21)
+2026-04-01T08:33:59.406Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: Channel is closed by peer
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 29.20 s -- in ch.sbb.example.BasicAppIT
+2026-04-01T08:34:02.406Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 2 of 21)
+2026-04-01T08:34:02.408Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:05.409Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 3 of 21)
+2026-04-01T08:34:05.411Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:08.412Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 4 of 21)
+2026-04-01T08:34:08.413Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:11.414Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 5 of 21)
+2026-04-01T08:34:11.417Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:14.417Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 6 of 21)
+2026-04-01T08:34:14.419Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:17.420Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 7 of 21)
+2026-04-01T08:34:17.422Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:20.423Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 8 of 21)
+2026-04-01T08:34:20.425Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:23.425Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 9 of 21)
+2026-04-01T08:34:23.428Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:26.428Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 10 of 21)
+2026-04-01T08:34:26.430Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+2026-04-01T08:34:29.431Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36748, scheme=tcp://, host=localhost, port=36748' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 11 of 21)
+2026-04-01T08:34:29.433Z  INFO 992901 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/992901/8e0a2f15ed18e3a70001/H44gj7-giO   local(/127.0.0.1:45204) remote(localhost/127.0.0.1:36748)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36748
+[ERROR] Surefire is going to kill self fork JVM. The exit has elapsed 30 seconds after System.exit(0).
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- maven-failsafe-plugin:3.5.3:verify (default) @ solace-example-basic-publish-subscribe ---
+[INFO] 
+[INFO] ------< ch.sbb.solace.examples:solace-example-processor-pipeline >------
+[INFO] Building Solace Example - Processor Pipeline 9.0.0                [2/21]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:3.5.0:clean (default-clean) @ solace-example-processor-pipeline ---
+[INFO] Deleting /home/ubuntu/workspace/spring-cloud-stream-binder/examples/processor-pipeline/target
+[INFO] 
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ solace-example-processor-pipeline ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.14.1:compile (default-compile) @ solace-example-processor-pipeline ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 1 source file with javac [debug parameters release 17] to target/classes
+[INFO] 
+[INFO] --- maven-resources-plugin:3.3.1:testResources (default-testResources) @ solace-example-processor-pipeline ---
+[INFO] Copying 0 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.14.1:testCompile (default-testCompile) @ solace-example-processor-pipeline ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 1 source file with javac [debug parameters release 17] to target/test-classes
+[INFO] 
+[INFO] --- maven-surefire-plugin:3.5.5:test (default-test) @ solace-example-processor-pipeline ---
+[INFO] 
+[INFO] --- maven-jar-plugin:3.4.2:jar (default-jar) @ solace-example-processor-pipeline ---
+[INFO] Building jar: /home/ubuntu/workspace/spring-cloud-stream-binder/examples/processor-pipeline/target/solace-example-processor-pipeline-9.0.0.jar
+[INFO] 
+[INFO] --- spring-boot-maven-plugin:4.0.4:repackage (repackage) @ solace-example-processor-pipeline ---
+[INFO] Replacing main artifact /home/ubuntu/workspace/spring-cloud-stream-binder/examples/processor-pipeline/target/solace-example-processor-pipeline-9.0.0.jar with repackaged archive, adding nested dependencies in BOOT-INF/.
+[INFO] The original artifact has been renamed to /home/ubuntu/workspace/spring-cloud-stream-binder/examples/processor-pipeline/target/solace-example-processor-pipeline-9.0.0.jar.original
+[INFO] 
+[INFO] --- maven-failsafe-plugin:3.5.3:integration-test (default) @ solace-example-processor-pipeline ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running ch.sbb.example.ProcessorAppIT
+08:34:30.586 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [ch.sbb.example.ProcessorAppIT]: ProcessorAppIT does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+08:34:30.645 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration ch.sbb.example.ProcessorApp for test class ch.sbb.example.ProcessorAppIT
+08:34:30.688 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [ch.sbb.example.ProcessorAppIT]: ProcessorAppIT does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+08:34:30.690 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration ch.sbb.example.ProcessorApp for test class ch.sbb.example.ProcessorAppIT
+08:34:30.714 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+08:34:30.715 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+08:34:30.734 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 2.0.4
+08:34:30.842 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+08:34:31.119 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+08:34:31.120 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+08:34:31.132 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 28.2.2
+  API Version: 1.50
+  Operating System: Ubuntu 24.04.4 LTS
+  Total Memory: 126754 MB
+08:34:31.146 [main] INFO tc.testcontainers/ryuk:0.14.0 -- Creating container for image: testcontainers/ryuk:0.14.0
+08:34:31.149 [main] INFO org.testcontainers.utility.RegistryAuthLocator -- Failure when attempting to lookup auth config. Please ignore if you don't have images in an authenticated registry. Details: (dockerImageName: testcontainers/ryuk:0.14.0, configFile: /home/ubuntu/.docker/config.json, configEnv: DOCKER_AUTH_CONFIG). Falling back to docker-java default behaviour. Exception message: Status 404: No config supplied. Checked in order: /home/ubuntu/.docker/config.json (file not found), DOCKER_AUTH_CONFIG (not set)
+08:34:31.263 [main] INFO tc.testcontainers/ryuk:0.14.0 -- Container testcontainers/ryuk:0.14.0 is starting: e8dc8da863b611bbf2daeca6157ca61ded86787ab0b710ebbc7317a1c871cc3d
+08:34:31.553 [main] INFO tc.testcontainers/ryuk:0.14.0 -- Container testcontainers/ryuk:0.14.0 started in PT0.406738405S
+08:34:31.557 [main] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+08:34:31.557 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+08:34:31.557 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+08:34:31.559 [main] INFO tc.solace/solace-pubsub-standard:latest -- Creating container for image: solace/solace-pubsub-standard:latest
+08:34:31.612 [main] INFO tc.solace/solace-pubsub-standard:latest -- Container solace/solace-pubsub-standard:latest is starting: eae9d0948e0ac0d4c104e72e01cb4a992c52893c5ebe14a23f2a1cf3c2f6b9bd
+08:34:45.169 [main] INFO tc.solace/solace-pubsub-standard:latest -- Container solace/solace-pubsub-standard:latest started in PT13.610526745S
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ 
+ :: Spring Boot ::   v4.0.4
+ :: Spring Cloud Stream ::   v5.0.1
+ :: Spring Cloud Function ::   v5.0.1
+2026-04-01T08:34:58.118Z  INFO 995037 --- [           main] [                                                 ] ch.sbb.example.ProcessorAppIT            : Starting ProcessorAppIT using Java 21.0.10 with PID 995037 (started by ubuntu in /home/ubuntu/workspace/spring-cloud-stream-binder/examples/processor-pipeline)
+2026-04-01T08:34:58.119Z  INFO 995037 --- [           main] [                                                 ] ch.sbb.example.ProcessorAppIT            : No active profile set, falling back to 1 default profile: "default"
+2026-04-01T08:34:58.523Z  INFO 995037 --- [           main] [                                                 ] faultConfiguringBeanFactoryPostProcessor : No bean named 'errorChannel' has been explicitly defined. Therefore, a default PublishSubscribeChannel will be created.
+2026-04-01T08:34:58.527Z  INFO 995037 --- [           main] [                                                 ] faultConfiguringBeanFactoryPostProcessor : No bean named 'integrationHeaderChannelRegistry' has been explicitly defined. Therefore, a default DefaultHeaderChannelRegistry will be created.
+2026-04-01T08:34:58.928Z  INFO 995037 --- [           main] [                                                 ] o.s.c.s.m.DirectWithAttributesChannel    : Channel 'application.uppercasesink-in-0' has 1 subscriber(s).
+2026-04-01T08:34:59.096Z  INFO 995037 --- [           main] [                                                 ] o.s.i.endpoint.EventDrivenConsumer       : Adding {logging-channel-adapter:_org.springframework.integration.errorLogger} as a subscriber to the 'errorChannel' channel
+2026-04-01T08:34:59.097Z  INFO 995037 --- [           main] [                                                 ] o.s.i.channel.PublishSubscribeChannel    : Channel 'application.errorChannel' has 1 subscriber(s).
+2026-04-01T08:34:59.097Z  INFO 995037 --- [           main] [                                                 ] o.s.i.endpoint.EventDrivenConsumer       : started bean '_org.springframework.integration.errorLogger'
+2026-04-01T08:34:59.098Z  INFO 995037 --- [           main] [                                                 ] o.s.c.s.binder.DefaultBinderFactory      : Creating binder: solace
+2026-04-01T08:34:59.098Z  INFO 995037 --- [           main] [                                                 ] o.s.c.s.binder.DefaultBinderFactory      : Constructing binder child context for solace
+2026-04-01T08:34:59.135Z  INFO 995037 --- [           main] [                                                 ] .s.s.c.s.b.c.a.JCSMPSessionConfiguration : Connect to host tcp://localhost:36751
+2026-04-01T08:34:59.164Z  INFO 995037 --- [           main] [                                                 ] c.s.t.i.n.NettyTransportExecutorService  : Epoll is enabled; Netty 4.2.10.Final
+2026-04-01T08:34:59.198Z  INFO 995037 --- [           main] [                                                 ] .s.s.c.s.b.c.a.JCSMPSessionConfiguration : Connecting JCSMP session JCSMPSession
+2026-04-01T08:34:59.211Z  INFO 995037 --- [           main] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 1, this_host_attempt: 1 of 21)
+2026-04-01T08:34:59.301Z  INFO 995037 --- [           main] [                                                 ] c.s.jcsmp.impl.JCSMPBasicSession         : Client-1: AdCtrl version changes: 2->4
+2026-04-01T08:34:59.305Z  INFO 995037 --- [           main] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connected to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (smfclient 1) local(/127.0.0.1:43134) remote(localhost/127.0.0.1:36751)
+2026-04-01T08:34:59.318Z  INFO 995037 --- [           main] [                                                 ] .s.s.c.s.b.c.a.JCSMPSessionConfiguration : Connect to host tcp://localhost:36751
+2026-04-01T08:34:59.322Z  INFO 995037 --- [           main] [                                                 ] .s.s.c.s.b.c.a.JCSMPSessionConfiguration : Connect to host tcp://localhost:36751
+2026-04-01T08:34:59.335Z  INFO 995037 --- [           main] [                                                 ] o.s.c.s.binder.DefaultBinderFactory      : Caching the binder: solace
+2026-04-01T08:34:59.347Z  INFO 995037 --- [           main] [                                                 ] c.s.s.c.s.b.p.SolaceEndpointProvisioner  : Creating queue durable scst/wk/processor-group/plain/example/processor/topic for consumer group processor-group
+2026-04-01T08:34:59.353Z  INFO 995037 --- [           main] [                                                 ] o.s.c.stream.binder.BinderErrorChannel   : Channel 'solace-1609215923.uppercasesink-in-0.errors' has 1 subscriber(s).
+2026-04-01T08:34:59.353Z  INFO 995037 --- [           main] [                                                 ] o.s.c.stream.binder.BinderErrorChannel   : Channel 'solace-1609215923.uppercasesink-in-0.errors' has 2 subscriber(s).
+2026-04-01T08:34:59.359Z  INFO 995037 --- [           main] [                                                 ] s.b.i.q.JCSMPInboundQueueMessageProducer : Creating 1 threads for binding=scst/wk/processor-group/plain/example/processor/topic <inbound adapter>
+2026-04-01T08:34:59.360Z  INFO 995037 --- [           main] [                                                 ] s.b.i.q.JCSMPInboundQueueMessageProducer : Flow receiver binding=scst/wk/processor-group/plain/example/processor/topic started in state 'Running'
+2026-04-01T08:34:59.361Z  INFO 995037 --- [           main] [                                                 ] c.s.s.c.s.b.i.q.FlowXMLMessageListener   : Started receiving thread example/processor/topic-0
+2026-04-01T08:34:59.371Z  INFO 995037 --- [sumerDispatcher] [                                                 ] c.s.s.c.s.b.i.q.SolaceFlowEventHandler   : FlowEvent binding=uppercasesink-in-0 flowId=0 event=FLOW_ACTIVE
+2026-04-01T08:34:59.371Z  INFO 995037 --- [           main] [                                                 ] c.s.s.c.s.b.p.SolaceEndpointProvisioner  : Subscribing queue scst/wk/processor-group/plain/example/processor/topic to topic example/processor/topic
+2026-04-01T08:34:59.373Z  INFO 995037 --- [           main] [                                                 ] s.b.i.q.JCSMPInboundQueueMessageProducer : started com.solace.spring.cloud.stream.binder.inbound.queue.JCSMPInboundQueueMessageProducer@612531a3
+2026-04-01T08:34:59.384Z  INFO 995037 --- [           main] [                                                 ] ch.sbb.example.ProcessorAppIT            : Started ProcessorAppIT in 1.447 seconds (process running for 29.316)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+2026-04-01T08:34:59.406Z  INFO 995037 --- [   scheduling-1] [                                                 ] .s.s.c.s.b.o.JCSMPOutboundMessageHandler : Creating producer to TOPIC example/processor/topic <message handler ID: b1002a60-e39e-4c9a-b201-08a4377c4a9a>
+2026-04-01T08:34:59.406Z  INFO 995037 --- [   scheduling-1] [                                                 ] c.s.s.c.s.b.util.SharedResourceManager   : No producer exists, a new one will be created
+2026-04-01T08:34:59.412Z  INFO 995037 --- [   scheduling-1] [                                                 ] .s.s.c.s.b.o.JCSMPOutboundMessageHandler : created producer for binding=publisher-out-0 flowId=2 destination=example/processor/topic deliveryMode=PERSISTENT
+2026-04-01T08:34:59.413Z  INFO 995037 --- [   scheduling-1] [                                                 ] o.s.c.s.m.DirectWithAttributesChannel    : Channel 'application.publisher-out-0' has 1 subscriber(s).
+2026-04-01T08:34:59.432Z  INFO 995037 --- [   scheduling-1] [                                                 ] ch.sbb.example.ProcessorApp              : Sourced: hello world
+2026-04-01T08:34:59.445Z  INFO 995037 --- [ocessor/topic-0] [                                                 ] ch.sbb.example.ProcessorApp              : Received: HELLO WORLD
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/home/ubuntu/.m2/repository/net/bytebuddy/byte-buddy-agent/1.17.8/byte-buddy-agent-1.17.8.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+2026-04-01T08:34:59.830Z  INFO 995037 --- [actorThread-1-1] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: handleException(): Channel Closed Event (smfclient 1) with exception: Channel is closed by peer
+2026-04-01T08:34:59.830Z  INFO 995037 --- [actorThread-1-1] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43134) remote(localhost/127.0.0.1:36751)) - startReconnect(): Channel Closed Event (smfclient 1); exception: Channel is closed by peer cur_stack=Thread: "Context_1_ReactorThread-1-1" daemon  id=96, prio=5: 	com.solacesystems.jcsmp.protocol.impl.TcpClientChannel.startReconnect(TcpClientChannel.java:1410) 	com.solacesystems.jcsmp.protocol.impl.TcpClientChannel.handleException(TcpClientChannel.java:1480) 	com.solacesystems.jcsmp.protocol.impl.TcpClientChannel.handleException(TcpClientChannel.java:1395) 	com.solacesystems.jcsmp.protocol.impl.TcpClientChannel.onEvent(TcpClientChannel.java:2835) 	com.solace.transport.impl.netty.NettyTransportEventExceptionHandler.channelInactive(NettyTransportEventExceptionHandler.java:43) 	io.netty.channel.AbstractChannelHandlerContext.fireChannelInactive(AbstractChannelHandlerContext.java:251) 	io.netty.handler.codec.ByteToMessageDecoder.channelInputClosed(ByteToMessageDecoder.java:427) 	io.netty.handler.codec.ByteToMessageDecoder.channelInactive(ByteToMessageDecoder.java:392) 	io.netty.channel.AbstractChannelHandlerContext.fireChannelInactive(AbstractChannelHandlerContext.java:251) 	io.netty.channel.ChannelInboundHandlerAdapter.channelInactive(ChannelInboundHandlerAdapter.java:81) 	io.netty.handler.timeout.IdleStateHandler.channelInactive(IdleStateHandler.java:279) 	io.netty.channel.AbstractChannelHandlerContext.fireChannelInactive(AbstractChannelHandlerContext.java:251) 	io.netty.channel.DefaultChannelPipeline$HeadContext.channelInactive(DefaultChannelPipeline.java:1424) 	io.netty.channel.DefaultChannelPipeline.fireChannelInactive(DefaultChannelPipeline.java:876) 	io.netty.channel.AbstractChannel$AbstractUnsafe$6.run(AbstractChannel.java:676) 	io.netty.util.concurrent.AbstractEventExecutor.runTask(AbstractEventExecutor.java:148) 	io.netty.util.concurrent.AbstractEventExecutor.safeExecute(AbstractEventExecutor.java:141) 	io.netty.util.concurrent.SingleThreadEventExecutor.runAllTasks(SingleThreadEventExecutor.java:535) 	io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:201) 	io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195) 	io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74) 	io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30) 	java.base/java.lang.Thread.run(Thread.java:1583) 
+2026-04-01T08:34:59.831Z  INFO 995037 --- [sumerDispatcher] [                                                 ] c.s.s.c.s.b.i.q.SolaceFlowEventHandler   : FlowEvent binding=uppercasesink-in-0 flowId=0 event=FLOW_INACTIVE
+2026-04-01T08:34:59.831Z  INFO 995037 --- [sumerDispatcher] [                                                 ] c.s.s.c.s.b.i.q.SolaceFlowEventHandler   : FlowEvent binding=uppercasesink-in-0 flowId=0 event=FLOW_DOWN
+2026-04-01T08:34:59.833Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 1 of 21)
+2026-04-01T08:34:59.835Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: Channel is closed by peer
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 29.62 s -- in ch.sbb.example.ProcessorAppIT
+2026-04-01T08:35:02.835Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 2 of 21)
+2026-04-01T08:35:02.837Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:05.838Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 3 of 21)
+2026-04-01T08:35:05.843Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:08.843Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 4 of 21)
+2026-04-01T08:35:08.845Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:11.846Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 5 of 21)
+2026-04-01T08:35:11.848Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:14.849Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 6 of 21)
+2026-04-01T08:35:14.850Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:17.851Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 7 of 21)
+2026-04-01T08:35:17.854Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:20.854Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 8 of 21)
+2026-04-01T08:35:20.856Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:23.856Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 9 of 21)
+2026-04-01T08:35:23.859Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:26.859Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 10 of 21)
+2026-04-01T08:35:26.861Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+2026-04-01T08:35:29.861Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connecting to host 'orig=tcp://localhost:36751, scheme=tcp://, host=localhost, port=36751' (host 1 of 1, smfclient 1, attempt 1 of 2147483647, this_host_attempt: 11 of 21)
+2026-04-01T08:35:29.864Z  INFO 995037 --- [connect_service] [                                                 ] c.s.j.protocol.impl.TcpClientChannel     : Client-1: Connection attempt failed to host 'localhost' ReconnectException com.solacesystems.jcsmp.JCSMPTransportException: (Client name: ip-10-241-59-147/995037/b120ed5955eaf1cf0001/B0nG04CuSr   local(/127.0.0.1:43150) remote(localhost/127.0.0.1:36751)) - Error communicating with the router. cause: io.netty.channel.AbstractChannel$AnnotatedConnectException: finishConnect(..) failed with error(-111): Connection refused: localhost/127.0.0.1:36751
+[ERROR] Surefire is going to kill self fork JVM. The exit has elapsed 30 seconds after System.exit(0).
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- maven-failsafe-plugin:3.5.3:verify (default) @ solace-example-processor-pipeline ---
+[INFO] 
+[INFO] -------< ch.sbb.solace.examples:solace-example-consumer-groups >--------
+[INFO] Building Solace Example - Consumer Groups 9.0.0                   [3/21]
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- maven-clean-plugin:3.5.0:clean (default-clean) @ solace-example-consumer-groups ---
+[INFO] Deleting /home/ubuntu/workspace/spring-cloud-stream-binder/examples/consumer-groups/target
+[INFO] 
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ solace-example-consumer-groups ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.14.1:compile (default-compile) @ solace-example-consumer-groups ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 1 source file with javac [debug parameters release 17] to target/classes
+[INFO] 
+[INFO] --- maven-resources-plugin:3.3.1:testResources (default-testResources) @ solace-example-consumer-groups ---
+[INFO] Copying 0 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- maven-compiler-plugin:3.14.1:testCompile (default-testCompile) @ solace-example-consumer-groups ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 1 source file with javac [debug parameters release 17] to target/test-classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /home/ubuntu/workspace/spring-cloud-stream-binder/examples/consumer-groups/src/test/java/ch/sbb/example/ConsumerGroupsIT.java:[34,37] cannot find symbol
+  symbol:   variable DURABLE
+  location: class ch.sbb.example.ConsumerGroupsApp
+[ERROR] /home/ubuntu/workspace/spring-cloud-stream-binder/examples/consumer-groups/src/test/java/ch/sbb/example/ConsumerGroupsIT.java:[35,37] cannot find symbol
+  symbol:   variable ANON
+  location: class ch.sbb.example.ConsumerGroupsApp
+[INFO] 2 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for Solace Binder Examples 9.0.0:
+[INFO] 
+[INFO] Solace Example - Basic Publish Subscribe ........... SUCCESS [01:01 min]
+[INFO] Solace Example - Processor Pipeline ................ SUCCESS [01:00 min]
+[INFO] Solace Example - Consumer Groups ................... FAILURE [  0.302 s]
+[INFO] Solace Example - Consumer Concurrency .............. SKIPPED
+[INFO] Solace Example - Manual Acknowledgment ............. SKIPPED
+[INFO] Solace Example - Error Handling Error Queue ........ SKIPPED
+[INFO] Solace Example - Error Handling Redelivery ......... SKIPPED
+[INFO] Solace Example - Dynamic Destinations .............. SKIPPED
+[INFO] Solace Example - Publisher Confirms ................ SKIPPED
+[INFO] Solace Example - Partitioned Queues ................ SKIPPED
+[INFO] Solace Example - Non-Persistent Messaging .......... SKIPPED
+[INFO] Solace Example - Solace Headers .................... SKIPPED
+[INFO] Solace Example - Large Message Chunking ............ SKIPPED
+[INFO] Solace Example - Health Indicator .................. SKIPPED
+[INFO] Solace Example - Metrics Monitoring ................ SKIPPED
+[INFO] Solace Example - Micrometer Tracing ................ SKIPPED
+[INFO] Solace Example - Multi-Binder ...................... SKIPPED
+[INFO] Solace Example - Queue Provisioning Options ........ SKIPPED
+[INFO] Solace Example - Pause Resume Bindings ............. SKIPPED
+[INFO] Solace Example - OAuth2 Authentication ............. SKIPPED
+[INFO] Solace Binder Examples ............................. SKIPPED
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  02:02 min
+[INFO] Finished at: 2026-04-01T08:35:30Z
+[INFO] ------------------------------------------------------------------------
+[WARNING] The requested profile "it_tests" could not be activated because it does not exist.
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:testCompile (default-testCompile) on project solace-example-consumer-groups: Compilation failure: Compilation failure: 
+[ERROR] /home/ubuntu/workspace/spring-cloud-stream-binder/examples/consumer-groups/src/test/java/ch/sbb/example/ConsumerGroupsIT.java:[34,37] cannot find symbol
+[ERROR]   symbol:   variable DURABLE
+[ERROR]   location: class ch.sbb.example.ConsumerGroupsApp
+[ERROR] /home/ubuntu/workspace/spring-cloud-stream-binder/examples/consumer-groups/src/test/java/ch/sbb/example/ConsumerGroupsIT.java:[35,37] cannot find symbol
+[ERROR]   symbol:   variable ANON
+[ERROR]   location: class ch.sbb.example.ConsumerGroupsApp
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :solace-example-consumer-groups

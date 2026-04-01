@@ -1,7 +1,7 @@
 spring:
   cloud:
     function:
-      definition: headerPublisher;headerConsumer
+      definition: headerConsumer
     stream:
       bindings:
         headerPublisher-out-0:
@@ -14,5 +14,3 @@ spring:
           headerConsumer-in-0:
             consumer:
               headerExclusions: custom-header
-      poller:
-        fixed-delay: 500

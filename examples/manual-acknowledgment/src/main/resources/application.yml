@@ -1,7 +1,7 @@
 spring:
   cloud:
     function:
-      definition: producer;manualAckConsumer
+      definition: manualAckConsumer
     stream:
       bindings:
         producer-out-0:
@@ -14,5 +14,3 @@ spring:
           manualAckConsumer-in-0:
             consumer:
               auto-bind-error-queue: true
-      poller:
-        fixed-delay: 500

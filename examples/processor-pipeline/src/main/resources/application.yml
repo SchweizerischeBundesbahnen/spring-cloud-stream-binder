@@ -1,7 +1,11 @@
 spring:
   cloud:
     function:
-      definition: source|uppercase|sink
+      definition: uppercase|sink
     stream:
-      poller:
-        fixed-delay: 2000
+      bindings:
+        publisher-out-0:
+          destination: example/processor/topic
+        uppercaseSink-in-0:
+          destination: example/processor/topic
+          group: processor-group

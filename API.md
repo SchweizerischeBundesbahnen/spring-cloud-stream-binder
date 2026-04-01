@@ -140,9 +140,20 @@ The Solace session properties (`solace.java.*`) originate from the [JCSMP Spring
 > ```
 > This approach allows different binders to connect to different broker instances.
 
-For more samples see [Solace Spring Cloud Samples](https://github.com/SolaceSamples/solace-samples-spring) repository.
+---
 
-For step-by-step instructions refer [Solace Spring Cloud Stream tutorial](https://tutorials.solace.dev/spring/spring-cloud-stream/) and check out the [blogs](https://solace.com/blog/?fwp_blog_search=spring%20cloud%20stream).
+## Example Suite
+
+For a complete, runnable suite of local examples demonstrating every binder feature utilizing `StreamBridge` and daemon threads, see the [Examples Suite](./examples/README.md) directory. 
+
+The suite includes 20 individually-documented templates demonstrating:
+* Foundational PubSub (Publish/Subscribe, Consumer Groups, Concurrency)
+* Solace-specific features (Headers, Provisioning, Pause/Resume)
+* Advanced Patterns (Partitioning, Dynamic Destinations, Processor Pipelines, Multi-Binder)
+* Error Handling (Redelivery, Error Queues)
+* Observability & Security (Micrometer Metrics & Tracing, OAuth2)
+
+---
 
 ## Configuration Options
 
@@ -1021,6 +1032,7 @@ The binder supports Micrometer tracing. To enable, ensure the needed Beans are a
 For more information about Spring Cloud Streams try these resources:
 
 *   [Spring Docs - Spring Cloud Stream Reference Documentation](https://docs.spring.io/spring-cloud-stream/docs/4.1.x/reference/html/)
+*   [Local Runnable Examples Suite](./examples/README.md)
 *   [GitHub Samples - Spring Cloud Stream Sample Applications](https://github.com/spring-cloud/spring-cloud-stream-samples)
 *   [Github Source - Spring Cloud Stream Source Code](https://github.com/spring-cloud/spring-cloud-stream)
 
