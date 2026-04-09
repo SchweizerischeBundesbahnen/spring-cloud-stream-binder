@@ -1,4 +1,4 @@
-# Difference between the splace binder and this fork
+# Difference between the Solace binder and this fork
 
 Additional:
 - Support for non-persistent publish and subscribe

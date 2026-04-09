@@ -63,25 +63,36 @@ public final class SolaceHeaders {
     /**
      * <p><b>Acceptable Value Type:</b> {@link Boolean}</p>
      * <p><b>Access:</b> Read</p>
+        * <p><b>Default Value:</b> {@code false}</p>
      * <br>
      * <p>Whether one or more messages have been discarded prior to the current message.</p>
+        * <p>When consuming Direct messages, use this header to detect upstream message loss on the session.</p>
      */
     public static final String DISCARD_INDICATION = PREFIX + "discardIndication";
 
     /**
      * <p><b>Acceptable Value Type:</b> {@link Boolean}</p>
      * <p><b>Access:</b> Read/Write</p>
+        * <p><b>Default Value:</b> {@code true} when publishing through this binder</p>
      * <br>
      * <p>Whether the message is eligible to be moved to a Dead Message Queue.</p>
+        * <p>If you expect expired or rejected messages to reach a Dead Message Queue, keep this enabled on the
+        * publisher.</p>
      */
     public static final String DMQ_ELIGIBLE = PREFIX + "dmqEligible";
 
     /**
      * <p><b>Acceptable Value Type:</b> {@link Long}</p>
      * <p><b>Access:</b> Read/Write</p>
+        * <p><b>Default Value:</b> {@code 0} (no expiration)</p>
      * <br>
      * <p>The UTC time (in milliseconds, from midnight, January 1, 1970 UTC) when the message is supposed to
      * expire.</p>
+      * <p>This header is semantically shared with {@link #TIME_TO_LIVE}. On outbound messages, do not set
+      * conflicting values for both headers. If an inbound message copy carries both headers with the same value,
+      * the binder treats them as the same underlying message lifetime.</p>
+        * <p>When consuming messages, a meaningful value is only available if the session property
+        * {@code CALCULATE_MESSAGE_EXPIRATION} is enabled.</p>
      */
     public static final String EXPIRATION = PREFIX + "expiration";
 
@@ -121,8 +132,11 @@ public final class SolaceHeaders {
     /**
      * <p><b>Acceptable Value Type:</b> {@link Long}</p>
      * <p><b>Access:</b> Read</p>
+        * <p><b>Default Value:</b> {@code 0}</p>
      * <br>
      * <p>The receive timestamp (in milliseconds, from midnight, January 1, 1970 UTC).</p>
+        * <p>On consumed messages, a meaningful value is only available if the session property
+        * {@code GENERATE_RCV_TIMESTAMPS} is enabled.</p>
      */
     public static final String RECEIVE_TIMESTAMP = PREFIX + "receiveTimestamp";
 
@@ -153,24 +167,36 @@ public final class SolaceHeaders {
     /**
      * <p><b>Acceptable Value Type:</b> {@link Long}</p>
      * <p><b>Access:</b> Read/Write</p>
+        * <p><b>Default Value:</b> {@code 0}</p>
      * <br>
      * <p>The send timestamp (in milliseconds, from midnight, January 1, 1970 UTC).</p>
+        * <p>When consuming messages, a meaningful value is only available if the session property
+        * {@code GENERATE_SEND_TIMESTAMPS} is enabled or if the publisher explicitly set this header.</p>
      */
     public static final String SENDER_TIMESTAMP = PREFIX + "senderTimestamp";
 
     /**
      * <p><b>Acceptable Value Type:</b> {@link Long}</p>
      * <p><b>Access:</b> Read/Write</p>
+        * <p><b>Default Value:</b> {@code 0}</p>
      * <br>
      * <p>The sequence number.</p>
+        * <p>When consuming messages, a meaningful value is only available if the session property
+        * {@code GENERATE_SEQUENCE_NUMBERS} is enabled or if the publisher explicitly set this header.</p>
      */
     public static final String SEQUENCE_NUMBER = PREFIX + "sequenceNumber";
 
     /**
      * <p><b>Acceptable Value Type:</b> {@link Long}</p>
      * <p><b>Access:</b> Read/Write</p>
+        * <p><b>Default Value:</b> {@code 0} (never expire)</p>
      * <br>
      * <p>The number of milliseconds before the message is discarded or moved to a Dead Message Queue.</p>
+        * <p>Prefer setting this header from a duration, for example
+        * {@code java.time.Duration.ofSeconds(30).toMillis()}.</p>
+      * <p>This header is semantically shared with {@link #EXPIRATION}. On outbound messages, do not set
+      * conflicting values for both headers. If an inbound message copy carries both headers with the same value,
+      * the binder treats them as the same underlying message lifetime.</p>
      */
     public static final String TIME_TO_LIVE = PREFIX + "timeToLive";
 

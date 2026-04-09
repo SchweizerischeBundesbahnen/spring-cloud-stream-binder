@@ -1,0 +1,20 @@
+spring:
+  cloud:
+    function:
+      definition: controlledConsumer
+    stream:
+      default:
+        consumer:
+          autoStartup: false
+      bindings:
+        controlledPublisher-out-0:
+          destination: example/programmatic-control/topic
+        controlledConsumer-in-0:
+          destination: example/programmatic-control/topic
+          group: programmatic-control-group
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: bindings,health,info

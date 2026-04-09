@@ -1,0 +1,13 @@
+spring:
+  cloud:
+    function:
+      definition: concurrentConsumer
+    stream:
+      bindings:
+        fastPublisher-out-0:
+          destination: example/concurrency/topic
+        concurrentConsumer-in-0:
+          destination: example/concurrency/topic
+          group: concurrent-group
+          consumer:
+            concurrency: 4

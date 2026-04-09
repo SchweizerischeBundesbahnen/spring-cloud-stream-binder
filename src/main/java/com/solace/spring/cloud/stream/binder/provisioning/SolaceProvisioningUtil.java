@@ -47,9 +47,13 @@ public class SolaceProvisioningUtil {
         return endpointProperties;
     }
 
-    public static ProducerFlowProperties getProducerFlowProperties(JCSMPSession jcsmpSession) {
+    public static ProducerFlowProperties getProducerFlowProperties(JCSMPSession jcsmpSession,
+                                                                   ExtendedProducerProperties<SolaceProducerProperties> properties) {
         ProducerFlowProperties producerFlowProperties = new ProducerFlowProperties();
-        Integer pubAckWindowSize = (Integer) jcsmpSession.getProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE);
+        Integer pubAckWindowSize = properties.getExtension().getPubAckWindowSize();
+        if (pubAckWindowSize == null) {
+            pubAckWindowSize = (Integer) jcsmpSession.getProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE);
+        }
         if (pubAckWindowSize != null) {
             producerFlowProperties.setWindowSize(pubAckWindowSize);
         }
@@ -62,8 +66,20 @@ public class SolaceProvisioningUtil {
 
     public static ConsumerFlowProperties getConsumerFlowProperties(String destinationName, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
         ConsumerFlowProperties consumerFlowProperties = new ConsumerFlowProperties();
-        final String selector = properties.getExtension().getSelector();
-        consumerFlowProperties.setSelector((selector == null || selector.isBlank()) ? null : selector);
+
+        Integer subAckWindowSize = properties.getExtension().getSubAckWindowSize();
+        if (subAckWindowSize != null) {
+            consumerFlowProperties.setTransportWindowSize(subAckWindowSize);
+        }
+        if (properties.getExtension().getFlowAckTimerInMsecs() != null) {
+            consumerFlowProperties.setAckTimerInMsecs(properties.getExtension().getFlowAckTimerInMsecs());
+        }
+        if (properties.getExtension().getFlowAckThreshold() != null) {
+            consumerFlowProperties.setAckThreshold(properties.getExtension().getFlowAckThreshold());
+        }
+        if (properties.getExtension().getFlowWindowedAckMaxSize() != null) {
+            consumerFlowProperties.setWindowedAckMaxSize(properties.getExtension().getFlowWindowedAckMaxSize());
+        }
         return consumerFlowProperties;
     }
 

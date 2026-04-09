@@ -1,0 +1,11 @@
+spring:
+  cloud:
+    function:
+      definition: confirmConsumer
+    stream:
+      bindings:
+        confirmPublisher-out-0:
+          destination: example/confirm/topic
+        confirmConsumer-in-0:
+          destination: example/confirm/topic
+          group: confirm-group

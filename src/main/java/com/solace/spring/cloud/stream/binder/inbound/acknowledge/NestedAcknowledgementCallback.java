@@ -8,10 +8,13 @@ import java.util.List;
 
 public class NestedAcknowledgementCallback implements AcknowledgmentCallback {
     private final List<AcknowledgmentCallback> acknowledgmentCallbacks = new ArrayList<>();
-    private boolean autoAckEnabled= true;
+    private boolean autoAckEnabled = true;
 
     public void addAcknowledgmentCallback(AcknowledgmentCallback acknowledgmentCallback) {
         this.acknowledgmentCallbacks.add(acknowledgmentCallback);
+        if (!autoAckEnabled) {
+            acknowledgmentCallback.noAutoAck();
+        }
     }
 
     @Override
@@ -27,10 +30,15 @@ public class NestedAcknowledgementCallback implements AcknowledgmentCallback {
     @Override
     public void noAutoAck() {
         autoAckEnabled = false;
+        acknowledgmentCallbacks.forEach(AcknowledgmentCallback::noAutoAck);
     }
 
     @Override
     public boolean isAutoAck() {
         return autoAckEnabled;
+    }
+
+    int size() {
+        return acknowledgmentCallbacks.size();
     }
 }

@@ -1,0 +1,15 @@
+spring:
+  cloud:
+    function:
+      definition: retryConsumer
+    stream:
+      bindings:
+        retryProducer-out-0:
+          destination: example/retry/topic
+        retryConsumer-in-0:
+          destination: example/retry/topic
+          group: retry-group
+          consumer:
+            max-attempts: 5
+            back-off-initial-interval: 100
+            back-off-max-interval: 500

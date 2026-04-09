@@ -6,6 +6,7 @@ import com.solace.spring.cloud.stream.binder.messaging.SolaceHeaderMeta;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solacesystems.common.util.ByteArray;
 import com.solacesystems.jcsmp.*;
+import com.solace.spring.cloud.stream.binder.messaging.SolaceHeaders;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -68,6 +69,7 @@ public class XMLMessageMapper {
     XMLMessage map(Object payload, Map<String, Object> headers, UUID messageId, Collection<String> excludedHeaders, boolean convertNonSerializableHeadersToString, DeliveryMode deliveryMode) {
         XMLMessage xmlMessage;
         SDTMap metadata = map(headers, excludedHeaders, convertNonSerializableHeadersToString);
+        validateExclusiveSolaceHeaders(headers, messageId);
         metadata.putInteger(SolaceBinderHeaders.MESSAGE_VERSION, MESSAGE_VERSION);
         if (payload instanceof byte[]) {
             BytesMessage bytesMessage = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
@@ -223,6 +225,19 @@ public class XMLMessageMapper {
         }
 
         return builder;
+    }
+
+    private void validateExclusiveSolaceHeaders(Map<String, Object> headers, UUID messageId) {
+        Object expiration = headers.get(SolaceHeaders.EXPIRATION);
+        Object timeToLive = headers.get(SolaceHeaders.TIME_TO_LIVE);
+
+        if (expiration != null && timeToLive != null && !Objects.equals(expiration, timeToLive)) {
+            String msg = String.format("Message %s cannot set conflicting values for headers %s and %s because they map to the same Solace XMLMessage field. Set only one header, or keep both values identical when round-tripping an inbound message.",
+                    messageId, SolaceHeaders.EXPIRATION, SolaceHeaders.TIME_TO_LIVE);
+            SolaceMessageConversionException exception = new SolaceMessageConversionException(new IllegalArgumentException(msg));
+            log.warn(msg, exception);
+            throw exception;
+        }
     }
 
     private <T> AbstractIntegrationMessageBuilder<T> injectRootMessageHeaders(AbstractIntegrationMessageBuilder<T> builder, AcknowledgmentCallback acknowledgmentCallback, Object sourceData) {

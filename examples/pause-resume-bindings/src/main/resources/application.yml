@@ -1,0 +1,14 @@
+spring:
+  cloud:
+    function:
+      definition: pausableConsumer
+    stream:
+      bindings:
+        pausableConsumer-in-0:
+          destination: example/pausable/topic
+          group: pausable-group
+management:
+  endpoints:
+    web:
+      exposure:
+        include: bindings

@@ -1,0 +1,16 @@
+spring:
+  cloud:
+    function:
+      definition: customQueueConsumer
+    stream:
+      bindings:
+        customQueueConsumer-in-0:
+          destination: example/primary/topic
+          group: custom-group
+      solace:
+        bindings:
+          customQueueConsumer-in-0:
+            consumer:
+              queueNameExpression: "'custom-prefix.' + group + '.v1'"
+              queueAccessType: 0  # EndpointProperties.ACCESSTYPE_EXCLUSIVE
+              queueAdditionalSubscriptions: "example/extra/>,example/more"

@@ -1,0 +1,16 @@
+spring:
+  cloud:
+    function:
+      definition: tracingConsumer
+    stream:
+      bindings:
+        tracingPublisher-out-0:
+          destination: example/tracing/topic
+        tracingConsumer-in-0:
+          destination: example/tracing/topic
+          group: tracing-group
+management:
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0

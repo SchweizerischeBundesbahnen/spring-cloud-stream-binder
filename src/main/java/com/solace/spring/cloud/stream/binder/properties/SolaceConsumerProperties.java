@@ -31,11 +31,7 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      */
     private String queueNameExpression = "'scst/' + (isAnonymous ? 'an/' : 'wk/') + (group?.trim() + '/') + 'plain/' + destination.trim().replaceAll('[*>]', '_')";
 
-    /**
-     * A SQL-92 selector expression to use for selection of messages for consumption. Max of 2000 characters.
-     */
-    @Deprecated
-    private String selector = null;
+
 
     // Error Queue Properties ---------
     /**
@@ -101,30 +97,51 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * Indicated if messages should be consumed using a queue or directly via topic.
      */
     private QualityOfService qualityOfService = QualityOfService.AT_LEAST_ONCE;
-    /**
-     * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
-     */
-    @Deprecated
-    private long maxProcessingTimeMs = 2000;
+
 
     /**
-     * When the message queue size exceeds concurrency*urgentWarningMultiplier, a more urgent warning is logged, defaults to 3
+     * Time in milliseconds before a long-running message processing thread is logged as a warning.
+     * This is used to detect potential deadlocks or stuck threads.
+     * A warning is logged once per message when processing time exceeds this threshold.
+     * Default: 300000 (5 minutes)
      */
-    private Integer urgentWarningMultiplier = 3;
-
-    /**
-     * Time in seconds between warning of queue congestion, defaults to 300 s.
-     */
-    private Integer timeBetweenWarningsS = 300;
-
-    /**
-     * Time in milliseconds till a long running consumer is logged as warning, defaults to 2000 ms.
-     */
-    private long watchdogTimeoutMs = 2000;
+    private long watchdogTimeoutMs = 300000;
     // ------------------------
 
     /**
      * The list of headers to exclude when converting consumed Solace message to Spring message.
      */
     private List<String> headerExclusions = new ArrayList<>();
+
+    /**
+     * Maps to the client-side {@code ConsumerFlowProperties.setTransportWindowSize(int)} value.
+     * This is the JCSMP subscribe acknowledgment window size: how many messages may be in flight on the wire for this
+     * consumer flow at the same time before acknowledgements advance the receive window.
+     *
+     * When unset, the flow inherits the session-level {@code JCSMPProperties.SUB_ACK_WINDOW_SIZE} default.
+     *
+     * It does not provision or modify the broker queue's "Maximum Delivered Unacknowledged Messages per Flow"
+     * setting ({@code maxDeliveredUnackedMsgsPerFlow}); that broker-side value must be configured via SEMP
+     * or equivalent broker configuration.
+     *
+     * Default: null (inherit {@code JCSMPProperties.SUB_ACK_WINDOW_SIZE})
+     */
+    private Integer subAckWindowSize;
+
+
+    /**
+     * The Ack timer in milliseconds for the consumer flow.
+     * Used for grouping acknowledgements.
+     */
+    private Integer flowAckTimerInMsecs;
+
+    /**
+     * The Ack threshold for the consumer flow.
+     */
+    private Integer flowAckThreshold;
+
+    /**
+     * The windowed Ack max size for the consumer flow.
+     */
+    private Integer flowWindowedAckMaxSize;
 }

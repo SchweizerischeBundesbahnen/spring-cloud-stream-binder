@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.0.0] - 2026-02-23
+
+### Breaking Changes
+- **Watchdog**: Removed queue-size-based warnings (`urgentWarningMultiplier`, `timeBetweenWarningsS` properties removed)
+- **Migration Required**: Users must switch to metrics-based backpressure monitoring
+
+### Added
+- **Configuration**: Added direction-specific client-flow window properties: consumer `subAckWindowSize` (inherits `SUB_ACK_WINDOW_SIZE`) and producer `pubAckWindowSize` (inherits `PUB_ACK_WINDOW_SIZE`). The broker queue `maxDeliveredUnackedMsgsPerFlow` limit still must be managed via SEMP or broker configuration.
+- **Examples**: Added `max-unacknowledged-messages` and `programmatic-binding-control` examples to cover broker-managed backlog fairness tuning and programmatic binding lifecycle control.
+
+### Changed
+- **Watchdog**: Changed default `watchdogTimeoutMs` from 2000ms (2 seconds) to 300000ms (5 minutes)
+- **Metrics**: Decoupled metric updates from deadlock detection timeout; metrics now update every 1 second
+- **Documentation**: Transformed API.adoc to API.md
+- **Examples**: Refined the example applications and READMEs so concurrency, manual acknowledgment, retry/redelivery, tracing, metrics, multi-binder, and OAuth2 samples reflect their actual runtime behavior and setup requirements.
+- **Examples**: Standardized the remaining example publishers on 30 second TTLs and `solace_dmqEligible=true` so the code samples match the documented Solace header guidance.
+- **Documentation**: Synchronized `doc/SPECIAL_HEADER.md` with the current `SolaceHeaders` and `SolaceBinderHeaders` definitions, including missing headers and corrected binder access semantics.
+- **Documentation**: Expanded the Solace header and session-property docs with header defaults, discard indication guidance, timestamp/sequence/expiration availability notes, and the exclusivity of `solace_expiration` vs `solace_timeToLive`.
+- **Examples**: Updated the headers, nonpersistent-messaging, and partitioned-queues samples so they reflect current header guidance and SEMP-based partitioned queue provisioning.
+
+### Fixed
+- **Examples**: The redelivery sample now demonstrates broker-level redelivery after exhausting local retries, the manual-ack sample explicitly disables auto-ack before accepting, and example tests now assert the behaviors their documentation describes.
+- **Messaging**: Outbound message mapping now rejects messages that set both `solace_expiration` and `solace_timeToLive`.
+- **Documentation**: Corrected the concurrency and partitioned-queue docs to state that the binder does not guarantee any processing order when `concurrency > 1`, including for partitioned queues.
+- **Documentation**: Corrected the `subAckWindowSize` / `pubAckWindowSize` guidance across the API and examples to distinguish the binder's client-flow windows from the broker queue `maxDeliveredUnackedMsgsPerFlow` limit, which must be configured via SEMP / broker configuration.
+
+### Removed
+- **Configuration**: Removed `urgentWarningMultiplier` property (no longer used)
+- **Configuration**: Removed `timeBetweenWarningsS` property (no longer used)
+- **Configuration**: Removed `maxProcessingTimeMs` property (replaced by `watchdogTimeoutMs`)
+- **Configuration**: Removed `selector` property (JMS selector syntax is no longer natively supported via JCSMP consumer flows)
+
+### Migration Guide
+Users upgrading from 8.0.x must:
+1. Remove `urgentWarningMultiplier`, `timeBetweenWarningsS`, `maxProcessingTimeMs`, and `selector` from configuration
+2. Set up metrics-based monitoring for backpressure detection
+3. Configure Prometheus alerts based on `solace.message.queue.backpressure` metric
+
+See API.md for detailed monitoring and migration guidance.
+
 ## [8.0.0] - 2026-02-19
 ### Changed
 - Update Spring Boot parent to 4.0.2

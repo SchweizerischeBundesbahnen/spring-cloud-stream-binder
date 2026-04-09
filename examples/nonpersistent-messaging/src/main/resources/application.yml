@@ -1,0 +1,18 @@
+spring:
+  cloud:
+    function:
+      definition: directConsumer
+    stream:
+      bindings:
+        directPublisher-out-0:
+          destination: example/direct/topic
+        directConsumer-in-0:
+          destination: example/direct/topic
+      solace:
+        bindings:
+          directPublisher-out-0:
+            producer:
+              deliveryMode: DIRECT
+          directConsumer-in-0:
+            consumer:
+              qualityOfService: AT_MOST_ONCE

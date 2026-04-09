@@ -1,0 +1,29 @@
+spring:
+  cloud:
+    function:
+      definition: partitionedConsumer
+    stream:
+      default:
+        consumer:
+          autoStartup: false
+      bindings:
+        partitionedPublisher-out-0:
+          destination: example/partitioned/topic
+        partitionedConsumer-in-0:
+          destination: example/partitioned/topic
+          group: partitioned-group
+          consumer:
+            concurrency: 2
+
+      solace:
+        bindings:
+          partitionedConsumer-in-0:
+            consumer:
+              provisionDurableQueue: false
+
+app:
+  partition-count: 2
+  semp:
+    host: http://localhost:8081
+    username: admin
+    password: admin

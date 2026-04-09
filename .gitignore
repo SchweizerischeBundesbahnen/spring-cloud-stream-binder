@@ -12,3 +12,6 @@ release.properties
 # Generated certificates for externalized docker (localdev)
 localdev
 src/test/resources/oauth2/certs/rootCA/rootCA.srl
+.vscode
+maven_*.log
+.gitignore
