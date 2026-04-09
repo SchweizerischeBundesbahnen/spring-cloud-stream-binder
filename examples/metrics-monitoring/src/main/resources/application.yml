@@ -1,0 +1,20 @@
+spring:
+  cloud:
+    function:
+      definition: metricsConsumer
+    stream:
+      bindings:
+        metricsPublisher-out-0:
+          destination: example/metrics/topic
+        metricsConsumer-in-0:
+          destination: example/metrics/topic
+          group: metrics-group
+management:
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: metrics,prometheus

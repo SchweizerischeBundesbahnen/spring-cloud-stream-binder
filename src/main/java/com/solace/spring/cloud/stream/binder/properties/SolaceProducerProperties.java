@@ -58,4 +58,13 @@ public class SolaceProducerProperties extends SolaceCommonProperties {
      * Indicated if messages should be sending fire and forget or producer has to wait for broker persistence ack.
      */
     private DeliveryMode deliveryMode = DeliveryMode.PERSISTENT;
+
+    /**
+     * Maps to the client-side {@code ProducerFlowProperties.setWindowSize(int)} value.
+     * This is the JCSMP publish acknowledgment window size: how many persistent publish acknowledgements may be
+     * outstanding on the wire for this producer flow at the same time.
+     * When unset, the producer flow inherits the session-level {@code JCSMPProperties.PUB_ACK_WINDOW_SIZE} default.
+     * Default: null (inherit {@code JCSMPProperties.PUB_ACK_WINDOW_SIZE})
+     */
+    private Integer pubAckWindowSize;
 }

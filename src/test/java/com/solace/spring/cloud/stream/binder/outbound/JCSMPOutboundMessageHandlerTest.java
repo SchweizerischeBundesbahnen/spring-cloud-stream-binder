@@ -449,6 +449,17 @@ public class JCSMPOutboundMessageHandlerTest {
     }
 
     @Test
+    public void testPubAckWindowSizeBindingPropertyOverridesSessionDefault() {
+        Mockito.when(session.getProperty(JCSMPProperties.ACK_EVENT_MODE))
+                .thenReturn(JCSMPProperties.SUPPORTED_ACK_EVENT_MODE_WINDOWED);
+        producerProperties.getExtension().setPubAckWindowSize(100);
+
+        messageHandler.start();
+
+        assertThat(producerFlowPropertiesCaptor.getValue().getWindowSize()).isEqualTo(100);
+    }
+
+    @Test
     public void testSourceDataNotThrowUnknownObject() {
         TextMessage textMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         Message<?> message = MessageGenerator.generateMessage(

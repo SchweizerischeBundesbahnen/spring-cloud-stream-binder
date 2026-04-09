@@ -1,0 +1,73 @@
+spring:
+  cloud:
+    stream:
+      default:
+        consumer:
+          autoStartup: false
+      bindings:
+        publisher-out-0:
+          destination: example/max-unacknowledged/topic
+
+app:
+  total-messages: 20
+
+---
+spring:
+  config:
+    activate:
+      on-profile: fast-consumer
+  cloud:
+    function:
+      definition: loadBalancedConsumer
+    stream:
+      bindings:
+        loadBalancedConsumer-in-0:
+          destination: example/max-unacknowledged/topic
+          group: max-unacknowledged-group
+      solace:
+        bindings:
+          loadBalancedConsumer-in-0:
+            consumer:
+              provisionDurableQueue: false
+
+app:
+  consumer:
+    enabled: true
+  instance-name: fast-consumer
+  processing-delay-ms: 0
+
+---
+spring:
+  config:
+    activate:
+      on-profile: slow-consumer
+  cloud:
+    function:
+      definition: loadBalancedConsumer
+    stream:
+      bindings:
+        loadBalancedConsumer-in-0:
+          destination: example/max-unacknowledged/topic
+          group: max-unacknowledged-group
+      solace:
+        bindings:
+          loadBalancedConsumer-in-0:
+            consumer:
+              provisionDurableQueue: false
+
+app:
+  consumer:
+    enabled: true
+  instance-name: slow-consumer
+  processing-delay-ms: 2000
+
+---
+spring:
+  config:
+    activate:
+      on-profile: publisher
+
+app:
+  instance-name: publisher
+  publisher:
+    enabled: true

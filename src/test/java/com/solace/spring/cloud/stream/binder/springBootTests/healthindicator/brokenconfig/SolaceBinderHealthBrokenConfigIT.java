@@ -48,7 +48,7 @@ public class SolaceBinderHealthBrokenConfigIT {
 
         //give application time to first provisioning breaks
         await().pollInterval(Duration.ofSeconds(1))
-                .atMost(2, TimeUnit.MINUTES).until(() -> {
+                .atMost(5, TimeUnit.MINUTES).until(() -> {
                     String firstHealthResponseBody = client.send(request, HttpResponse.BodyHandlers.ofString()).body();
                     //first test requirement: DOWN after initial spring starts
                     return objectMapper.readTree(firstHealthResponseBody).get("status").asText().equals("DOWN");

@@ -1,0 +1,25 @@
+spring:
+  cloud:
+    function:
+      definition: toBroker1;toBroker2
+    stream:
+      binders:
+        solace-broker-1:
+          type: solace
+        solace-broker-2:
+          type: solace
+      bindings:
+        fromBroker1-out-0:
+          destination: example/multibinder/topic
+          binder: solace-broker-1
+        fromBroker2-out-0:
+          destination: example/multibinder/topic
+          binder: solace-broker-2
+        toBroker1-in-0:
+          destination: example/multibinder/topic
+          group: group-1
+          binder: solace-broker-1
+        toBroker2-in-0:
+          destination: example/multibinder/topic
+          group: group-2
+          binder: solace-broker-2

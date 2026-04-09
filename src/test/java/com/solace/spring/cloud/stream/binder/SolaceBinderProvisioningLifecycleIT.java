@@ -48,13 +48,12 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -419,7 +418,7 @@ public class SolaceBinderProvisioningLifecycleIT {
 
         int numMsgsPerFlow = 10;
         Set<Message<?>> messages = new HashSet<>();
-        Map<String, Instant> foundPayloads = new HashMap<>();
+        Map<String, Integer> foundPayloads = new HashMap<>();
         for (int i = 0; i < numMsgsPerFlow * consumerConcurrency; i++) {
             String payload = "foo-" + i;
             foundPayloads.put(payload, null);
@@ -432,61 +431,13 @@ public class SolaceBinderProvisioningLifecycleIT {
 
         String queue0 = binder.getConsumerQueueName(consumerBinding);
 
-        final long stallIntervalInMillis = 100;
-        final CyclicBarrier barrier = new CyclicBarrier(consumerConcurrency);
-        final CountDownLatch latch = new CountDownLatch(numMsgsPerFlow * consumerConcurrency);
-        moduleInputChannel.subscribe(message1 -> {
-            @SuppressWarnings("unchecked")
-            List<byte[]> payloads = consumerProperties.isBatchMode() ? (List<byte[]>) message1.getPayload() :
-                    Collections.singletonList((byte[]) message1.getPayload());
-            for (byte[] payloadBytes : payloads) {
-                String payload = new String(payloadBytes);
-                synchronized (foundPayloads) {
-                    if (!foundPayloads.containsKey(payload)) {
-                        softly.fail("Received unexpected message %s", payload);
-                        return;
-                    }
-                }
-            }
-
-            Instant timestamp;
-            try { // Align the timestamps between the threads with a human-readable stall interval
-                barrier.await();
-                Thread.sleep(stallIntervalInMillis);
-                timestamp = Instant.now();
-                log.info("Received message {} (size: {}) (timestamp: {})",
-                        StaticMessageHeaderAccessor.getId(message1), payloads.size(), timestamp);
-            } catch (InterruptedException e) {
-                log.error("Interrupt received", e);
-                return;
-            } catch (BrokenBarrierException e) {
-                log.error("Unexpected barrier error", e);
-                return;
-            }
-
-            for (byte[] payloadBytes : payloads) {
-                String payload = new String(payloadBytes);
-                synchronized (foundPayloads) {
-                    foundPayloads.put(payload, timestamp);
-                }
-                latch.countDown();
-            }
-        });
+        final CountDownLatch latch = subscribeAndCaptureParallelGroups(
+                moduleInputChannel, consumerProperties, foundPayloads, consumerConcurrency, softly);
 
         messages.forEach(moduleOutputChannel::send);
 
         assertThat(latch.await(1, TimeUnit.MINUTES)).isTrue();
-        assertThat(foundPayloads).allSatisfy((payload, instant) -> {
-            assertThat(instant).as("Did not receive message %s", payload).isNotNull();
-            assertThat(foundPayloads.values()
-                    .stream()
-                    // Get "closest" messages with a margin of error of half the stalling interval
-                    .filter(instant1 -> Duration.between(instant, instant1).abs()
-                            .minusMillis(stallIntervalInMillis / 2).isNegative())
-                    .count())
-                    .as("Unexpected number of messages in parallel")
-                    .isEqualTo((long) consumerConcurrency);
-        });
+        assertParallelGroupDistribution(foundPayloads, consumerConcurrency, numMsgsPerFlow);
 
         String msgVpnName = (String) context.getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
         List<String> txFlowsIds = sempV2Api.monitor().getMsgVpnQueueTxFlows(
@@ -545,7 +496,7 @@ public class SolaceBinderProvisioningLifecycleIT {
 
         int numMsgsPerFlow = 10;
         Set<Message<?>> messages = new HashSet<>();
-        Map<String, Instant> foundPayloads = new HashMap<>();
+        Map<String, Integer> foundPayloads = new HashMap<>();
         for (int i = 0; i < numMsgsPerFlow * consumerConcurrency; i++) {
             String payload = "foo-" + i;
             foundPayloads.put(payload, null);
@@ -558,61 +509,13 @@ public class SolaceBinderProvisioningLifecycleIT {
 
         String queue0 = binder.getConsumerQueueName(consumerBinding);
 
-        final long stallIntervalInMillis = 100;
-        final CyclicBarrier barrier = new CyclicBarrier(consumerConcurrency);
-        final CountDownLatch latch = new CountDownLatch(numMsgsPerFlow * consumerConcurrency);
-        moduleInputChannel.subscribe(message1 -> {
-            @SuppressWarnings("unchecked")
-            List<byte[]> payloads = consumerProperties.isBatchMode() ? (List<byte[]>) message1.getPayload() :
-                    Collections.singletonList((byte[]) message1.getPayload());
-            for (byte[] payloadBytes : payloads) {
-                String payload = new String(payloadBytes);
-                synchronized (foundPayloads) {
-                    if (!foundPayloads.containsKey(payload)) {
-                        softly.fail("Received unexpected message %s", payload);
-                        return;
-                    }
-                }
-            }
-
-            Instant timestamp;
-            try { // Align the timestamps between the threads with a human-readable stall interval
-                barrier.await();
-                Thread.sleep(stallIntervalInMillis);
-                timestamp = Instant.now();
-                log.info("Received message {} (size: {}) (timestamp: {})",
-                        StaticMessageHeaderAccessor.getId(message1), payloads.size(), timestamp);
-            } catch (InterruptedException e) {
-                log.error("Interrupt received", e);
-                return;
-            } catch (BrokenBarrierException e) {
-                log.error("Unexpected barrier error", e);
-                return;
-            }
-
-            for (byte[] payloadBytes : payloads) {
-                String payload = new String(payloadBytes);
-                synchronized (foundPayloads) {
-                    foundPayloads.put(payload, timestamp);
-                }
-                latch.countDown();
-            }
-        });
+        final CountDownLatch latch = subscribeAndCaptureParallelGroups(
+                moduleInputChannel, consumerProperties, foundPayloads, consumerConcurrency, softly);
 
         messages.forEach(moduleOutputChannel::send);
 
         assertThat(latch.await(1, TimeUnit.MINUTES)).isTrue();
-        assertThat(foundPayloads).allSatisfy((payload, instant) -> {
-            assertThat(instant).as("Did not receive message %s", payload).isNotNull();
-            assertThat(foundPayloads.values()
-                    .stream()
-                    // Get "closest" messages with a margin of error of half the stalling interval
-                    .filter(instant1 -> Duration.between(instant, instant1).abs()
-                            .minusMillis(stallIntervalInMillis / 2).isNegative())
-                    .count())
-                    .as("Unexpected number of messages in parallel")
-                    .isEqualTo((long) consumerConcurrency);
-        });
+        assertParallelGroupDistribution(foundPayloads, consumerConcurrency, numMsgsPerFlow);
 
         String msgVpnName = (String) context.getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
         List<String> txFlowsIds = sempV2Api.monitor().getMsgVpnQueueTxFlows(
@@ -670,7 +573,7 @@ public class SolaceBinderProvisioningLifecycleIT {
 
         int numMsgsPerFlow = 10;
         Set<Message<?>> messages = new HashSet<>();
-        Map<String, Instant> foundPayloads = new HashMap<>();
+        Map<String, Integer> foundPayloads = new HashMap<>();
         for (int i = 0; i < numMsgsPerFlow * consumerConcurrency; i++) {
             String payload = "foo-" + i;
             foundPayloads.put(payload, null);
@@ -683,61 +586,13 @@ public class SolaceBinderProvisioningLifecycleIT {
 
         String queue0 = binder.getConsumerQueueName(consumerBinding);
 
-        final long stallIntervalInMillis = 100;
-        final CyclicBarrier barrier = new CyclicBarrier(consumerConcurrency);
-        final CountDownLatch latch = new CountDownLatch(numMsgsPerFlow * consumerConcurrency);
-        moduleInputChannel.subscribe(message1 -> {
-            @SuppressWarnings("unchecked")
-            List<byte[]> payloads = consumerProperties.isBatchMode() ? (List<byte[]>) message1.getPayload() :
-                    Collections.singletonList((byte[]) message1.getPayload());
-            for (byte[] payloadBytes : payloads) {
-                String payload = new String(payloadBytes);
-                synchronized (foundPayloads) {
-                    if (!foundPayloads.containsKey(payload)) {
-                        softly.fail("Received unexpected message %s", payload);
-                        return;
-                    }
-                }
-            }
-
-            Instant timestamp;
-            try { // Align the timestamps between the threads with a human-readable stall interval
-                barrier.await();
-                Thread.sleep(stallIntervalInMillis);
-                timestamp = Instant.now();
-                log.info("Received message {} (size: {}) (timestamp: {})",
-                        StaticMessageHeaderAccessor.getId(message1), payloads.size(), timestamp);
-            } catch (InterruptedException e) {
-                log.error("Interrupt received", e);
-                return;
-            } catch (BrokenBarrierException e) {
-                log.error("Unexpected barrier error", e);
-                return;
-            }
-
-            for (byte[] payloadBytes : payloads) {
-                String payload = new String(payloadBytes);
-                synchronized (foundPayloads) {
-                    foundPayloads.put(payload, timestamp);
-                }
-                latch.countDown();
-            }
-        });
+        final CountDownLatch latch = subscribeAndCaptureParallelGroups(
+                moduleInputChannel, consumerProperties, foundPayloads, consumerConcurrency, softly);
 
         messages.forEach(moduleOutputChannel::send);
 
         assertThat(latch.await(1, TimeUnit.MINUTES)).isTrue();
-        assertThat(foundPayloads).allSatisfy((payload, instant) -> {
-            assertThat(instant).as("Did not receive message %s", payload).isNotNull();
-            assertThat(foundPayloads.values()
-                    .stream()
-                    // Get "closest" messages with a margin of error of half the stalling interval
-                    .filter(instant1 -> Duration.between(instant, instant1).abs()
-                            .minusMillis(stallIntervalInMillis / 2).isNegative())
-                    .count())
-                    .as("Unexpected number of messages in parallel")
-                    .isEqualTo((long) consumerConcurrency);
-        });
+        assertParallelGroupDistribution(foundPayloads, consumerConcurrency, numMsgsPerFlow);
 
         String msgVpnName = (String) context.getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
         List<String> txFlowsIds = sempV2Api.monitor().getMsgVpnQueueTxFlows(
@@ -987,6 +842,72 @@ public class SolaceBinderProvisioningLifecycleIT {
             if (producerBinding != null) producerBinding.unbind();
             if (consumerBinding != null) consumerBinding.unbind();
         }
+    }
+
+    private CountDownLatch subscribeAndCaptureParallelGroups(DirectChannel moduleInputChannel,
+                                                             ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
+                                                             Map<String, Integer> foundPayloads,
+                                                             int consumerConcurrency,
+                                                             SoftAssertions softly) {
+        AtomicInteger parallelGroup = new AtomicInteger(1);
+        CyclicBarrier barrier = new CyclicBarrier(consumerConcurrency, parallelGroup::incrementAndGet);
+        CountDownLatch latch = new CountDownLatch(foundPayloads.size());
+
+        moduleInputChannel.subscribe(message1 -> {
+            @SuppressWarnings("unchecked")
+            List<byte[]> payloads = consumerProperties.isBatchMode() ? (List<byte[]>) message1.getPayload() :
+                    Collections.singletonList((byte[]) message1.getPayload());
+            for (byte[] payloadBytes : payloads) {
+                String payload = new String(payloadBytes);
+                synchronized (foundPayloads) {
+                    if (!foundPayloads.containsKey(payload)) {
+                        softly.fail("Received unexpected message %s", payload);
+                        return;
+                    }
+                }
+            }
+
+            int parallelGroupId = parallelGroup.get();
+            try {
+                barrier.await();
+                log.info("Received message {} (size: {}) (parallel group: {})",
+                        StaticMessageHeaderAccessor.getId(message1), payloads.size(), parallelGroupId);
+            } catch (InterruptedException e) {
+                log.error("Interrupt received", e);
+                return;
+            } catch (BrokenBarrierException e) {
+                log.error("Unexpected barrier error", e);
+                return;
+            }
+
+            for (byte[] payloadBytes : payloads) {
+                String payload = new String(payloadBytes);
+                synchronized (foundPayloads) {
+                    foundPayloads.put(payload, parallelGroupId);
+                }
+                latch.countDown();
+            }
+        });
+
+        return latch;
+    }
+
+    private void assertParallelGroupDistribution(Map<String, Integer> foundPayloads,
+                                                 int consumerConcurrency,
+                                                 int expectedParallelGroups) {
+        assertThat(foundPayloads).allSatisfy((payload, parallelGroupId) ->
+                assertThat(parallelGroupId).as("Did not receive message %s", payload).isNotNull());
+
+        Map<Integer, Long> messagesPerParallelGroup = foundPayloads.values().stream()
+                .collect(Collectors.groupingBy(parallelGroupId -> parallelGroupId, Collectors.counting()));
+
+        assertThat(messagesPerParallelGroup)
+                .as("Unexpected barrier groups")
+                .hasSize(expectedParallelGroups)
+                .allSatisfy((parallelGroupId, messageCount) ->
+                        assertThat(messageCount)
+                                .as("Unexpected number of messages in parallel for group %s", parallelGroupId)
+                                .isEqualTo((long) consumerConcurrency));
     }
 
     @Test

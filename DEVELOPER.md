@@ -37,7 +37,7 @@ DOCKER_HOST=tcp://123.123.123.123:2375
 
 1. Update the version in the pom.xml
 2. Push a branch to github
-3. Create a Pullrequest 
-4. Approve and merge the Pullrequest to master
+3. Create a Pull Request
+4. Approve and merge the Pull Request to master
 5. Create a release in github and assign the same version
 6. Go to https://oss.sonatype.org and release the new version

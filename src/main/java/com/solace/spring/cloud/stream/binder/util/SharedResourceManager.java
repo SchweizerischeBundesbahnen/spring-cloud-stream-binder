@@ -31,10 +31,10 @@ abstract class SharedResourceManager<T> {
     public T get(String key) throws Exception {
         synchronized (lock) {
             if (registeredIds.isEmpty()) {
-                log.info(String.format("No %s exists, a new one will be created", type));
+                log.info("No {} exists, a new one will be created", type);
                 sharedResource = create();
-            } else if (log.isTraceEnabled()) {
-                log.trace(String.format("A message %s already exists, reusing it", type));
+            } else {
+                log.trace("A message {} already exists, reusing it", type);
             }
 
             registeredIds.add(key);
@@ -54,11 +54,11 @@ abstract class SharedResourceManager<T> {
             if (!registeredIds.contains(key)) return;
 
             if (registeredIds.size() <= 1) {
-                log.info(String.format("%s is the last user, closing %s...", key, type));
+                log.info("{} is the last user, closing {}...", key, type);
                 close();
                 sharedResource = null;
             } else {
-                log.info(String.format("%s is not the last user, persisting %s...", key, type));
+                log.info("{} is not the last user, persisting {}...", key, type);
             }
             registeredIds.remove(key);
         }

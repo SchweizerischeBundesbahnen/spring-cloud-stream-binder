@@ -182,7 +182,7 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
             if (DeliveryMode.DIRECT.equals(properties.getExtension().getDeliveryMode())) {
                 producer = defaultProducer;
             } else {
-                producer = jcsmpSession.createProducer(SolaceProvisioningUtil.getProducerFlowProperties(jcsmpSession),
+                producer = jcsmpSession.createProducer(SolaceProvisioningUtil.getProducerFlowProperties(jcsmpSession, properties),
                         producerEventHandler);
             }
             if (producer instanceof JCSMPXMLMessageProducer jcsmpxmlMessageProducer) {

@@ -121,6 +121,7 @@ public class XMLMessageMapperTest {
                 .filter(h -> h.getValue().isWritable())
                 .collect(Collectors.toSet());
         assertNotEquals(0, writeableHeaders.size(), "Test header set was empty");
+        long sharedMessageLifetime = ThreadLocalRandom.current().nextLong(10000);
 
         for (Map.Entry<String, ? extends HeaderMeta<?>> header : writeableHeaders) {
             messageBuilder.setHeader(header.getKey(), Objects.requireNonNull(switch (header.getKey()) {
@@ -135,7 +136,10 @@ public class XMLMessageMapperTest {
                 case SolaceHeaders.EXPIRATION,
                      SolaceHeaders.SENDER_TIMESTAMP,
                      SolaceHeaders.SEQUENCE_NUMBER,
-                     SolaceHeaders.TIME_TO_LIVE -> (long) ThreadLocalRandom.current().nextInt(10000);
+                     SolaceHeaders.TIME_TO_LIVE -> switch (header.getKey()) {
+                        case SolaceHeaders.EXPIRATION, SolaceHeaders.TIME_TO_LIVE -> sharedMessageLifetime;
+                        default -> (long) ThreadLocalRandom.current().nextInt(10000);
+                     };
                 case SolaceHeaders.PRIORITY -> ThreadLocalRandom.current().nextInt(255);
                 case SolaceHeaders.REPLY_TO -> JCSMPFactory.onlyInstance().createQueue(RandomStringUtils.randomAlphanumeric(10));
                 case SolaceHeaders.USER_DATA -> RandomStringUtils.randomAlphanumeric(10).getBytes();
@@ -395,6 +399,25 @@ public class XMLMessageMapperTest {
         }
     }
 
+            @Test
+            void testFailMapSpringMessageToXMLMessage_ExpirationAndTtlMutuallyExclusive() {
+            Message<?> testSpringMessage = new DefaultMessageBuilderFactory()
+                .withPayload("test")
+                .setHeader(SolaceHeaders.EXPIRATION, 1L)
+                .setHeader(SolaceHeaders.TIME_TO_LIVE, 2L)
+                .build();
+
+            SolaceMessageConversionException exception = assertThrows(SolaceMessageConversionException.class,
+                () -> xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT));
+
+            Assertions.assertThat(exception)
+                .hasMessageContaining(SolaceHeaders.EXPIRATION)
+                .hasMessageContaining(SolaceHeaders.TIME_TO_LIVE)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("conflicting values");
+            }
+
     @Test
     void testMapXMLMessageToErrorXMLMessage() throws Exception {
         SDTMap headers = JCSMPFactory.onlyInstance().createMap();
@@ -483,6 +506,7 @@ public class XMLMessageMapperTest {
                 .filter(h -> h.getValue().getScope().equals(HeaderMeta.Scope.WIRE))
                 .collect(Collectors.toSet());
         assertNotEquals(0, writeableHeaders.size(), "Test header set was empty");
+        long sharedMessageLifetime = ThreadLocalRandom.current().nextLong(10000);
 
         for (Map.Entry<String, ? extends HeaderMeta<?>> header : writeableHeaders) {
             messageBuilder.setHeader(header.getKey(), Objects.requireNonNull(switch (header.getKey()) {
@@ -501,7 +525,10 @@ public class XMLMessageMapperTest {
                 case SolaceHeaders.EXPIRATION,
                      SolaceHeaders.SENDER_TIMESTAMP,
                      SolaceHeaders.SEQUENCE_NUMBER,
-                     SolaceHeaders.TIME_TO_LIVE -> ThreadLocalRandom.current().nextLong(10000);
+                     SolaceHeaders.TIME_TO_LIVE -> switch (header.getKey()) {
+                         case SolaceHeaders.EXPIRATION, SolaceHeaders.TIME_TO_LIVE -> sharedMessageLifetime;
+                         default -> ThreadLocalRandom.current().nextLong(10000);
+                     };
                 case SolaceHeaders.PRIORITY -> ThreadLocalRandom.current().nextInt(255);
                 case SolaceHeaders.REPLY_TO -> JCSMPFactory.onlyInstance().createQueue(RandomStringUtils.randomAlphanumeric(10));
                 case SolaceHeaders.USER_DATA -> RandomStringUtils.randomAlphanumeric(10).getBytes();

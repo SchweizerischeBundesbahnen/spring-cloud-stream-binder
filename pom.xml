@@ -11,7 +11,7 @@
     </parent>
     <groupId>ch.sbb</groupId>
     <artifactId>spring-cloud-stream-binder-solace</artifactId>
-    <version>8.0.0</version>
+    <version>9.0.0</version>
 
     <name>Spring Cloud Stream Binder Solace</name>
     <description>A Spring Cloud Stream Binder implementation using the Solace Java API (JCSMP)</description>
@@ -26,6 +26,7 @@
         <java.version>17</java.version>
         <spring-cloud.version>2025.1.1</spring-cloud.version>
         <maven.test.skip>true</maven.test.skip>
+        <failsafe.forkCount>1C</failsafe.forkCount>
         <build.timestamp>${maven.build.timestamp}</build.timestamp>
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm:ss</maven.build.timestamp.format>
     </properties>
@@ -453,44 +454,24 @@
                         <version>3.5.5</version>
                         <executions>
                             <execution>
+                                <id>default</id>
+                                <phase>none</phase>
+                            </execution>
+                            <execution>
                                 <id>integration-test</id>
                                 <goals>
                                     <goal>integration-test</goal>
                                     <goal>verify</goal>
                                 </goals>
                                 <configuration>
-                                    <reportsDirectory>${project.build.directory}/failsafe-reports</reportsDirectory>
+                                    <reportsDirectory>${project.build.directory}/failsafe-reports-${surefire.forkNumber}</reportsDirectory>
                                     <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary.xml</summaryFile>
-                                    <excludes>
-                                        <exclude>**/springBootTests/**/*IT.java</exclude>
-                                    </excludes>
-                                    <argLine>
-                                        --add-opens java.base/java.lang=ALL-UNNAMED
-                                        --add-opens java.base/java.util=ALL-UNNAMED
-                                        --add-opens java.base/java.net=ALL-UNNAMED
-                                    </argLine>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>integration-test-springboot</id>
-                                <goals>
-                                    <goal>integration-test</goal>
-                                    <goal>verify</goal>
-                                </goals>
-                                <configuration>
-                                    <reportsDirectory>${project.build.directory}/failsafe-reports-springboot</reportsDirectory>
-                                    <summaryFile>${project.build.directory}/failsafe-reports-springboot/failsafe-summary.xml</summaryFile>
-                                    <forkCount>2C</forkCount>
-                                    <reuseForks>false</reuseForks> <!-- new JVM per test class -->
-                                    <properties>
-                                        <configurationParameters>junit.jupiter.tags=isolated</configurationParameters>
-                                    </properties>
-                                    <includes>
-                                        <include>**/springBootTests/**/*IT.java</include><!-- To make all viewers clear that these are explicit needed here, they would be whitelisted anyways. -->
-                                    </includes>
-                                    <excludes>
-                                        <exclude>**/binder/*IT.java</exclude>
-                                    </excludes>
+                                    <forkCount>${failsafe.forkCount}</forkCount>
+                                    <reuseForks>false</reuseForks> <!-- new JVM per test class, enables parallel across @Isolated tests -->
+                                    <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                                    <systemPropertyVariables>
+                                        <surefire.forkNumber>${surefire.forkNumber}</surefire.forkNumber>
+                                    </systemPropertyVariables>
                                     <argLine>
                                         --add-opens java.base/java.lang=ALL-UNNAMED
                                         --add-opens java.base/java.util=ALL-UNNAMED

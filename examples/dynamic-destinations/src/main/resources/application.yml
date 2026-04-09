@@ -1,0 +1,9 @@
+spring:
+  cloud:
+    function:
+      definition: wildcardConsumer
+    stream:
+      bindings:
+        wildcardConsumer-in-0:
+          destination: example/dynamic/>
+          group: dynamic-group

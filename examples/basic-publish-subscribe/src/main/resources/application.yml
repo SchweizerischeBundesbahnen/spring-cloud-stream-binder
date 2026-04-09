@@ -1,0 +1,11 @@
+spring:
+  cloud:
+    function:
+      definition: sink
+    stream:
+      bindings:
+        source-out-0:
+          destination: example/basic/topic
+        sink-in-0:
+          destination: example/basic/topic
+          group: basic-group

@@ -1,0 +1,13 @@
+spring:
+  cloud:
+    function:
+      definition: queuedConsumer;anonConsumer
+    stream:
+      bindings:
+        publisher-out-0:
+          destination: example/groups/topic
+        queuedConsumer-in-0:
+          destination: example/groups/topic
+          group: durable-group
+        anonConsumer-in-0:
+          destination: example/groups/topic

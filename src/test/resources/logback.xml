@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <include resource="org/springframework/boot/logging/logback/base.xml"/>
+
+    <!-- Per-fork log file: writes to target/logs/it-fork-{forkNumber}.log when run via failsafe -->
+    <appender name="FORK_FILE" class="ch.qos.logback.core.FileAppender">
+        <file>target/logs/it-fork-${surefire.forkNumber:-0}.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <root level="INFO">
+        <appender-ref ref="FORK_FILE"/>
+    </root>
+
     <logger name="CONSOLE" level="OFF"/>
     <logger name="com.solacesystems.jcsmp" level="OFF"/>
     <logger name="com.solace.spring.cloud.stream.binder" level="OFF"/>
