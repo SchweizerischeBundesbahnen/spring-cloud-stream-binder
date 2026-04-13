@@ -40,7 +40,7 @@ jobs:
 
       - name: Trigger new workflow run
         if: steps.auto_commit.outputs.changes_detected == 'true'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const ref = '${{ github.head_ref || github.ref_name }}';
