@@ -1,6 +1,13 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
+
+## [9.0.1] - 2026-04-20
+### Changed
+- Updated testcontainers-junit-jupiter, testcontainers-toxiproxy, testcontainers-solace from 2.0.3 to 2.0.4
+- Updated swagger-annotations from 2.2.42 to 2.2.48
+- Updated swagger-core from 2.2.43 to 2.2.48
+- Updated swagger-models from 2.2.45 to 2.2.48
 
 ## [9.0.0] - 2026-02-23
 

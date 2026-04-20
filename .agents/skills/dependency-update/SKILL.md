@@ -14,7 +14,7 @@ description: "Check and update Maven dependencies. Use when upgrading libraries,
 ## Procedure
 
 ### Step 1: Analyze Current Dependencies
-Read `pom.xml` and catalog all dependencies with explicit versions vs BOM-managed versions.
+Read `pom.xml` and catalog all dependencies AND plugins with explicit versions vs BOM-managed versions.
 
 Reference: [version-matrix](./references/version-matrix.md)
 
@@ -25,37 +25,57 @@ Key explicitly-versioned dependencies to check:
 - `testcontainers-solace` and `testcontainers-*`
 - `okhttp`
 - `swagger-codegen-maven-plugin`
+- `swagger-annotations`, `swagger-core`, `swagger-models`
 - `gson`
 - `wavefront-sdk-java`
+- All Maven plugins with explicit versions (e.g. `maven-source-plugin`, `central-publishing-maven-plugin`)
 
 ### Step 2: Check for Updates
-For each explicitly-versioned dependency:
-- Check Maven Central for the latest release via web search
+For each explicitly-versioned dependency and plugin:
+- Check Maven Central for the latest **stable** release via web search (skip RC/alpha/beta)
+- Only update if the version is actually available and downloadable from Maven Central
 - Verify compatibility with the current Spring Boot and Spring Cloud BOMs
 - Assess risk level: patch (safe), minor (review changelog), major (breaking — review carefully)
 
 ### Step 3: Apply Updates
 For approved updates:
 1. Update the version in `pom.xml`
-2. Run unit tests:
+2. Run build verification:
+   ```shell
+   mvn verify "-Dgpg.skip" -DskipTests
+   ```
+   Note: Use `-Dgpg.skip` because GPG signing is not available in dev environments.
+3. If build succeeds, run tests:
    ```shell
    mvn test-compile -P it_tests && mvn test -DskipITs -P it_tests > maven_tests.log 2>&1
    ```
-3. If tests pass, run integration tests:
+4. If tests pass, run integration tests:
    ```shell
    mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml > maven_it_tests.log 2>&1
    ```
-4. Parse results: `tail -20 maven_tests.log` and `grep -E "Tests run:|BUILD" maven_tests.log`
+5. Parse results: `tail -20 maven_tests.log` and `grep -E "Tests run:|BUILD" maven_tests.log`
 
-### Step 4: Update Documentation
-- Update `README.md` version compatibility table if Spring Boot/Cloud versions changed
-- Add entry to `CHANGELOG.md` for dependency updates
-- Update `DEVELOPER.md` if build tool requirements changed
+### Step 4: Version Bump
+After successful `mvn verify`, bump the project version to the next patch release:
+1. Update `<version>` in `pom.xml` (e.g. 9.0.0 → 9.0.1)
+2. Update the Maven dependency snippet in `README.md` to the new version
 
-### Step 5: Verify Dependabot Coverage
+### Step 5: Update Documentation
+
+#### README.md — Version Compatibility Table
+- **Only ADD a new line** at the top of the table for the new version
+- **NEVER modify or replace existing lines** in the table — they are historical records
+- Update the Maven dependency snippet `<version>` to the new version
+
+#### CHANGELOG.md
+- First check if `CHANGELOG.md` exists in the repository
+- If it exists, add a new version entry (e.g. `## [9.0.1] - 2026-04-20`) with a `### Changed` section listing all dependency updates
+- Do NOT use `[Unreleased]` — use the concrete version number and today's date directly
+
+### Step 6: Verify Dependabot Coverage
 Check `.github/dependabot.yml` to ensure new dependencies are covered by automated updates.
 
-### Step 6: Verify CI
+### Step 7: Verify CI
 ```shell
 gh run list --limit 5
 ```
