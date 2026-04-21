@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.4</version>
+        <version>4.0.5</version>
         <relativePath/>
     </parent>
 
@@ -20,7 +20,7 @@
         <java.version>17</java.version>
         <spring-cloud.version>2025.1.1</spring-cloud.version>
         <solace-binder.version>9.0.1</solace-binder.version>
-        <testcontainers-solace.version>2.0.3</testcontainers-solace.version>
+        <testcontainers-solace.version>2.0.4</testcontainers-solace.version>
         <testcontainers.version>2.0.4</testcontainers.version>
     </properties>
 
@@ -93,7 +93,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>3.5.3</version>
+                <version>3.5.5</version>
                 <configuration>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>

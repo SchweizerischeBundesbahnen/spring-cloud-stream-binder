@@ -15,9 +15,6 @@ description: "Check and update Maven dependencies. Use when upgrading libraries,
 
 ### Step 1: Analyze Current Dependencies
 Read `pom.xml` and catalog all dependencies AND plugins with explicit versions vs BOM-managed versions.
-
-Reference: [version-matrix](./references/version-matrix.md)
-
 Key explicitly-versioned dependencies to check:
 - `spring-boot-starter-solace-client-config`
 - `jakarta.annotation-api`
@@ -54,6 +51,13 @@ For approved updates:
    mvn -B verify -Dmaven.test.skip=false -P it_tests --file pom.xml > maven_it_tests.log 2>&1
    ```
 5. Parse results: `tail -20 maven_tests.log` and `grep -E "Tests run:|BUILD" maven_tests.log`
+
+### Step 3b: Update Examples
+All example projects under `examples/` must also be updated:
+1. Check all explicitly-versioned dependencies and plugins in example `pom.xml` files (e.g. `testcontainers-solace.version`, `maven-failsafe-plugin`, `spring-boot-starter-parent`)
+2. For each, check Maven Central for the latest **stable** release (same rules as Step 2)
+3. Apply all applicable updates across all example `pom.xml` files
+4. Verify examples still compile after updates
 
 ### Step 4: Version Bump
 After successful `mvn verify`, bump the project version to the next patch release:
