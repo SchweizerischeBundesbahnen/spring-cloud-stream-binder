@@ -88,6 +88,11 @@ public class SolaceEndpointProvisioner
                     "Provisioning will continue under the assumption that it is disabled...");
         }
 
+        if (SolaceProvisioningUtil.isTopicSubscription(properties.getExtension().getQualityOfService())) {
+            log.info("Consumer is configured with AT_MOST_ONCE QoS, subscribing directly to topic {}", name);
+            return new SolaceConsumerDestination(name, name, group, true, null, Set.of(properties.getExtension().getQueueAdditionalSubscriptions()));
+        }
+
         boolean isAnonEndpoint = SolaceProvisioningUtil.isAnonEndpoint(group, properties.getExtension().getQualityOfService());
         boolean isDurableEndpoint = SolaceProvisioningUtil.isDurableEndpoint(group, properties.getExtension().getQualityOfService());
         SolaceProvisioningUtil.QueueNames queueNames = SolaceProvisioningUtil.getQueueNames(name, group, properties, isAnonEndpoint);

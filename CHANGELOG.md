@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.0.2] - 2026-04-21
+
+### Changed
+- fix non-persistent provisioning. Don't create a queue if the binding is configured as qualityOfService=AT_MOST_ONCE.
+
 ## [9.0.1] - 2026-04-21
 ### Changed
 - Updated maven-compiler-plugin from 3.14.0 to 3.15.0
