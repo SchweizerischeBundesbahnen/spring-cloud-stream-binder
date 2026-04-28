@@ -1,6 +1,7 @@
 package com.solace.spring.cloud.stream.binder.outbound;
 
 import com.solace.spring.cloud.stream.binder.messaging.SolaceBinderHeaders;
+import com.solace.spring.cloud.stream.binder.messaging.SolaceHeaders;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
 import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties;
 import com.solace.spring.cloud.stream.binder.test.spring.MessageGenerator;
@@ -483,6 +484,48 @@ public class JCSMPOutboundMessageHandlerTest {
         assertDoesNotThrow(() -> messageHandler.handleMessage(message));
     }
 
+    @Test
+    public void testDefaultHeaderApplied() throws Exception {
+        producerProperties.getExtension().setDefaultHeader(Map.of(
+                "custom-default-header", "my-default-value",
+                SolaceHeaders.TIME_TO_LIVE, 23000L,
+                SolaceHeaders.SENDER_ID, "my-sender-id"));
+
+        Message<?> message = MessageBuilder.withPayload("payload")
+                .setHeader("existing-header", "existing-value")
+                .build();
+
+        messageHandler.start();
+        assertDoesNotThrow(() -> messageHandler.handleMessage(message));
+
+        Mockito.verify(messageProducer, Mockito.atLeastOnce()).send(xmlMessageCaptor.capture(), any(Destination.class));
+
+        XMLMessage sentMsg = xmlMessageCaptor.getValue();
+        SDTMap properties = sentMsg.getProperties();
+        assertThat(properties.getString("custom-default-header")).isEqualTo("my-default-value");
+        assertThat(properties.getString("existing-header")).isEqualTo("existing-value");
+        assertThat(sentMsg.getTimeToLive()).isEqualTo(23000L);
+        assertThat(sentMsg.getSenderId()).isEqualTo("my-sender-id");
+    }
+
+    @Test
+    public void testDefaultHeaderIgnoredWhenAlreadyPresent() throws Exception {
+        producerProperties.getExtension().setDefaultHeader(Map.of("custom-default-header", "my-default-value"));
+
+        Message<?> message = MessageBuilder.withPayload("payload")
+                .setHeader("custom-default-header", "overridden-value")
+                .build();
+
+        messageHandler.start();
+        assertDoesNotThrow(() -> messageHandler.handleMessage(message));
+
+        Mockito.verify(messageProducer, Mockito.atLeastOnce()).send(xmlMessageCaptor.capture(), any(Destination.class));
+
+        XMLMessage sentMsg = xmlMessageCaptor.getValue();
+        SDTMap properties = sentMsg.getProperties();
+        assertThat(properties.getString("custom-default-header")).isEqualTo("overridden-value");
+    }
+
     private List<Object> getCorrelationKeys() throws JCSMPException {
         Mockito.verify(messageProducer, Mockito.atLeastOnce()).send(xmlMessageCaptor.capture(), any(Destination.class));
         return xmlMessageCaptor.getAllValues()
@@ -506,3 +549,4 @@ public class JCSMPOutboundMessageHandlerTest {
         return createCorrelationKey(correlationData, msg);
     }
 }
+

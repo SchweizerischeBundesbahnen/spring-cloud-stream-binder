@@ -45,6 +45,7 @@ This keeps the broker management UI on `http://localhost:8081` so the web- and a
 * [**dynamic-destinations**](./dynamic-destinations/README.md): Demonstrates programmatic publishing directly to calculated string destinations via Spring `StreamBridge`.
 * [**queue-provisioning-options**](./queue-provisioning-options/README.md): Shows advanced Solace queue tuning via YAML metadata properties (`errorMsgRejected`, access types, etc).
 * [**partitioned-queues**](./partitioned-queues/README.md): Shows how to publish partition keys and provision the example queue as partitioned via SEMP before starting the consumer binding.
+* [**default-headers**](./default-headers/README.md): Detailed instruction on mapping and reading proprietary or custom default headers directly onto standard Spring `Message<?>` envelopes before they are published.
 * [**solace-headers**](./solace-headers/README.md): Detailed instruction on mapping and reading proprietary Solace-specific headers directly onto standard Spring `Message<?>` envelopes.
 
 ### Architecture & Workflows

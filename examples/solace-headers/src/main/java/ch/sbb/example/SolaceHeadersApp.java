@@ -22,7 +22,9 @@ import java.util.function.Consumer;
 @EnableScheduling
 public class SolaceHeadersApp {
     private static final Logger log = LoggerFactory.getLogger(SolaceHeadersApp.class);
-    public record ReceivedHeaders(String correlationId, String customOrgId, Long timeToLive, Boolean dmqEligible) {}
+
+    public record ReceivedHeaders(String correlationId, String customOrgId, Long timeToLive, Boolean dmqEligible) {
+    }
 
     public static final BlockingQueue<ReceivedHeaders> RECEIVED_HEADERS = new LinkedBlockingQueue<>();
     private final AtomicInteger count = new AtomicInteger();
@@ -32,7 +34,9 @@ public class SolaceHeadersApp {
         this.streamBridge = streamBridge;
     }
 
-    public static void main(String[] args) { SpringApplication.run(SolaceHeadersApp.class, args); }
+    public static void main(String[] args) {
+        SpringApplication.run(SolaceHeadersApp.class, args);
+    }
 
     @Scheduled(fixedRate = 500)
     public void publish() {
@@ -42,12 +46,12 @@ public class SolaceHeadersApp {
                 .setHeader(SolaceHeaders.CORRELATION_ID, "corr-id-" + index)
                 .setHeader(SolaceHeaders.APPLICATION_MESSAGE_TYPE, "Example/Type")
                 .setHeader(SolaceHeaders.PRIORITY, index % 255)
-            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
                 // User-defined properties (Spring automatically maps these)
                 .setHeader("custom-org-id", "ORG-" + index)
                 .build();
-                
+
         streamBridge.send("headerPublisher-out-0", message);
         log.info("Published with CorrelationID: corr-id-{}", index);
     }
@@ -59,7 +63,7 @@ public class SolaceHeadersApp {
             String customOrg = msg.getHeaders().get("custom-org-id", String.class);
             Long timeToLive = msg.getHeaders().get(SolaceHeaders.TIME_TO_LIVE, Long.class);
             Boolean dmqEligible = msg.getHeaders().get(SolaceHeaders.DMQ_ELIGIBLE, Boolean.class);
-            
+
             log.info("Received {} | CorrelationID={} | TTL={} | dmqEligible={} | custom-org-id={} (should be null due to headerExclusions)",
                     msg.getPayload(), correlationId, timeToLive, dmqEligible, customOrg);
 

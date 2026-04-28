@@ -1,10 +1,5 @@
 package com.solace.spring.cloud.stream.binder.util;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import com.solace.spring.cloud.stream.binder.messaging.*;
 import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties;
 import com.solace.spring.cloud.stream.binder.test.util.SerializableFoo;
@@ -44,6 +39,10 @@ import org.springframework.messaging.support.GenericMessage;
 import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.SerializationUtils;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
+import tools.jackson.databind.ObjectWriter;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Parameter;
@@ -64,12 +63,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MockitoExtension.class)
 public class XMLMessageMapperTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private final ObjectWriter objectWriter = OBJECT_MAPPER.writer();
-    private final ObjectReader objectReader = OBJECT_MAPPER.reader();
-
-    @Spy
-    private final XMLMessageMapper xmlMessageMapper = new XMLMessageMapper();
-
     private static final Log logger = LogFactory.getLog(XMLMessageMapperTest.class);
     private static final Set<String> JMS_INVALID_HEADER_NAMES = new HashSet<>(Arrays.asList("~ab;c", "NULL",
             "TRUE", "FALSE", "NOT", "AND", "OR", "BETWEEN", "LIKE", "IN", "IS", "ESCAPE", "JMSX_abc", "JMS_abc"));
@@ -80,6 +73,106 @@ public class XMLMessageMapperTest {
                 .anyMatch(c -> c.skip(1).anyMatch(c1 -> !Character.isJavaIdentifierPart(c1))));
         assertTrue(JMS_INVALID_HEADER_NAMES.stream().anyMatch(h -> h.startsWith("JMSX")));
         assertTrue(JMS_INVALID_HEADER_NAMES.stream().anyMatch(h -> h.startsWith("JMS_")));
+    }
+
+    private final ObjectWriter objectWriter = OBJECT_MAPPER.writer();
+    private final ObjectReader objectReader = OBJECT_MAPPER.reader();
+    @Spy
+    private final XMLMessageMapper xmlMessageMapper = new XMLMessageMapper();
+
+    private static Stream<Arguments> springPayloadTypeProviders() {
+        return Stream.of(
+                Arguments.of(Named.of("BYTE_ARRAY", new SpringMessageTypeProvider<>(
+                        BytesMessage.class,
+                        MimeTypeUtils.APPLICATION_OCTET_STREAM,
+                        () -> "testPayload".getBytes(StandardCharsets.UTF_8),
+                        BytesMessage::getData))),
+                Arguments.of(Named.of("STRING", new SpringMessageTypeProvider<>(
+                        TextMessage.class,
+                        MimeTypeUtils.TEXT_PLAIN,
+                        () -> "testPayload",
+                        TextMessage::getText))),
+                Arguments.of(Named.of("SERIALIZABLE", new SpringMessageTypeProvider<>(
+                        BytesMessage.class,
+                        new MimeType("application", "x-java-serialized-object"),
+                        () -> new SerializableFoo("abc123", "HOOPLA!"),
+                        m -> SerializationUtils.deserialize(m.getData()),
+                        true))),
+                Arguments.of(Named.of("SDT_STREAM", new SpringMessageTypeProvider<>(
+                        StreamMessage.class,
+                        new MimeType("application", "x-java-serialized-object"),
+                        () -> {
+                            SDTStream sdtStream = JCSMPFactory.onlyInstance().createStream();
+                            sdtStream.writeBoolean(true);
+                            sdtStream.writeCharacter('s');
+                            sdtStream.writeMap(JCSMPFactory.onlyInstance().createMap());
+                            sdtStream.writeStream(JCSMPFactory.onlyInstance().createStream());
+                            return sdtStream;
+                        },
+                        StreamMessage::getStream))),
+                Arguments.of(Named.of("SDT_MAP", new SpringMessageTypeProvider<>(
+                        MapMessage.class,
+                        new MimeType("application", "x-java-serialized-object"),
+                        () -> {
+                            SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
+                            sdtMap.putBoolean("a", true);
+                            sdtMap.putCharacter("b", 's');
+                            sdtMap.putMap("c", JCSMPFactory.onlyInstance().createMap());
+                            sdtMap.putStream("d", JCSMPFactory.onlyInstance().createStream());
+                            return sdtMap;
+                        },
+                        MapMessage::getMap)))
+        );
+    }
+
+    private static Stream<Arguments> xmlMessageTypeProviders() {
+        return Stream.of(
+                Arguments.of(Named.of("BYTE_ARRAY", new XmlMessageTypeProvider<>(
+                        BytesMessage.class,
+                        MimeTypeUtils.APPLICATION_OCTET_STREAM,
+                        () -> RandomStringUtils.randomAlphabetic(10).getBytes(StandardCharsets.UTF_8),
+                        BytesMessage::setData))),
+                Arguments.of(Named.of("SERIALIZABLE", new XmlMessageTypeProvider<>(
+                        BytesMessage.class,
+                        new MimeType("application", "x-java-serialized-object"),
+                        () -> new SerializableFoo(RandomStringUtils.randomAlphabetic(10),
+                                RandomStringUtils.randomAlphabetic(10)),
+                        (msg, p) -> msg.setData(SerializationUtils.serialize(p)),
+                        props -> props.putBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD, true)))),
+                Arguments.of(Named.of("STRING", new XmlMessageTypeProvider<>(
+                        TextMessage.class,
+                        MimeTypeUtils.TEXT_PLAIN,
+                        () -> RandomStringUtils.randomAlphabetic(10),
+                        TextMessage::setText))),
+                Arguments.of(Named.of("SDT_MAP", new XmlMessageTypeProvider<>(
+                        MapMessage.class,
+                        new MimeType("application", "x-java-serialized-object"),
+                        () -> {
+                            SDTMap expectedPayload = JCSMPFactory.onlyInstance().createMap();
+                            expectedPayload.putBoolean("a", true);
+                            expectedPayload.putCharacter("b", 's');
+                            expectedPayload.putMap("c", JCSMPFactory.onlyInstance().createMap());
+                            expectedPayload.putStream("d", JCSMPFactory.onlyInstance().createStream());
+                            return expectedPayload;
+                        },
+                        MapMessage::setMap))),
+                Arguments.of(Named.of("SDT_STREAM", new XmlMessageTypeProvider<>(
+                        StreamMessage.class,
+                        new MimeType("application", "x-java-serialized-object"),
+                        () -> {
+                            SDTStream expectedPayload = JCSMPFactory.onlyInstance().createStream();
+                            expectedPayload.writeBoolean(true);
+                            expectedPayload.writeCharacter('s');
+                            expectedPayload.writeMap(JCSMPFactory.onlyInstance().createMap());
+                            expectedPayload.writeStream(JCSMPFactory.onlyInstance().createStream());
+                            return expectedPayload;
+                        },
+                        StreamMessage::setStream))),
+                Arguments.of(Named.of("XML_CONTENT", new XmlMessageTypeProvider<>(
+                        XMLContentMessage.class,
+                        MimeTypeUtils.TEXT_XML,
+                        () -> "<a><b>testPayload</b><c>testPayload2</c></a>",
+                        XMLContentMessage::setXMLContent))));
     }
 
     @ParameterizedTest
@@ -137,9 +230,9 @@ public class XMLMessageMapperTest {
                      SolaceHeaders.SENDER_TIMESTAMP,
                      SolaceHeaders.SEQUENCE_NUMBER,
                      SolaceHeaders.TIME_TO_LIVE -> switch (header.getKey()) {
-                        case SolaceHeaders.EXPIRATION, SolaceHeaders.TIME_TO_LIVE -> sharedMessageLifetime;
-                        default -> (long) ThreadLocalRandom.current().nextInt(10000);
-                     };
+                    case SolaceHeaders.EXPIRATION, SolaceHeaders.TIME_TO_LIVE -> sharedMessageLifetime;
+                    default -> (long) ThreadLocalRandom.current().nextInt(10000);
+                };
                 case SolaceHeaders.PRIORITY -> ThreadLocalRandom.current().nextInt(255);
                 case SolaceHeaders.REPLY_TO -> JCSMPFactory.onlyInstance().createQueue(RandomStringUtils.randomAlphanumeric(10));
                 case SolaceHeaders.USER_DATA -> RandomStringUtils.randomAlphanumeric(10).getBytes();
@@ -399,24 +492,24 @@ public class XMLMessageMapperTest {
         }
     }
 
-            @Test
-            void testFailMapSpringMessageToXMLMessage_ExpirationAndTtlMutuallyExclusive() {
-            Message<?> testSpringMessage = new DefaultMessageBuilderFactory()
+    @Test
+    void testFailMapSpringMessageToXMLMessage_ExpirationAndTtlMutuallyExclusive() {
+        Message<?> testSpringMessage = new DefaultMessageBuilderFactory()
                 .withPayload("test")
                 .setHeader(SolaceHeaders.EXPIRATION, 1L)
                 .setHeader(SolaceHeaders.TIME_TO_LIVE, 2L)
                 .build();
 
-            SolaceMessageConversionException exception = assertThrows(SolaceMessageConversionException.class,
+        SolaceMessageConversionException exception = assertThrows(SolaceMessageConversionException.class,
                 () -> xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT));
 
-            Assertions.assertThat(exception)
+        Assertions.assertThat(exception)
                 .hasMessageContaining(SolaceHeaders.EXPIRATION)
                 .hasMessageContaining(SolaceHeaders.TIME_TO_LIVE)
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("conflicting values");
-            }
+    }
 
     @Test
     void testMapXMLMessageToErrorXMLMessage() throws Exception {
@@ -526,9 +619,9 @@ public class XMLMessageMapperTest {
                      SolaceHeaders.SENDER_TIMESTAMP,
                      SolaceHeaders.SEQUENCE_NUMBER,
                      SolaceHeaders.TIME_TO_LIVE -> switch (header.getKey()) {
-                         case SolaceHeaders.EXPIRATION, SolaceHeaders.TIME_TO_LIVE -> sharedMessageLifetime;
-                         default -> ThreadLocalRandom.current().nextLong(10000);
-                     };
+                    case SolaceHeaders.EXPIRATION, SolaceHeaders.TIME_TO_LIVE -> sharedMessageLifetime;
+                    default -> ThreadLocalRandom.current().nextLong(10000);
+                };
                 case SolaceHeaders.PRIORITY -> ThreadLocalRandom.current().nextInt(255);
                 case SolaceHeaders.REPLY_TO -> JCSMPFactory.onlyInstance().createQueue(RandomStringUtils.randomAlphanumeric(10));
                 case SolaceHeaders.USER_DATA -> RandomStringUtils.randomAlphanumeric(10).getBytes();
@@ -1449,13 +1542,13 @@ public class XMLMessageMapperTest {
     }
 
     private void validateSpringHeaders(MessageHeaders messageHeaders, XMLMessage xmlMessage)
-            throws SDTException, JsonProcessingException {
+            throws SDTException {
         validateSpringHeaders(messageHeaders, xmlMessage, xmlMessage.getProperties());
     }
 
     private void validateSpringHeaders(MessageHeaders messageHeaders, XMLMessage xmlMessage,
                                        SDTMap expectedHeaders)
-            throws SDTException, JsonProcessingException {
+            throws SDTException {
         List<String> nonReadableBinderHeaderMeta = SolaceBinderHeaderMeta.META
                 .entrySet()
                 .stream()
@@ -1509,7 +1602,6 @@ public class XMLMessageMapperTest {
         Assertions.assertThat(messageHeaders).doesNotContainKey(SolaceHeaders.DELIVERY_COUNT);
     }
 
-
     private <T> void validateSpringPayload(Object payload, T expectedPayload) {
         Assertions.assertThat(payload).isInstanceOf(expectedPayload.getClass());
 
@@ -1528,51 +1620,6 @@ public class XMLMessageMapperTest {
         } else {
             assertEquals(expectedPayload, springMessagePayload);
         }
-    }
-
-    private static Stream<Arguments> springPayloadTypeProviders() {
-        return Stream.of(
-                Arguments.of(Named.of("BYTE_ARRAY", new SpringMessageTypeProvider<>(
-                        BytesMessage.class,
-                        MimeTypeUtils.APPLICATION_OCTET_STREAM,
-                        () -> "testPayload".getBytes(StandardCharsets.UTF_8),
-                        BytesMessage::getData))),
-                Arguments.of(Named.of("STRING", new SpringMessageTypeProvider<>(
-                        TextMessage.class,
-                        MimeTypeUtils.TEXT_PLAIN,
-                        () -> "testPayload",
-                        TextMessage::getText))),
-                Arguments.of(Named.of("SERIALIZABLE", new SpringMessageTypeProvider<>(
-                        BytesMessage.class,
-                        new MimeType("application", "x-java-serialized-object"),
-                        () -> new SerializableFoo("abc123", "HOOPLA!"),
-                        m -> SerializationUtils.deserialize(m.getData()),
-                        true))),
-                Arguments.of(Named.of("SDT_STREAM", new SpringMessageTypeProvider<>(
-                        StreamMessage.class,
-                        new MimeType("application", "x-java-serialized-object"),
-                        () -> {
-                            SDTStream sdtStream = JCSMPFactory.onlyInstance().createStream();
-                            sdtStream.writeBoolean(true);
-                            sdtStream.writeCharacter('s');
-                            sdtStream.writeMap(JCSMPFactory.onlyInstance().createMap());
-                            sdtStream.writeStream(JCSMPFactory.onlyInstance().createStream());
-                            return sdtStream;
-                        },
-                        StreamMessage::getStream))),
-                Arguments.of(Named.of("SDT_MAP", new SpringMessageTypeProvider<>(
-                        MapMessage.class,
-                        new MimeType("application", "x-java-serialized-object"),
-                        () -> {
-                            SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
-                            sdtMap.putBoolean("a", true);
-                            sdtMap.putCharacter("b", 's');
-                            sdtMap.putMap("c", JCSMPFactory.onlyInstance().createMap());
-                            sdtMap.putStream("d", JCSMPFactory.onlyInstance().createStream());
-                            return sdtMap;
-                        },
-                        MapMessage::getMap)))
-        );
     }
 
     private record SpringMessageTypeProvider<T, MT extends XMLMessage>(
@@ -1599,56 +1646,6 @@ public class XMLMessageMapperTest {
         public T extractSmfPayload(MT message) {
             return xmlMessagePayloadGetter.apply(message);
         }
-    }
-
-    private static Stream<Arguments> xmlMessageTypeProviders() {
-        return Stream.of(
-                Arguments.of(Named.of("BYTE_ARRAY", new XmlMessageTypeProvider<>(
-                        BytesMessage.class,
-                        MimeTypeUtils.APPLICATION_OCTET_STREAM,
-                        () -> RandomStringUtils.randomAlphabetic(10).getBytes(StandardCharsets.UTF_8),
-                        BytesMessage::setData))),
-                Arguments.of(Named.of("SERIALIZABLE", new XmlMessageTypeProvider<>(
-                        BytesMessage.class,
-                        new MimeType("application", "x-java-serialized-object"),
-                        () -> new SerializableFoo(RandomStringUtils.randomAlphabetic(10),
-                                RandomStringUtils.randomAlphabetic(10)),
-                        (msg, p) -> msg.setData(SerializationUtils.serialize(p)),
-                        props -> props.putBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD, true)))),
-                Arguments.of(Named.of("STRING", new XmlMessageTypeProvider<>(
-                        TextMessage.class,
-                        MimeTypeUtils.TEXT_PLAIN,
-                        () -> RandomStringUtils.randomAlphabetic(10),
-                        TextMessage::setText))),
-                Arguments.of(Named.of("SDT_MAP", new XmlMessageTypeProvider<>(
-                        MapMessage.class,
-                        new MimeType("application", "x-java-serialized-object"),
-                        () -> {
-                            SDTMap expectedPayload = JCSMPFactory.onlyInstance().createMap();
-                            expectedPayload.putBoolean("a", true);
-                            expectedPayload.putCharacter("b", 's');
-                            expectedPayload.putMap("c", JCSMPFactory.onlyInstance().createMap());
-                            expectedPayload.putStream("d", JCSMPFactory.onlyInstance().createStream());
-                            return expectedPayload;
-                        },
-                        MapMessage::setMap))),
-                Arguments.of(Named.of("SDT_STREAM", new XmlMessageTypeProvider<>(
-                        StreamMessage.class,
-                        new MimeType("application", "x-java-serialized-object"),
-                        () -> {
-                            SDTStream expectedPayload = JCSMPFactory.onlyInstance().createStream();
-                            expectedPayload.writeBoolean(true);
-                            expectedPayload.writeCharacter('s');
-                            expectedPayload.writeMap(JCSMPFactory.onlyInstance().createMap());
-                            expectedPayload.writeStream(JCSMPFactory.onlyInstance().createStream());
-                            return expectedPayload;
-                        },
-                        StreamMessage::setStream))),
-                Arguments.of(Named.of("XML_CONTENT", new XmlMessageTypeProvider<>(
-                        XMLContentMessage.class,
-                        MimeTypeUtils.TEXT_XML,
-                        () -> "<a><b>testPayload</b><c>testPayload2</c></a>",
-                        XMLContentMessage::setXMLContent))));
     }
 
     private static class XmlMessageTypeCartesianProvider implements CartesianParameterArgumentsProvider<

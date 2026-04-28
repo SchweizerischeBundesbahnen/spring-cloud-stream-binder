@@ -411,6 +411,10 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 :   The list of headers to exclude from the published message. Excluding Solace message headers is not supported.
     Default: Empty `List<String>`
 
+`defaultHeader`
+:   Set of default headers that will be added to the published message. If a header occurs in the published message as well, the default header will be ignored.
+    Default: Empty `Map<String, Object>`
+
 `nonserializableHeaderConvertToString`
 :   When set to `true`, irreversibly convert non-serializable headers to strings. An exception is thrown otherwise.
     Default: `false`
