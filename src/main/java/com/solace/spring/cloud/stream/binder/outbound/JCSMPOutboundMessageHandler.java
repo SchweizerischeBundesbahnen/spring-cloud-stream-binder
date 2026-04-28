@@ -101,7 +101,8 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
                 message,
                 properties.getExtension().getHeaderExclusions(),
                 properties.getExtension().isNonserializableHeaderConvertToString(),
-                properties.getExtension().getDeliveryMode());
+                properties.getExtension().getDeliveryMode(),
+                properties.getExtension().getDefaultHeader());
         tracing.ifPresent(tracingProxy -> tracingProxy.injectTracingHeader(smfMessageMapped.getProperties()));
 
         smfMessageMapped.setCorrelationKey(correlationKey);

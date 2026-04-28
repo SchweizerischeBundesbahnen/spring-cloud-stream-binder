@@ -24,6 +24,7 @@
         <module>partitioned-queues</module>
         <module>nonpersistent-messaging</module>
         <module>solace-headers</module>
+        <module>default-headers</module>
         <module>large-message-chunking</module>
         <module>health-indicator</module>
         <module>metrics-monitoring</module>

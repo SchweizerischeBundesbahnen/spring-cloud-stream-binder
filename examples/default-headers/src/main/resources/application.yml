@@ -1,0 +1,19 @@
+﻿spring:
+  cloud:
+    function:
+      definition: headerConsumer
+    stream:
+      bindings:
+        headerPublisher-out-0:
+          destination: example/headers/topic
+        headerConsumer-in-0:
+          destination: example/headers/topic
+          group: headers-group
+      solace:
+        bindings:
+          headerPublisher-out-0:
+            producer:
+              default-header:
+                custom-default-header: my-default-value
+                solace_timeToLive: 23000
+                solace_senderId: my-project_${HOSTNAME}

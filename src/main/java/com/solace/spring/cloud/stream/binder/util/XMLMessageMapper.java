@@ -25,6 +25,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.ObjectWriter;
 
+import org.springframework.core.convert.support.DefaultConversionService;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -61,15 +62,24 @@ public class XMLMessageMapper {
     }
 
     public XMLMessage map(Message<?> message, Collection<String> excludedHeaders, boolean convertNonSerializableHeadersToString, DeliveryMode deliveryMode) {
-        return map(message.getPayload(), message.getHeaders(), message.getHeaders().getId(), excludedHeaders, convertNonSerializableHeadersToString, deliveryMode);
+        return map(message.getPayload(), message.getHeaders(), message.getHeaders().getId(), excludedHeaders, convertNonSerializableHeadersToString, deliveryMode, null);
+    }
+
+    public XMLMessage map(Message<?> message, Collection<String> excludedHeaders, boolean convertNonSerializableHeadersToString, DeliveryMode deliveryMode, Map<String, Object> defaultHeader) {
+        return map(message.getPayload(), message.getHeaders(), message.getHeaders().getId(), excludedHeaders, convertNonSerializableHeadersToString, deliveryMode, defaultHeader);
     }
 
     // exposed for testing
     @SneakyThrows
-    XMLMessage map(Object payload, Map<String, Object> headers, UUID messageId, Collection<String> excludedHeaders, boolean convertNonSerializableHeadersToString, DeliveryMode deliveryMode) {
+    XMLMessage map(Object payload, Map<String, Object> headers, UUID messageId, Collection<String> excludedHeaders, boolean convertNonSerializableHeadersToString, DeliveryMode deliveryMode, Map<String, Object> defaultHeader) {
         XMLMessage xmlMessage;
-        SDTMap metadata = map(headers, excludedHeaders, convertNonSerializableHeadersToString);
-        validateExclusiveSolaceHeaders(headers, messageId);
+        Map<String, Object> effectiveHeaders = new HashMap<>();
+        if (defaultHeader != null) {
+            effectiveHeaders.putAll(defaultHeader);
+        }
+        effectiveHeaders.putAll(headers);
+        validateExclusiveSolaceHeaders(effectiveHeaders, messageId);
+        SDTMap metadata = map(effectiveHeaders, excludedHeaders, convertNonSerializableHeadersToString);
         metadata.putInteger(SolaceBinderHeaders.MESSAGE_VERSION, MESSAGE_VERSION);
         if (payload instanceof byte[]) {
             BytesMessage bytesMessage = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
@@ -112,7 +122,20 @@ public class XMLMessageMapper {
             }
 
             Object value = headers.get(header.getKey());
+
+            if (value == null && defaultHeader != null && defaultHeader.containsKey(header.getKey())) {
+                value = defaultHeader.get(header.getKey());
+            }
+
             if (value != null) {
+                if (!header.getValue().getType().isInstance(value)) {
+                    try {
+                        value = DefaultConversionService.getSharedInstance().convert(value, header.getValue().getType());
+                    } catch (Exception e) {
+                        // Ignored, will be caught by the next isInstance check
+                    }
+                }
+
                 if (!header.getValue().getType().isInstance(value)) {
                     String msg = String.format("Message %s has an invalid value type for header %s. Expected %s but received %s.", messageId, header.getKey(), header.getValue().getType(), value.getClass());
                     SolaceMessageConversionException exception = new SolaceMessageConversionException(msg);
@@ -248,19 +271,24 @@ public class XMLMessageMapper {
     SDTMap map(Map<String, Object> headers, Collection<String> excludedHeaders, boolean convertNonSerializableHeadersToString) {
         SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
         Set<String> serializedHeaders = new HashSet<>();
-        for (Map.Entry<String, Object> header : headers.entrySet()) {
-            if (isJcsmpDefaultHeader(header) || isSpringPollutedHeader(header)) {
+
+        Set<String> keys = new HashSet<>(headers.keySet());
+
+        for (String key : keys) {
+            Object value = headers.get(key);
+
+            if (isJcsmpDefaultHeader(key, value) || isSpringPollutedHeader(key, value)) {
                 continue;
             }
-            if (excludedHeaders != null && excludedHeaders.contains(header.getKey())) {
+            if (excludedHeaders != null && excludedHeaders.contains(key)) {
                 continue;
             }
-            if (IntegrationMessageHeaderAccessor.SOURCE_DATA.equals(header.getKey()) ||
-                    IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK.equals(header.getKey())) {
+            if (IntegrationMessageHeaderAccessor.SOURCE_DATA.equals(key) ||
+                    IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK.equals(key)) {
                 continue;
             }
 
-            addSDTMapObject(metadata, serializedHeaders, header.getKey(), header.getValue(), convertNonSerializableHeadersToString);
+            addSDTMapObject(metadata, serializedHeaders, key, value, convertNonSerializableHeadersToString);
         }
 
         if (headers.containsKey(SolaceBinderHeaders.PARTITION_KEY)) {
@@ -283,18 +311,18 @@ public class XMLMessageMapper {
         return metadata;
     }
 
-    private static boolean isSpringPollutedHeader(Map.Entry<String, Object> header) {
-        return header.getKey().equals("target-protocol") || // A not true header: https://github.com/spring-cloud/spring-cloud-stream/issues/2222
-                (header.getKey().equals("id") && header.getValue() instanceof UUID) || // Message header pollution from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L137
-                (header.getKey().equals("timestamp"));// JCSMP lib supports better supported header via config flags: GENERATE_RCV_TIMESTAMPS and GENERATE_SEND_TIMESTAMPS don't use the polluted version from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L151
+    private static boolean isSpringPollutedHeader(String key, Object value) {
+        return key.equals("target-protocol") || // A not true header: https://github.com/spring-cloud/spring-cloud-stream/issues/2222
+                (key.equals("id") && value instanceof UUID) || // Message header pollution from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L137
+                (key.equals("timestamp"));// JCSMP lib supports better supported header via config flags: GENERATE_RCV_TIMESTAMPS and GENERATE_SEND_TIMESTAMPS don't use the polluted version from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L151
     }
 
-    private static boolean isJcsmpDefaultHeader(Map.Entry<String, Object> header) {
-        return header.getKey().equalsIgnoreCase(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK) ||
-                header.getKey().equalsIgnoreCase(BinderHeaders.TARGET_DESTINATION) ||
-                header.getKey().equalsIgnoreCase(SolaceBinderHeaders.CONFIRM_CORRELATION) ||
-                SolaceHeaderMeta.META.containsKey(header.getKey()) ||
-                SolaceBinderHeaderMeta.META.containsKey(header.getKey());
+    private static boolean isJcsmpDefaultHeader(String key, Object value) {
+        return key.equalsIgnoreCase(IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK) ||
+                key.equalsIgnoreCase(BinderHeaders.TARGET_DESTINATION) ||
+                key.equalsIgnoreCase(SolaceBinderHeaders.CONFIRM_CORRELATION) ||
+                SolaceHeaderMeta.META.containsKey(key) ||
+                SolaceBinderHeaderMeta.META.containsKey(key);
     }
 
     @SneakyThrows
