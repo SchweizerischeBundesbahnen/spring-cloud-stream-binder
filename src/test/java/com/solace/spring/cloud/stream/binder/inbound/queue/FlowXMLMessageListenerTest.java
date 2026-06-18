@@ -7,12 +7,15 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
@@ -429,6 +432,74 @@ class FlowXMLMessageListenerTest {
 
         } finally {
             listener.stopReceiverThreads();
+        }
+    }
+
+    /**
+     * Graceful-shutdown regression test.
+     *
+     * <p>Models the {@code JCSMPInboundQueueMessageProducer.doStop()} ordering at the listener level.
+     * The {@link Consumer} passed to {@code startReceiverThreads} stands in for
+     * {@code onReceiveConcurrent}, whose {@code activeMessages} window spans the message ACK. A shared
+     * {@link AtomicBoolean} simulates {@code FlowReceiver.close()}: any "ACK" that runs after it is set
+     * is the bug we are guarding against (an ACK on a closed flow throws {@code IllegalStateException}).
+     *
+     * <p>With the fix, {@code drain()} blocks until every queued and in-flight message has been fully
+     * processed, so closing the flow afterwards is safe. If {@code drain()} were a no-op, some messages
+     * would be "ACKed" after close and the assertions below would fail.
+     */
+    @Test
+    void testDrain_allInFlightMessagesSettledBeforeFlowClose() {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+
+        AtomicBoolean flowClosed = new AtomicBoolean(false);
+        AtomicInteger acked = new AtomicInteger();
+        List<Throwable> ackAfterClose = Collections.synchronizedList(new ArrayList<>());
+
+        Consumer<BytesXMLMessage> consumer = msg -> {
+            sleepQuietly(200); // simulate message processing
+            if (flowClosed.get()) {
+                // simulates settling/ACK on an already-closed flow -> IllegalStateException in real life
+                ackAfterClose.add(new IllegalStateException("ACK on closed flow"));
+            } else {
+                acked.incrementAndGet();
+            }
+        };
+
+        int n = 12;
+        listener.startReceiverThreads(3, "drainTest", consumer, 2000);
+        for (int i = 0; i < n; i++) {
+            listener.onReceive(mockMessage());
+        }
+
+        // Mirror doStop(): FlowReceiver.stop() (no new deliveries) -> drain() -> close() -> stop threads
+        listener.drain(10_000);
+        flowClosed.set(true); // simulate FlowReceiver.close()
+        listener.stopReceiverThreads();
+
+        assertThat(listener.isIdle())
+                .as("listener must be idle once drain() returns")
+                .isTrue();
+        assertThat(ackAfterClose)
+                .as("no message may be ACKed after the flow is closed")
+                .isEmpty();
+        assertThat(acked.get())
+                .as("every in-flight message must be settled before the flow is closed")
+                .isEqualTo(n);
+    }
+
+    private static BytesXMLMessage mockMessage() {
+        BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
+        Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
+        Mockito.when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
+        return mockMessage;
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 }
