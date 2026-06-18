@@ -106,6 +106,16 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * Default: 300000 (5 minutes)
      */
     private long watchdogTimeoutMs = 300000;
+
+    /**
+     * Time in milliseconds that {@code doStop()} waits for in-flight messages to be processed and
+     * settled before the Solace flow is closed (graceful shutdown of the consumer binding).
+     * <p>0 (the default) disables draining: shutdown closes the flow immediately, exactly as it did
+     * before this feature existed — no behavioural change and no performance impact unless opted in.
+     * When set {@literal >} 0, keep the value below the deployment shutdown budget (Kubernetes
+     * {@code terminationGracePeriodSeconds} / Spring {@code spring.lifecycle.timeout-per-shutdown-phase}).
+     */
+    private long drainTimeoutMs = 0;
     // ------------------------
 
     /**

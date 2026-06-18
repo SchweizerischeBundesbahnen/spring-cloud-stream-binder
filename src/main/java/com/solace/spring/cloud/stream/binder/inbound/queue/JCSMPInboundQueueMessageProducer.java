@@ -311,8 +311,13 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         solaceBinderHealthAccessor.ifPresent(solaceBinderHealth -> solaceBinderHealth.removeBindingHealthIndicator(consumerProperties.getBindingName()));
         FlowReceiver currentFlowReceiver = this.flowReceiver.get();
         if (currentFlowReceiver != null) {
-            currentFlowReceiver.stop();
-            currentFlowReceiver.close();
+            currentFlowReceiver.stop(); // stop new deliveries, but keep the flow open so in-flight messages can still be ACKed
+            long drainTimeoutMs = consumerProperties.getExtension().getDrainTimeoutMs();
+            if (drainTimeoutMs > 0) {
+                // opt-in graceful shutdown: let workers finish + settle in-flight messages before closing the flow
+                this.flowXMLMessageListener.drain(drainTimeoutMs);
+            }
+            currentFlowReceiver.close(); // now safe to close: nothing left to ACK on this flow
             this.flowReceiver.set(null); // Clear the reference to ensure clean restart
         }
         this.flowXMLMessageListener.stopReceiverThreads();

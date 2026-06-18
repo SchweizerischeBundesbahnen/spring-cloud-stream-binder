@@ -112,6 +112,46 @@ public class FlowXMLMessageListener implements XMLMessageListener {
         }
     }
 
+    /**
+     * @return {@code true} when nothing is waiting in the internal queue and nothing is currently
+     * being processed. Note that {@code activeMessages} membership spans the whole worker
+     * {@code loop} iteration, which includes the consumer callback's ACK/settle, so "idle" means all
+     * received messages have been fully settled.
+     */
+    public boolean isIdle() {
+        return messageQueue.isEmpty() && activeMessages.isEmpty();
+    }
+
+    /**
+     * Blocks until {@link #isIdle()} returns {@code true} or {@code timeoutMs} elapses.
+     *
+     * <p>The caller MUST have stopped the {@code FlowReceiver} first (so the broker delivers no new
+     * messages) but MUST NOT have closed it yet, so that messages already pulled into the internal
+     * queue can still be processed and ACKed/NACKed on the still-open flow. Worker threads keep
+     * running for the duration. On timeout the method returns anyway; any unsettled messages will be
+     * redelivered by the broker (client-ack = at-least-once).
+     */
+    @SuppressWarnings("BusyWait")
+    public void drain(long timeoutMs) {
+        long deadlineNanos = System.nanoTime() + timeoutMs * 1_000_000L;
+        while (!isIdle()) {
+            if (System.nanoTime() >= deadlineNanos) {
+                log.warn("Drain timeout after {}ms: {} queued and {} in-flight message(s) remain; "
+                                + "closing flow anyway (unsettled messages will be redelivered)",
+                        timeoutMs, messageQueue.size(), activeMessages.size());
+                return;
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Drain interrupted; closing flow with messages still in-flight");
+                return;
+            }
+        }
+        log.info("Drain complete: all in-flight messages processed and settled");
+    }
+
     @SuppressWarnings("BusyWait")
     private void watchdog(long watchdogTimeoutMs) {
         while (running) {
