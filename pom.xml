@@ -26,7 +26,7 @@
         <java.version>17</java.version>
         <spring-cloud.version>2025.1.2</spring-cloud.version>
         <maven.test.skip>true</maven.test.skip>
-        <failsafe.forkCount>1C</failsafe.forkCount>
+        <failsafe.forkCount>3</failsafe.forkCount>
         <build.timestamp>${maven.build.timestamp}</build.timestamp>
         <maven.build.timestamp.format>yyyy-MM-dd HH:mm:ss</maven.build.timestamp.format>
     </properties>
