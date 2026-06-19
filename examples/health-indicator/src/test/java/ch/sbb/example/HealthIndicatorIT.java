@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HealthIndicatorIT {
 
     @Container
-    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:latest")
+    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
             .withExposedPorts(8080, 55555);
 
     @DynamicPropertySource
@@ -55,20 +55,20 @@ class HealthIndicatorIT {
 
         assertThat(response).isNotNull();
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        
+
         Map<String, Object> body = response.getBody();
         assertThat(body).isNotNull();
         assertThat(body.get("status")).isEqualTo("UP");
-        
+
         Map<String, Object> components = (Map<String, Object>) body.get("components");
         assertThat(components).containsKey("binders");
-        
+
         Map<String, Object> binders = (Map<String, Object>) components.get("binders");
         assertThat(binders.get("status")).isEqualTo("UP");
-        
+
         Map<String, Object> binderComponents = (Map<String, Object>) binders.get("components");
         assertThat(binderComponents).containsKey("solace");
-        
+
         Map<String, Object> solaceBinder = (Map<String, Object>) binderComponents.get("solace");
         assertThat(solaceBinder.get("status")).isEqualTo("UP");
     }

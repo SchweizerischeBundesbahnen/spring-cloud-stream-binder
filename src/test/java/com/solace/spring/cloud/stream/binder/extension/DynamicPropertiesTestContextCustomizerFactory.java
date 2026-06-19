@@ -37,7 +37,7 @@ public class DynamicPropertiesTestContextCustomizerFactory implements ContextCus
     private static final String DEFAULT_ADMIN_PASSWORD = "admin";
     private static final long DEFAULT_SHM_SIZE = (long) Math.pow(1024, 3); // 1 GB
 
-    public static final SolaceContainer solaceContainer = new SolaceContainer("solace/solace-pubsub-standard:latest").withExposedPorts(8080, 55555, 55003, 55443)
+    public static final SolaceContainer solaceContainer = new SolaceContainer("solace/solace-pubsub-standard:10.25.0").withExposedPorts(8080, 55555, 55003, 55443)
             .withSharedMemorySize(DEFAULT_SHM_SIZE)
             .withCredentials("testuserSolace", "testpassSolace")
             .withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withUlimits(new Ulimit[]{new Ulimit("nofile", 1048576L, 1048576L)}))

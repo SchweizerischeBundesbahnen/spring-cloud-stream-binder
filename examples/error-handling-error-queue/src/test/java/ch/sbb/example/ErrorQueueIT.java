@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ErrorQueueIT {
 
     @Container
-    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:latest")
+    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
             .withExposedPorts(8080, 55555);
 
     @DynamicPropertySource
@@ -42,11 +42,11 @@ class ErrorQueueIT {
         String errorQueueName = "scst/error/wk/error-group/plain/example/error/topic";
         String encodedQueueName = errorQueueName.replace("/", "%2F");
         String uri = "http://" + solace.getHost() + ":" + solace.getMappedPort(8080) + "/SEMP/v2/monitor/msgVpns/default/queues/" + encodedQueueName;
-        
+
         java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
         String authHeader = "Basic " + java.util.Base64.getEncoder().encodeToString("admin:admin".getBytes());
         boolean messageFound = false;
-        
+
         // Polling loop to wait for broker error delivery
         for (int i = 0; i < 20; i++) {
             java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
@@ -55,7 +55,7 @@ class ErrorQueueIT {
                     .GET()
                     .build();
             java.net.http.HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-            
+
             if (response.statusCode() == 200) {
                 String body = response.body();
                 // A freshly provisioned dead letter queue with messages in it will report physical msg spool usage
@@ -67,7 +67,7 @@ class ErrorQueueIT {
             }
             Thread.sleep(500);
         }
-        
+
         assertThat(messageFound).as("Message physically spooled in the Solace broker's Error Queue").isTrue();
     }
 }

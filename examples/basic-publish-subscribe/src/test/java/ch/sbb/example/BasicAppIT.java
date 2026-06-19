@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BasicAppIT {
 
     @Container
-    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:latest")
+    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
             .withExposedPorts(8080, 55555);
 
     @DynamicPropertySource

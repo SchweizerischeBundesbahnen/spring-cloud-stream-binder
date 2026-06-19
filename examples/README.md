@@ -11,7 +11,7 @@ You can easily spin one up via Docker:
 ```bash
 docker run -d -p 8081:8080 -p 55555:55555 --shm-size=2g \
   --env username_admin_globalaccesslevel=admin --env username_admin_password=admin \
-  --name=solace solace/solace-pubsub-standard:latest
+  --name=solace solace/solace-pubsub-standard:10.25.0
 ```
 
 This keeps the broker management UI on `http://localhost:8081` so the web- and actuator-based examples can keep using `http://localhost:8080` for the Spring Boot application itself.

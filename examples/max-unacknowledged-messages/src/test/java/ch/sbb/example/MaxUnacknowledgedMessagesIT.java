@@ -23,7 +23,7 @@ import static org.awaitility.Awaitility.await;
 class MaxUnacknowledgedMessagesIT {
 
     @Container
-    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:latest")
+    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
             .withExposedPorts(8080, 55555);
 
     @Test

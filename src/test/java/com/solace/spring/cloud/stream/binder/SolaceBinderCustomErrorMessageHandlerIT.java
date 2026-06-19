@@ -252,7 +252,7 @@ public class SolaceBinderCustomErrorMessageHandlerIT {
 
         String queueName = binder.getConsumerQueueName(consumerBinding);
 
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 2,
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() <= 1 ? 2 : consumerProperties.getMaxAttempts() + 1,
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     log.info("Received message {}", StaticMessageHeaderAccessor.getId(msg));

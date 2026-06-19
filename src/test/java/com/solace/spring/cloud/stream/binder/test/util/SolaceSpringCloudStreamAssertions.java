@@ -176,7 +176,7 @@ public class SolaceSpringCloudStreamAssertions {
                     .hasEntrySatisfying(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT, deliveryAttempt ->
                             assertThat(deliveryAttempt)
                                     .asInstanceOf(InstanceOfAssertFactories.ATOMIC_INTEGER)
-                                    .hasValue(consumerProperties.getMaxAttempts() + 1));
+                                    .hasValue(consumerProperties.getMaxAttempts() <= 1 ? 1 : consumerProperties.getMaxAttempts()));
 
             if (expectRawMessageHeader) {
                 assertThat((Object) StaticMessageHeaderAccessor.getSourceData(errorMessage))

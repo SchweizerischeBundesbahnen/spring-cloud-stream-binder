@@ -32,10 +32,10 @@ If you do not already have two local brokers running, start them first:
 # Start two Solace brokers on different ports
 docker run -d -p 8081:8080 -p 55555:55555 --shm-size=2g \
   --env username_admin_globalaccesslevel=admin --env username_admin_password=admin \
-  --name=solace1 solace/solace-pubsub-standard:latest
+  --name=solace1 solace/solace-pubsub-standard:10.25.0
 docker run -d -p 8082:8080 -p 55556:55555 --shm-size=2g \
   --env username_admin_globalaccesslevel=admin --env username_admin_password=admin \
-  --name=solace2 solace/solace-pubsub-standard:latest
+  --name=solace2 solace/solace-pubsub-standard:10.25.0
 
 mvn spring-boot:run -Dspring-boot.run.arguments="--spring.cloud.stream.binders.solace-broker-1.environment.solace.java.host=tcp://localhost:55555 --spring.cloud.stream.binders.solace-broker-1.environment.solace.java.msgVpn=default --spring.cloud.stream.binders.solace-broker-1.environment.solace.java.client-username=default --spring.cloud.stream.binders.solace-broker-1.environment.solace.java.client-password=default --spring.cloud.stream.binders.solace-broker-2.environment.solace.java.host=tcp://localhost:55556 --spring.cloud.stream.binders.solace-broker-2.environment.solace.java.msgVpn=default --spring.cloud.stream.binders.solace-broker-2.environment.solace.java.client-username=default --spring.cloud.stream.binders.solace-broker-2.environment.solace.java.client-password=default"
 ```
@@ -97,7 +97,7 @@ public class MultiBinderApp {
     private static final Logger log = LoggerFactory.getLogger(MultiBinderApp.class);
     public static final BlockingQueue<String> RECEIVED_1 = new LinkedBlockingQueue<>();
     public static final BlockingQueue<String> RECEIVED_2 = new LinkedBlockingQueue<>();
-    
+
     private final AtomicInteger count = new AtomicInteger(1);
     private final StreamBridge streamBridge;
 
@@ -116,7 +116,7 @@ public class MultiBinderApp {
         .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
         .build());
         log.info("Published to Broker 1: {}", msg1);
-        
+
         String msg2 = "msg-to-broker2-" + c;
       streamBridge.send("fromBroker2-out-0", MessageBuilder.withPayload(msg2)
         .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())

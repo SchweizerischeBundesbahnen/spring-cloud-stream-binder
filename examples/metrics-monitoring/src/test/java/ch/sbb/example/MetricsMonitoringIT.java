@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MetricsMonitoringIT {
 
     @Container
-    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:latest")
+    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
             .withExposedPorts(8080, 55555);
 
     @DynamicPropertySource
@@ -68,7 +68,7 @@ class MetricsMonitoringIT {
 
         ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/actuator/prometheus", String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        
+
         String metricsData = response.getBody();
         assertThat(metricsData).isNotNull();
         assertThat(metricsData).contains("solace_");

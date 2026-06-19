@@ -18,11 +18,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MultiBinderIT {
 
     @Container
-    static SolaceContainer solace1 = new SolaceContainer("solace/solace-pubsub-standard:latest")
+    static SolaceContainer solace1 = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
             .withExposedPorts(8080, 55555);
-            
+
     @Container
-    static SolaceContainer solace2 = new SolaceContainer("solace/solace-pubsub-standard:latest")
+    static SolaceContainer solace2 = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
             .withExposedPorts(8080, 55555);
 
     @DynamicPropertySource
@@ -33,7 +33,7 @@ class MultiBinderIT {
         r.add("spring.cloud.stream.binders.solace-broker-1.environment.solace.java.client-username", solace1::getUsername);
         r.add("spring.cloud.stream.binders.solace-broker-1.environment.solace.java.client-password", solace1::getPassword);
         r.add("solace.java.reconnectRetries", () -> "0");
-        
+
         // Binder 2 properties
         r.add("spring.cloud.stream.binders.solace-broker-2.environment.solace.java.host", () -> solace2.getOrigin(Service.SMF));
         r.add("spring.cloud.stream.binders.solace-broker-2.environment.solace.java.msgVpn", solace2::getVpn);
