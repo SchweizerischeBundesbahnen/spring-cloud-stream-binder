@@ -8,6 +8,7 @@ Additional:
 - Provide and cache JCSMPSessions as Bean to avoid multiple connections to the same broker
 - Support large messages up to 1.2GB with chunking (need partitioned queues if using groups)
 - Micrometer Tracing
+- Opt-in graceful consumer shutdown that drains and acknowledges in-flight messages before closing the flow (`drainTimeoutMs`)
 
 Not supported by fork on purpose:
 - Batch processing - We judge this feature as unnecessary complex and an antipattern

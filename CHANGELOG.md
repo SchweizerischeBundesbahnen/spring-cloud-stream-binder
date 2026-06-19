@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Added `defaultHeader` producer property to configure fallback values for outbound Solace headers.
+- Added `drainTimeoutMs` consumer property for opt-in graceful shutdown: when set above `0`, a stopped consumer binding drains its in-flight messages and lets them be acknowledged before the Solace flow is closed. Defaults to `0` (disabled), preserving the previous immediate-close behaviour.
 
 ## [9.0.2] - 2026-04-21
 

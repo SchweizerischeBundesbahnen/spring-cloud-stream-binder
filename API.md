@@ -395,6 +395,13 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
 :   Time in milliseconds before a long-running message processing thread is logged as a warning. This is used to detect potential deadlocks or stuck threads. A warning is logged once per message when processing time exceeds this threshold.
     Default: `300000` (5 minutes)
 
+`drainTimeoutMs`
+:   Time in milliseconds that the consumer binding waits, when it is stopped, for messages already pulled into the binder's internal worker queue to finish processing and be acknowledged before the Solace flow is closed (graceful shutdown). On stop the binder first tells the broker to stop delivering new messages, then drains the in-flight backlog, then closes the flow.
+    `0` (the default) disables draining: the flow is closed immediately on stop, exactly as before this property existed. There is no behavioural change and no performance impact unless you opt in by setting a value `> 0`.
+    When set `> 0`, this value must be less than your deployment's shutdown budget (Kubernetes [`terminationGracePeriodSeconds`](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) / Spring `spring.lifecycle.timeout-per-shutdown-phase`), otherwise the process is force-killed before the drain can finish. If the timeout elapses before the backlog is drained, the binder closes the flow anyway and any still-unsettled messages are redelivered by the broker (client acknowledgment is at-least-once).
+    Default: `0` (disabled)
+    See: [Consumer Graceful Shutdown](#consumer-graceful-shutdown)
+
 #### Solace Producer Properties
 
 The following properties are available for Solace producers only and must be prefixed with `spring.cloud.stream.solace.bindings.<bindingName>.producer.` where `bindingName` looks something like `functionName-out-0` as defined in [Functional Binding Names](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#_functional_binding_names).
@@ -951,6 +958,43 @@ To use this feature, add Spring Boot Actuator to the classpath and expose the `b
 
 > [!NOTE]
 > There is no guarantee that the effect of pausing a binding will be instantaneous: messages already in-flight or being processed by the binder may still be delivered after the call to pause returns.
+
+## Consumer Graceful Shutdown
+
+When a consumer binding is stopped — on application shutdown, a programmatic `binding.stop()`, or a context refresh — the binder can wait for messages it has already pulled from the broker to finish processing before it closes the Solace flow. This is controlled by the [`drainTimeoutMs`](#solace-consumer-properties) consumer property and is **opt-in**.
+
+### Why it matters
+
+The binder decouples the Solace dispatcher thread from your application code through an internal worker queue (see [Inbound Message Flow](#inbound-message-flow)). At the moment a binding stops, messages may already sit in that internal queue or be mid-processing on a worker thread. With the default behaviour the flow is closed immediately, so those in-flight messages are never acknowledged and the broker redelivers them once the consumer comes back (client acknowledgment is at-least-once). Redelivery is safe, but it can cause duplicate processing and a burst of work right after restart.
+
+### How draining works
+
+When `drainTimeoutMs > 0`, stopping the consumer binding performs the shutdown in this order:
+
+1.  **Stop deliveries** — the binder calls `FlowReceiver.stop()` so the broker sends no new messages, but keeps the flow open so in-flight messages can still be acknowledged.
+2.  **Drain** — the binder blocks until its internal queue is empty and every worker thread has finished processing and settling (ACK/NACK) the messages it holds, or until `drainTimeoutMs` elapses.
+3.  **Close** — once it is safe (nothing left to acknowledge), the binder closes the flow and then stops the worker threads.
+
+If the timeout elapses first, the binder logs a warning and closes the flow anyway; any messages that are still unsettled are redelivered by the broker.
+
+### Configuration
+
+```yaml
+spring:
+  cloud:
+    stream:
+      solace:
+        bindings:
+          process-in-0:
+            consumer:
+              drainTimeoutMs: 25000   # wait up to 25s for in-flight messages to settle on stop
+```
+
+> [!IMPORTANT]
+> `drainTimeoutMs` must be **less than** your deployment's overall shutdown budget, otherwise the process is force-killed before the drain can finish. On Kubernetes that budget is the pod's [`terminationGracePeriodSeconds`](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) (default `30` seconds); with Spring Boot graceful shutdown it is `spring.lifecycle.timeout-per-shutdown-phase`.
+
+> [!NOTE]
+> Draining applies to the consumer (inbound) side of `AT_LEAST_ONCE` (queue) bindings, where acknowledgment is in play. With the default `drainTimeoutMs: 0` the behaviour is unchanged from earlier versions.
 
 ## Failed Producer Message Error Handling
 
