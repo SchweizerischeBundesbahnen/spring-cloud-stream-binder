@@ -74,7 +74,7 @@ public class BasicApp {
     public void publish() {
         String msg = "Hello from Solace #" + count.getAndIncrement();
       streamBridge.send("source-out-0", MessageBuilder.withPayload(msg)
-          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis()) // Prefer always Duration over raw millis for readability and avoid confusion about time units.
           .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
           .build());
         log.info("Published: {}", msg);
