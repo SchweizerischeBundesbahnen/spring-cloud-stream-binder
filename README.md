@@ -29,6 +29,7 @@ Consult the table below to determine which version of the BOM you need to use:
 
 | Spring Cloud | Spring Cloud Stream Binder Solace | Spring Boot | sol-jcsmp |
 |--------------|-----------------------------------|-------------|-----------|
+| 2025.1.2     | 9.1.0                             | 4.1.0       | 10.30.1   |
 | 2025.1.1     | 9.0.2                             | 4.0.4       | 10.29.0   |
 | 2025.1.1     | 9.0.1                             | 4.0.4       | 10.29.0   |
 | 2025.1.1     | 9.0.0                             | 4.0.4       | 10.29.0   |
@@ -86,7 +87,7 @@ Check out the difference between this fork and the original solace spring cloud 
     <dependency>
         <groupId>ch.sbb</groupId>
         <artifactId>spring-cloud-stream-binder-solace</artifactId>
-        <version>9.0.2</version>
+        <version>9.1.0</version>
     </dependency>
 </dependencies>
 ```

@@ -18,7 +18,7 @@ Analyze Maven dependencies for update opportunities and compatibility risks.
 
 ### 1. Catalog Explicitly-Versioned Dependencies
 Read `pom.xml` and list all dependencies with hardcoded versions (not managed by BOMs):
-- `spring-boot-starter-solace-client-config` (3.0.2)
+- `spring-boot-starter-solace-client-config` (3.1.0)
 - `jakarta.annotation-api` (3.0.0)
 - `junit-pioneer` (2.3.0)
 - `testcontainers-solace` (2.0.3)

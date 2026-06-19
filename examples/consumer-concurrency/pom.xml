@@ -7,19 +7,19 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.5</version>
+        <version>4.1.0</version>
         <relativePath/>
     </parent>
 
     <groupId>ch.sbb.solace.examples</groupId>
     <artifactId>solace-example-consumer-concurrency</artifactId>
-    <version>9.0.2</version>
+    <version>9.1.0</version>
     <name>Solace Example - Consumer Concurrency</name>
 
     <properties>
         <java.version>17</java.version>
-        <spring-cloud.version>2025.1.1</spring-cloud.version>
-        <solace-binder.version>9.0.2</solace-binder.version>
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
+        <solace-binder.version></solace-binder.version>
         <testcontainers-solace.version>2.0.4</testcontainers-solace.version>
         <testcontainers.version>2.0.4</testcontainers.version>
     </properties>
@@ -97,3 +97,4 @@
         </plugins>
     </build>
 </project>
+

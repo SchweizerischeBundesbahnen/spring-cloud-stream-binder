@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [9.1.0] - 2026-06-19
+
 ### Added
 - Added `defaultHeader` producer property to configure fallback values for outbound Solace headers.
 
