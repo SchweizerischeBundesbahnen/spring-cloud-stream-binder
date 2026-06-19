@@ -328,7 +328,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     @Execution(ExecutionMode.CONCURRENT)
     public void testConsumerRequeue(
             @Values(booleans = {false, true}) boolean namedConsumerGroup,
-            @Values(ints = {0, 2}) int maxAttempts,
+            @Values(ints = {1, 3}) int maxAttempts,
             @Values(booleans = {false, true}) boolean throwMessagingExceptionWithMissingAckCallback,
             SoftAssertions softly,
             TestInfo testInfo) throws Exception {
@@ -389,7 +389,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
     @Execution(ExecutionMode.CONCURRENT)
     public void testConsumerErrorQueueRepublish(
             @Values(booleans = {false, true}) boolean namedConsumerGroup,
-            @Values(ints = {0, 2}) int maxAttempts,
+            @Values(ints = {1, 3}) int maxAttempts,
             @Values(booleans = {false, true}) boolean throwMessagingExceptionWithMissingAckCallback,
             JCSMPSession jcsmpSession,
             SempV2Api sempV2Api,
@@ -422,7 +422,7 @@ public class SolaceBinderBasicIT extends SpringCloudStreamContext {
 
         binderBindUnbindLatency();
 
-        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts() + 1,
+        consumerInfrastructureUtil.sendAndSubscribe(moduleInputChannel, consumerProperties.getMaxAttempts(),
                 () -> messages.forEach(moduleOutputChannel::send),
                 (msg, callback) -> {
                     callback.run();

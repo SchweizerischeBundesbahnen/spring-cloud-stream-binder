@@ -928,7 +928,7 @@ An Error Queue can be provisioned for a particular consumer group by setting the
 
 ### Mutating Messages while using Spring's Retry Template
 
-When locally reprocessing failed messages with [Spring's Retry Template](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#_retry_template) (i.e. when consumer `maxAttempts > 0`), mutations of nested objects within the Spring `Message<?>` may persist between retries.
+When locally reprocessing failed messages with [Spring's Retry Template](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#_retry_template) (i.e. when consumer `maxAttempts > 1`), mutations of nested objects within the Spring `Message<?>` may persist between retries.
 
 **Example: Mutating `SDTMap` payload and failing the message**
 
