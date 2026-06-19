@@ -58,7 +58,7 @@ spring:
 
 1. **`default-header`** — Producer property: a `Map<String, Object>` of headers automatically attached to every message published through this binding. If the message already carries a header with the same name, the configured default is ignored.
 2. **`custom-default-header`** — A user-defined header. Mapped to a Solace user property and delivered to the consumer like any normal header.
-3. **`solace_timeToLive`** — A standard Solace header. Defaulting it here means every message gets a 23 s TTL without each producer having to set it explicitly.
+3. **`solace_timeToLive`** — A standard Solace header. This unit is always Defaulting it here means every message gets a 23 s TTL to all messages so producers don't have to set it individually. The value must be an integer in milliseconds.
 4. **`solace_senderId`** — Demonstrates that default header values support Spring property placeholders, so values can be resolved from the environment (e.g. host name, profile, build info).
 
 ## Code Walkthrough
