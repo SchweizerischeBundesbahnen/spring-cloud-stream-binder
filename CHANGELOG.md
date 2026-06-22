@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - Added `defaultHeader` producer property to configure fallback values for outbound Solace headers.
 - Added `drainTimeoutMs` consumer property for opt-in graceful shutdown: when set above `0`, a stopped consumer binding drains its in-flight messages and lets them be acknowledged before the Solace flow is closed. Defaults to `0` (disabled), preserving the previous immediate-close behaviour.
 
+### Changed
+- Update spring-boot-starter-parent from 4.0.2 to 4.1.0
+- Update spring-cloud-dependencies from 2025.1.1 to 2025.1.2
+
 ## [9.0.2] - 2026-04-21
 
 ### Fixed

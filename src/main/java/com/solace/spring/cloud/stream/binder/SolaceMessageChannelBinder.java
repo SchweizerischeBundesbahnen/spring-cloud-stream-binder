@@ -22,12 +22,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.cloud.stream.binder.*;
 import org.springframework.cloud.stream.provisioning.ConsumerDestination;
 import org.springframework.cloud.stream.provisioning.ProducerDestination;
-import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
-import java.time.Duration;
 import org.springframework.integration.core.MessageProducer;
 import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
 import org.springframework.integration.support.ErrorMessageStrategy;
@@ -173,7 +168,7 @@ public class SolaceMessageChannelBinder
                 recoveryCallback,
                 errorQueueInfrastructure);
 
-        if (retryTemplate.isEmpty()){
+        if (retryTemplate.isEmpty()) {
             adapter.setErrorChannel(errorInfra.getErrorChannel());
         }
         adapter.setErrorMessageStrategy(errorMessageStrategy);
