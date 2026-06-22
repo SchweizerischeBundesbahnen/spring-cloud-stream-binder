@@ -2,7 +2,10 @@ package com.solace.spring.cloud.stream.binder.inbound.queue;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.SDTException;
+import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.Topic;
+import com.solacesystems.jcsmp.XMLMessage;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -11,13 +14,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -486,6 +493,210 @@ class FlowXMLMessageListenerTest {
         assertThat(acked.get())
                 .as("every in-flight message must be settled before the flow is closed")
                 .isEqualTo(n);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Partition-aware dispatch (STTRS-3135 variant 2)
+    // ---------------------------------------------------------------------------------------------
+
+    @Test
+    void testPartitionAware_sameKeyAlwaysHandledBySameThread_andOrderPreserved() throws InterruptedException {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        try {
+            int threadCount = 4;
+            int keyCount = 8;
+            int perKey = 25;
+            CountDownLatch latch = new CountDownLatch(keyCount * perKey);
+            Map<String, Set<String>> threadsByKey = new ConcurrentHashMap<>();
+            Map<String, List<Integer>> seqByKey = new ConcurrentHashMap<>();
+
+            Consumer<BytesXMLMessage> consumer = msg -> {
+                String key = readPartitionKey(msg);
+                int seq = Integer.parseInt(msg.getMessageId().substring(msg.getMessageId().indexOf('#') + 1));
+                threadsByKey.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet())
+                        .add(Thread.currentThread().getName());
+                seqByKey.computeIfAbsent(key, k -> Collections.synchronizedList(new ArrayList<>())).add(seq);
+                try {
+                    Thread.sleep(1); // create contention so a non-affine dispatch would interleave threads
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                latch.countDown();
+            };
+
+            listener.startReceiverThreads(threadCount, "partitionAware", consumer, 60000, true);
+            Thread.sleep(200);
+
+            // Interleave keys but keep each key's sequence numbers strictly increasing in send order.
+            for (int seq = 0; seq < perKey; seq++) {
+                for (int k = 0; k < keyCount; k++) {
+                    listener.onReceive(mockPartitionedMessage("key-" + k, "key-" + k + "#" + seq));
+                }
+            }
+
+            assertThat(latch.await(30, TimeUnit.SECONDS)).as("all messages processed").isTrue();
+
+            assertThat(threadsByKey).hasSize(keyCount);
+            threadsByKey.forEach((key, threads) -> assertThat(threads)
+                    .as("partition %s must be processed by exactly one worker thread", key)
+                    .hasSize(1));
+
+            seqByKey.forEach((key, seqs) -> assertThat(seqs)
+                    .as("messages of partition %s must be processed in receive order", key)
+                    .containsExactlyElementsOf(IntStream.range(0, perKey).boxed().toList()));
+
+            Set<String> allThreads = threadsByKey.values().stream()
+                    .flatMap(Set::stream).collect(Collectors.toSet());
+            assertThat(allThreads)
+                    .as("multiple worker threads should be used across partitions")
+                    .hasSizeGreaterThanOrEqualTo(2);
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    @Test
+    void testPartitionAware_nullPartitionKey_distributedRoundRobinWithoutError() throws InterruptedException {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        try {
+            int threadCount = 4;
+            int messageCount = 200;
+            CountDownLatch latch = new CountDownLatch(messageCount);
+            Set<String> threads = ConcurrentHashMap.newKeySet();
+
+            Consumer<BytesXMLMessage> consumer = msg -> {
+                threads.add(Thread.currentThread().getName());
+                latch.countDown();
+            };
+
+            listener.startReceiverThreads(threadCount, "pa-nullkey", consumer, 60000, true);
+            Thread.sleep(200);
+
+            for (int i = 0; i < messageCount; i++) {
+                listener.onReceive(mockPartitionedMessage(null, "m#" + i));
+            }
+
+            assertThat(latch.await(30, TimeUnit.SECONDS)).as("all messages processed").isTrue();
+            assertThat(threads)
+                    .as("messages without a partition key should be spread round-robin across threads")
+                    .hasSizeGreaterThanOrEqualTo(2);
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    @Test
+    void testNonPartitionAware_singleSharedQueue_doesNotPinPartitionToOneThread() throws InterruptedException {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        try {
+            int threadCount = 4;
+            int messageCount = 200;
+            CountDownLatch latch = new CountDownLatch(messageCount);
+            Set<String> threads = ConcurrentHashMap.newKeySet();
+
+            Consumer<BytesXMLMessage> consumer = msg -> {
+                threads.add(Thread.currentThread().getName());
+                try {
+                    Thread.sleep(2);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                latch.countDown();
+            };
+
+            // Default mode (partitionAware = false): all workers share a single queue.
+            listener.startReceiverThreads(threadCount, "shared", consumer, 60000);
+            Thread.sleep(200);
+
+            for (int i = 0; i < messageCount; i++) {
+                listener.onReceive(mockPartitionedMessage("same-key", "same#" + i));
+            }
+
+            assertThat(latch.await(30, TimeUnit.SECONDS)).as("all messages processed").isTrue();
+            assertThat(threads)
+                    .as("shared-queue mode must NOT pin a single partition key to one thread")
+                    .hasSizeGreaterThanOrEqualTo(2);
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    @Test
+    void testPartitionAware_singleThread_usesSingleQueue() throws Exception {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        try {
+            @SuppressWarnings("unchecked")
+            Consumer<BytesXMLMessage> consumer = mock(Consumer.class);
+            listener.startReceiverThreads(1, "pa-single", consumer, 60000, true);
+            assertThat(workerQueueCount(listener))
+                    .as("with concurrency 1, partition-aware mode must not create per-thread queues")
+                    .isEqualTo(1);
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    @Test
+    void testPartitionAware_multiThread_createsOneQueuePerThread() throws Exception {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        try {
+            @SuppressWarnings("unchecked")
+            Consumer<BytesXMLMessage> consumer = mock(Consumer.class);
+            listener.startReceiverThreads(5, "pa-multi", consumer, 60000, true);
+            assertThat(workerQueueCount(listener))
+                    .as("partition-aware mode must create one queue per worker thread")
+                    .isEqualTo(5);
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    @Test
+    void testNonPartitionAware_multiThread_usesSingleQueue() throws Exception {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        try {
+            @SuppressWarnings("unchecked")
+            Consumer<BytesXMLMessage> consumer = mock(Consumer.class);
+            listener.startReceiverThreads(5, "shared-multi", consumer, 60000); // partitionAware defaults to false
+            assertThat(workerQueueCount(listener))
+                    .as("default mode must use a single shared queue regardless of thread count")
+                    .isEqualTo(1);
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static int workerQueueCount(FlowXMLMessageListener listener) throws Exception {
+        Field field = FlowXMLMessageListener.class.getDeclaredField("messageQueues");
+        field.setAccessible(true);
+        return ((List<?>) field.get(listener)).size();
+    }
+
+    private static String readPartitionKey(BytesXMLMessage msg) {
+        try {
+            SDTMap properties = msg.getProperties();
+            return properties == null ? null
+                    : properties.getString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY);
+        } catch (SDTException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static BytesXMLMessage mockPartitionedMessage(String partitionKey, String messageId) {
+        BytesXMLMessage msg = mock(BytesXMLMessage.class);
+        Mockito.when(msg.getMessageId()).thenReturn(messageId);
+        Mockito.when(msg.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
+        SDTMap properties = JCSMPFactory.onlyInstance().createMap();
+        if (partitionKey != null) {
+            try {
+                properties.putString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY, partitionKey);
+            } catch (SDTException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        Mockito.when(msg.getProperties()).thenReturn(properties);
+        return msg;
     }
 
     private static BytesXMLMessage mockMessage() {

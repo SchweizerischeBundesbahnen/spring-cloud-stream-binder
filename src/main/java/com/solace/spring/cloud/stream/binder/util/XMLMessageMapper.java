@@ -397,6 +397,16 @@ public class XMLMessageMapper {
             int messageVersion = metadata.getInteger(SolaceBinderHeaders.MESSAGE_VERSION);
             headers.put(SolaceBinderHeaders.MESSAGE_VERSION, messageVersion);
         }
+
+        // Expose the Solace queue-partition-key (JMSXGroupID) message property as the binder's
+        // partition-key header, mirroring how the producer maps SolaceBinderHeaders.PARTITION_KEY onto
+        // that property. This lets consumers read the partition key of each received message (e.g. to
+        // implement per-partition ordered processing when concurrency > 1).
+        if (!exclusionList.contains(SolaceBinderHeaders.PARTITION_KEY)
+                && metadata.containsKey(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY)) {
+            headers.put(SolaceBinderHeaders.PARTITION_KEY,
+                    metadata.getString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY));
+        }
         return new MessageHeaders(headers);
     }
 

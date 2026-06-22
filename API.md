@@ -402,6 +402,12 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: `0` (disabled)
     See: [Consumer Graceful Shutdown](#consumer-graceful-shutdown)
 
+`partitionAware`
+:   Opt-in preservation of per-partition message ordering when consuming with `concurrency > 1`. When `true`, each received message is dispatched to a worker thread based on its Solace partition key (the `JMSXGroupID` queue-partition-key property): all messages that share a partition key are handled by the same worker thread — and therefore processed sequentially in receive order — while messages with different partition keys are still processed in parallel. Messages without a partition key carry no ordering constraint and are distributed round-robin across the worker threads.
+    `false` (the default) keeps a single shared worker queue feeding all threads: maximum throughput but no per-partition ordering guarantee — exactly the behaviour from before this property existed. Has no effect when `concurrency == 1` (a single worker thread already preserves order).
+    Default: `false`
+    See: [Consumer Concurrency](#consumer-concurrency)
+
 #### Solace Producer Properties
 
 The following properties are available for Solace producers only and must be prefixed with `spring.cloud.stream.solace.bindings.<bindingName>.producer.` where `bindingName` looks something like `functionName-out-0` as defined in [Functional Binding Names](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#_functional_binding_names).
@@ -595,7 +601,7 @@ These can be used for:
 | `solace_scst_largeMessageSupport` | Boolean | Write | `false` | Set to `true` to enable sending of large messages (only on producer side). If using groups only partitioned queues are supported; otherwise, the message chunks may get delivered to the wrong consumer. |
 | `solace_scst_messageVersion` | Integer | Read | 1 | A static number set by the publisher to indicate the Spring Cloud Stream Solace message version. |
 | `solace_scst_nullPayload` | Boolean | Read | Absent unless inbound payload was null | Present and true to indicate when the PubSub+ message payload was null. |
-| `solace_scst_partitionKey` | String | Write | Unset | The partition key for PubSub+ partitioned queues. |
+| `solace_scst_partitionKey` | String | Read/Write | Unset | The partition key for PubSub+ partitioned queues. Set it on a produced message to route it to a partition; it is also populated on consumed messages from the Solace `JMSXGroupID` property so applications can read each message's partition key. |
 | `solace_scst_serializedHeaders` | String | Internal Binder Use Only | Unset | A JSON String array of header names where each entry indicates that the header's value was serialized by a Solace Spring Cloud Stream binder before publishing it to a broker. |
 | `solace_scst_serializedHeadersEncoding` | String | Internal Binder Use Only | `"base64"` when serialized headers are present | The encoding algorithm used to encode the headers indicated by `solace_scst_serializedHeaders`. |
 | `solace_scst_serializedPayload` | Boolean | Internal Binder Use Only | Unset | Is `true` if a Solace Spring Cloud Stream binder has serialized the payload before publishing it to a broker. Is undefined otherwise. |
@@ -683,7 +689,7 @@ Configure Spring Cloud Stream's [concurrency consumer property](https://docs.spr
 
 *   Concurrent processing is now supported for exclusive queues and for anonymous consumer groups.
 *   This enables higher throughput when you cannot or do not want to use non-exclusive queues.
-*   There will be no guarantee of ordering any more when concurrent processing is used.
+*   By default there is no guarantee of ordering any more when concurrent processing is used. If you need messages of the same partition key to stay ordered while still processing different partition keys in parallel, opt in to [partition-aware consumption](#preserving-per-partition-ordering).
 
 > [!NOTE]
 > Setting `provisionDurableQueue` to `false` disables endpoint configuration validation. In this scenario, it is the developer's responsibility to ensure queue settings meet your expectations.
@@ -727,6 +733,40 @@ spring:
 *   Anonymous groups use temporary queues; multiple processing threads will share the same underlying flow.
 *   Make sure any stateful components are safe for concurrent use.
 *   There will be no guarantee of ordering any more.
+
+### Preserving Per-Partition Ordering
+
+By default, raising `concurrency` above `1` removes any ordering guarantee: every worker thread competes for messages from a single shared queue, so two messages with the same partition key may be processed by different threads at the same time.
+
+Set the consumer property [`partitionAware`](#solace-consumer-properties) to `true` to keep per-partition ordering while still processing in parallel:
+
+*   The binder reads each message's Solace partition key (the `JMSXGroupID` queue-partition-key property — the same value the producer sets via the [`solace_scst_partitionKey`](#message-headers) header).
+*   Instead of one shared queue, the binder creates one queue per worker thread and routes each message to `floorMod(partitionKey.hashCode(), concurrency)`. All messages of a partition key therefore land on the same worker thread and are processed sequentially, in the order the broker delivered them, while different partition keys are spread across the remaining threads and run in parallel.
+*   Messages without a partition key carry no ordering constraint and are distributed round-robin across the worker threads.
+*   This is in-memory dispatch inside one consumer flow; it does not require the broker queue itself to be partitioned, only that the messages carry a partition key.
+
+```yaml
+spring:
+  cloud:
+    stream:
+      bindings:
+        input:
+          destination: orders
+          group: accounting
+          consumer:
+            concurrency: 4
+      solace:
+        bindings:
+          input:
+            consumer:
+              partitionAware: true
+```
+
+> [!NOTE]
+> `partitionAware` has no effect when `concurrency == 1` (a single worker thread already preserves order) and no effect on throughput-mode bindings that leave it at the default `false`. Ordering is only as good as your handler: if your code offloads work to other threads (e.g. `CompletableFuture`, `@Async`), order can still become non-deterministic.
+
+> [!TIP]
+> Even without `partitionAware`, the partition key of each consumed message is available via the `solace_scst_partitionKey` header, so an application can implement its own per-partition serialization if it prefers.
 
 ### Inbound Message Flow
 
@@ -772,12 +812,17 @@ public class MyMessageBuilder {
 }
 ```
 
-As for consuming messages from partitioned queues, this is handled transparently by the PubSub+ broker. That is to say, consuming messages from a partitioned queue is no different from consuming messages from any other queue.
+As for consuming messages from partitioned queues, this is handled transparently by the PubSub+ broker. That is to say, consuming messages from a partitioned queue is no different from consuming messages from any other queue. The partition key of each consumed message is exposed on the Spring message under the `solace_scst_partitionKey` header (read from the Solace `JMSXGroupID` property), so your application can read it — for example to serialize processing per partition itself.
 
 The binder does not configure `partitionCount` on your behalf. If you want a runnable local example of a partitioned queue, provision or update the queue with SEMP before starting the consumer binding.
 
 > [!WARNING]
-> **Note on Message Ordering:** Partitioned queues help the broker keep messages for the same partition key on the same consumer flow, but the binder does **not** guarantee processing order when `concurrency > 1`. If your application needs strict ordering, keep the consumer single-threaded with `concurrency: 1`. Additionally, if your application logic offloads processing to asynchronous threads (e.g., using `CompletableFuture`, `@Async`, or manually managed thread pools), the processing order may become non-deterministic even with `concurrency: 1`.
+> **Note on Message Ordering:** Partitioned queues help the broker keep messages for the same partition key on the same consumer flow, but with the default settings the binder does **not** guarantee processing order when `concurrency > 1`. You have three options if you need ordering:
+> 1. Keep the consumer single-threaded with `concurrency: 1`.
+> 2. Set the consumer property `partitionAware: true` to keep per-partition ordering while still processing different partition keys in parallel — see [Preserving Per-Partition Ordering](#preserving-per-partition-ordering).
+> 3. Implement ordering yourself using the `solace_scst_partitionKey` header exposed on each consumed message.
+>
+> In all cases, if your application logic offloads processing to asynchronous threads (e.g., using `CompletableFuture`, `@Async`, or manually managed thread pools), the processing order may become non-deterministic even with `concurrency: 1`.
 
 See [Partitioned Queues](https://docs.solace.com/Messaging/Guaranteed-Msg/Queues.htm#partitioned-queues) for more.
 

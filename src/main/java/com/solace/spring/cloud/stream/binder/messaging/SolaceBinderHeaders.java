@@ -25,9 +25,15 @@ public final class SolaceBinderHeaders {
 
     /**
      * <p><b>Acceptable Value Type:</b> {@link String}</p>
-     * <p><b>Access:</b> Write</p>
+     * <p><b>Access:</b> Read/Write</p>
      * <br>
      * <p>The partition key for PubSub+ partitioned queues.</p>
+     * <p>When producing, set this header to route the message to a partition (it is written to the
+     * Solace {@code JMSXGroupID} queue-partition-key message property).</p>
+     * <p>When consuming, this header is populated from that same message property so the application
+     * can read the partition key of each received message — useful for implementing per-partition
+     * ordered processing on the client side when {@code concurrency > 1}. See also the consumer
+     * {@code partitionAware} property, which makes the binder preserve per-partition ordering itself.</p>
      */
     public static final String PARTITION_KEY = PREFIX + "partitionKey";
 

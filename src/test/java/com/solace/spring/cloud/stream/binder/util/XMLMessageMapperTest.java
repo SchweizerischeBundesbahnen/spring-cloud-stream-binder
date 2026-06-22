@@ -837,6 +837,10 @@ public class XMLMessageMapperTest {
                 case SolaceBinderHeaders.MESSAGE_VERSION:
                     metadata.putInteger(header.getKey(), ThreadLocalRandom.current().nextInt());
                     break;
+                case SolaceBinderHeaders.PARTITION_KEY:
+                    // The partition key is read back from the Solace queue-partition-key (JMSXGroupID) property.
+                    metadata.putString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY, header.getKey());
+                    break;
                 default:
                     fail(String.format("no test for header %s", header.getKey()));
             }
@@ -922,6 +926,9 @@ public class XMLMessageMapperTest {
                 case SolaceBinderHeaders.MESSAGE_VERSION:
                     assertEquals(xmlMessage.getProperties().get(header.getKey()), actualValue);
                     break;
+                case SolaceBinderHeaders.PARTITION_KEY:
+                    assertEquals(xmlMessage.getProperties().getString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY), actualValue);
+                    break;
                 default:
                     if (HeaderMeta.Scope.WIRE.equals(header.getValue().getScope())) {
                         fail(String.format("no test for header %s", header.getKey()));
@@ -963,9 +970,6 @@ public class XMLMessageMapperTest {
                     break;
                 case SolaceBinderHeaders.TARGET_DESTINATION_TYPE:
                     metadata.putString(header.getKey(), "topic");
-                    break;
-                case SolaceBinderHeaders.PARTITION_KEY:
-                    metadata.putString(header.getKey(), "partitionKey");
                     break;
                 case SolaceBinderHeaders.LARGE_MESSAGE_SUPPORT:
                     metadata.putBoolean(header.getKey(), true);
@@ -1150,6 +1154,54 @@ public class XMLMessageMapperTest {
                 Collections.emptyList(), false);
         assertThat(sdtMap.keySet(), hasItem(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY));
         assertEquals(jmsxGroupID, sdtMap.getString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY));
+    }
+
+    @Test
+    void testMapXMLMessageToSpringMessage_exposesPartitionKeyHeader() throws Exception {
+        String partitionKey = "partition-key-value";
+        TextMessage xmlMessage = Mockito.mock(TextMessage.class);
+        Mockito.when(xmlMessage.getText()).thenReturn("payload");
+        SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
+        metadata.putString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY, partitionKey);
+        Mockito.when(xmlMessage.getProperties()).thenReturn(metadata);
+
+        AcknowledgmentCallback acknowledgmentCallback = Mockito.mock(AcknowledgmentCallback.class);
+        Message<?> springMessage = xmlMessageMapper.map(xmlMessage, acknowledgmentCallback, new SolaceConsumerProperties());
+
+        // Variant 1: the Solace queue-partition-key is exposed under the documented binder header...
+        assertEquals(partitionKey, springMessage.getHeaders().get(SolaceBinderHeaders.PARTITION_KEY));
+        // ...while the raw JMSXGroupID property is still passed through for backward compatibility.
+        assertEquals(partitionKey,
+                springMessage.getHeaders().get(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY));
+    }
+
+    @Test
+    void testMapXMLMessageToSpringMessage_partitionKeyHeaderIsExcludable() throws Exception {
+        String partitionKey = "partition-key-value";
+        TextMessage xmlMessage = Mockito.mock(TextMessage.class);
+        Mockito.when(xmlMessage.getText()).thenReturn("payload");
+        SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
+        metadata.putString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY, partitionKey);
+        Mockito.when(xmlMessage.getProperties()).thenReturn(metadata);
+
+        SolaceConsumerProperties consumerProperties = new SolaceConsumerProperties();
+        consumerProperties.setHeaderExclusions(List.of(SolaceBinderHeaders.PARTITION_KEY));
+        AcknowledgmentCallback acknowledgmentCallback = Mockito.mock(AcknowledgmentCallback.class);
+        Message<?> springMessage = xmlMessageMapper.map(xmlMessage, acknowledgmentCallback, consumerProperties);
+
+        assertNull(springMessage.getHeaders().get(SolaceBinderHeaders.PARTITION_KEY));
+    }
+
+    @Test
+    void testMapXMLMessageToSpringMessage_noPartitionKeyHeaderWhenAbsent() throws Exception {
+        TextMessage xmlMessage = Mockito.mock(TextMessage.class);
+        Mockito.when(xmlMessage.getText()).thenReturn("payload");
+        Mockito.when(xmlMessage.getProperties()).thenReturn(JCSMPFactory.onlyInstance().createMap());
+
+        AcknowledgmentCallback acknowledgmentCallback = Mockito.mock(AcknowledgmentCallback.class);
+        Message<?> springMessage = xmlMessageMapper.map(xmlMessage, acknowledgmentCallback, new SolaceConsumerProperties());
+
+        assertNull(springMessage.getHeaders().get(SolaceBinderHeaders.PARTITION_KEY));
     }
 
     @Test

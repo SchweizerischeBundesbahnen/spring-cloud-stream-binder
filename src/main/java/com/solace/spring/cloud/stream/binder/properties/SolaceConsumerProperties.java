@@ -116,6 +116,24 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * {@code terminationGracePeriodSeconds} / Spring {@code spring.lifecycle.timeout-per-shutdown-phase}).
      */
     private long drainTimeoutMs = 0;
+
+    /**
+     * Opt-in: preserve per-partition message ordering when consuming a Solace partitioned queue with
+     * {@code concurrency > 1}.
+     * <p>When {@code true}, each received message is dispatched to a worker thread based on its Solace
+     * partition key (the {@code JMSXGroupID} queue-partition-key message property): all messages that
+     * share a partition key are handled by the same worker thread, so they are processed sequentially
+     * in receive order, while messages with different partition keys are still processed in parallel.
+     * Concretely, the single shared worker queue is replaced by one bounded-ordering queue per worker
+     * thread and a message is routed to {@code floorMod(partitionKey.hashCode(), concurrency)}.
+     * Messages without a partition key carry no ordering constraint and are distributed round-robin
+     * across the worker threads.
+     * <p>When {@code false} (the default), every worker thread competes for every message from a
+     * single shared queue: maximum throughput but no per-partition ordering guarantee — exactly the
+     * behaviour from before this feature existed.
+     * <p>Has no effect when {@code concurrency == 1} (a single worker thread already preserves order).
+     */
+    private boolean partitionAware = false;
     // ------------------------
 
     /**
