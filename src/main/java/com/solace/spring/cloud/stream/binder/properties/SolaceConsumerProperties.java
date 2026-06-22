@@ -124,7 +124,7 @@ public class SolaceConsumerProperties extends SolaceCommonProperties {
      * partition key (the {@code JMSXGroupID} queue-partition-key message property): all messages that
      * share a partition key are handled by the same worker thread, so they are processed sequentially
      * in receive order, while messages with different partition keys are still processed in parallel.
-     * Concretely, the single shared worker queue is replaced by one bounded-ordering queue per worker
+     * Concretely, the single shared worker queue is replaced by one dedicated worker queue per worker
      * thread and a message is routed to {@code floorMod(partitionKey.hashCode(), concurrency)}.
      * Messages without a partition key carry no ordering constraint and are distributed round-robin
      * across the worker threads.
