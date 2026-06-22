@@ -1,13 +1,15 @@
 # Partitioned Queues
 
-Demonstrates how to set Solace partition keys on outbound messages using `SolaceBinderHeaders.PARTITION_KEY`, and how to provision the example queue as a partitioned queue over SEMP before starting the consumer binding. Partitioned queues let the broker keep messages for the same partition key on the same consumer flow, which is useful for partition affinity and distributing different keys across flows. They do **not** change the binder's rule that `concurrency > 1` provides no ordering guarantee.
+Demonstrates how to set Solace partition keys on outbound messages using `SolaceBinderHeaders.PARTITION_KEY`, how to read the partition key back on the consumer side, and how to provision the example queue as a partitioned queue over SEMP before starting the consumer binding. Partitioned queues let the broker keep messages for the same partition key on the same consumer flow, which is useful for partition affinity and distributing different keys across flows. By default they do **not** change the binder's rule that `concurrency > 1` provides no ordering guarantee — but you can opt in to per-partition ordering with the `partitionAware` consumer property (see below).
 
 ## Features Demonstrated
 
 - Setting `SolaceBinderHeaders.PARTITION_KEY` on outbound messages
+- Reading the partition key of each consumed message from the `solace_scst_partitionKey` header
 - Provisioning the example queue with `partitionCount: 2` via SEMP before starting the binding
 - How the binder translates partition keys to Solace's `JMSXGroupID` message property
 - Combining partition keys with `concurrency: 2` for parallel processing inside one process
+- Optionally preserving per-partition ordering under concurrency with the `partitionAware` consumer property
 
 ## Prerequisites
 
@@ -135,10 +137,23 @@ The included test validates both behaviors that matter for this example: partiti
 - Multi-tenant systems where partition affinity helps distribute tenants across consumer flows
 - Any scenario where you want **parallel processing across keys** while preserving broker-side key-to-flow affinity
 
-> **⚠️ Ordering caveat:** The binder does **not** guarantee processing order when `concurrency > 1`, including when the source queue is partitioned. Partitioned queues help the broker keep the same key on the same flow, but strict ordering still requires a single-threaded consumer (`concurrency: 1`) and synchronous handler execution.
+> **⚠️ Ordering caveat:** By default the binder does **not** guarantee processing order when `concurrency > 1`, including when the source queue is partitioned. To keep per-partition order while still consuming concurrently, set the consumer property `partitionAware: true` — the binder then routes all messages of a partition key to the same worker thread:
+>
+> ```yaml
+> spring:
+>   cloud:
+>     stream:
+>       solace:
+>         bindings:
+>           partitionedConsumer-in-0:
+>             consumer:
+>               partitionAware: true
+> ```
+>
+> Without `partitionAware`, strict ordering requires a single-threaded consumer (`concurrency: 1`). In all cases, asynchronous handler execution (e.g. `CompletableFuture`, `@Async`) can still reorder processing.
 
 ## Related API Documentation
 
 - [Partitioning](../../API.md#partitioning) — Full documentation on partition keys, native PubSub+ support, and ordering caveats
 - [Solace Binder Headers](../../API.md#solace-binder-headers) — `solace_scst_partitionKey` header reference
-- [Consumer Concurrency](../../API.md#consumer-concurrency) — How concurrency interacts with partitioned queues
+- [Consumer Concurrency](../../API.md#consumer-concurrency) — How concurrency interacts with partitioned queues, including [Preserving Per-Partition Ordering](../../API.md#preserving-per-partition-ordering)

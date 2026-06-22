@@ -248,7 +248,8 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 consumerProperties.getConcurrency(),
                 consumerDestination.getBindingDestinationName(),
                 this::onReceiveConcurrent,
-                consumerProperties.getExtension().getWatchdogTimeoutMs());
+                consumerProperties.getExtension().getWatchdogTimeoutMs(),
+                consumerProperties.getExtension().isPartitionAware());
         this.flowReceiver.set(jcsmpSession.createFlow(flowXMLMessageListener, consumerFlowProperties, endpointProperties, solaceFlowEventHandler));
         if (!paused.get()) {
             this.flowReceiver.get().start();

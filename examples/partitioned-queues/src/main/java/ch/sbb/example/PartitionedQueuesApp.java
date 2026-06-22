@@ -107,7 +107,10 @@ public class PartitionedQueuesApp {
         return msg -> {
             String payload = msg.getPayload();
             String thread = Thread.currentThread().getName();
-            log.info("Received '{}' on thread '{}'", payload, thread);
+            // The partition key of the consumed message is exposed as a header (read from JMSXGroupID),
+            // so the application can see which partition each message belongs to.
+            String partitionKey = (String) msg.getHeaders().get(SolaceBinderHeaders.PARTITION_KEY);
+            log.info("Received '{}' (partitionKey={}) on thread '{}'", payload, partitionKey, thread);
             MSG_TO_THREAD.put(payload, thread);
         };
     }
