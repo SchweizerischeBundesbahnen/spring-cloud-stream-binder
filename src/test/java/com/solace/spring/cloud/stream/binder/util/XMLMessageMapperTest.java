@@ -839,7 +839,9 @@ public class XMLMessageMapperTest {
                     break;
                 case SolaceBinderHeaders.PARTITION_KEY:
                     // The partition key is read back from the Solace queue-partition-key (JMSXGroupID) property.
-                    metadata.putString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY, header.getKey());
+                    // Use a representative, arbitrary partition-key value (not the header name) so the round-trip
+                    // assertion verifies the value is propagated rather than coincidentally matching the header name.
+                    metadata.putString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY, RandomStringUtils.randomAlphanumeric(10));
                     break;
                 default:
                     fail(String.format("no test for header %s", header.getKey()));
