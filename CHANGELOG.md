@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [9.2.0] - 2026-06-25
+
 ### Added
 - STTRS-3135: The partition key of consumed messages is now exposed on the Spring message under the `solace_scst_partitionKey` header (read from the Solace `JMSXGroupID` queue-partition-key property), mirroring the producer-side header. This lets consumers read each message's partition key, e.g. to implement per-partition ordering on the client side.
 - STTRS-3135: Added the `partitionAware` consumer property (default `false`). When enabled with `concurrency > 1`, the binder dispatches messages to worker threads by partition key so that all messages sharing a partition key are processed sequentially by the same thread (per-partition ordering preserved) while different partition keys are processed in parallel. Defaults to `false`, preserving the previous shared-queue throughput behaviour.
