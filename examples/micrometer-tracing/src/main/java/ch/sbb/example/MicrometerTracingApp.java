@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,11 +28,11 @@ public class MicrometerTracingApp {
 
     public static final BlockingQueue<TraceObservation> TRACING_LOGS = new LinkedBlockingQueue<>();
     private final AtomicInteger count = new AtomicInteger();
-    
+
     // Spring Boot automatically configures the Tracer
     private final Tracer tracer;
     private final StreamBridge streamBridge;
-    
+
     public MicrometerTracingApp(Tracer tracer, StreamBridge streamBridge) {
         this.tracer = tracer;
         this.streamBridge = streamBridge;
@@ -44,7 +45,7 @@ public class MicrometerTracingApp {
         if (count.get() < 3) {
             int c = count.incrementAndGet();
             String payload = "msg-" + c;
-            
+
             // Start a new span manually to observe trace propagation
             io.micrometer.tracing.Span newSpan = tracer.nextSpan().name("send-msg").start();
             try (io.micrometer.tracing.Tracer.SpanInScope ws = tracer.withSpan(newSpan)) {
@@ -52,11 +53,18 @@ public class MicrometerTracingApp {
                 String currentSpanId = newSpan.context().spanId();
                 log.info("Publishing msg {}. TraceID: {}, SpanID: {}", c, currentTraceId, currentSpanId);
                 TRACING_LOGS.offer(new TraceObservation("PUBLISHER", payload, currentTraceId, currentSpanId));
-                
-                streamBridge.send("tracingPublisher-out-0", MessageBuilder.withPayload(payload)
-                        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-                        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                        .build());
+
+                // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs
+                // window is exhausted), so always wrap the publish in a try/catch even though the binder retries
+                // transient failures.
+                try {
+                    streamBridge.send("tracingPublisher-out-0", MessageBuilder.withPayload(payload)
+                            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                            .build());
+                } catch (MessagingException e) {
+                    log.error("Failed to publish msg {}", payload, e);
+                }
             } finally {
                 newSpan.end();
             }

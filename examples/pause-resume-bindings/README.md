@@ -77,13 +77,19 @@ management:
 
 ```java
 @PostMapping("/send")
-public String publish(@RequestBody String payload) {
-  streamBridge.send("example/pausable/topic", MessageBuilder.withPayload(payload)
-      .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-      .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-      .build());
+public ResponseEntity<String> publish(@RequestBody String payload) {
+  try {
+    streamBridge.send("example/pausable/topic", MessageBuilder.withPayload(payload)
+        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+        .build());
     log.info("Published to pausable topic: {}", payload);
-    return "Sent " + payload;
+    return ResponseEntity.ok("Sent " + payload);
+  } catch (MessagingException e) {
+    log.error("Failed to publish to pausable topic: {}", payload, e);
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body("Failed to send " + payload + ": " + e.getMessage());
+  }
 }
 
 @Bean
@@ -96,6 +102,8 @@ public Consumer<String> pausableConsumer() {
 ```
 
 The `/send` helper endpoint publishes test messages into the same destination that the pausable consumer reads from, with a 30 second TTL and `solace_dmqEligible=true`. The pause/resume functionality itself is still provided by the Spring Cloud Stream framework and the Solace binder — no special pause logic is needed in the consumer.
+
+Because the endpoint publishes straight from the request thread, `streamBridge.send(...)` is wrapped in a `try/catch` for `org.springframework.messaging.MessagingException`. That publish is synchronous and can throw once the producer's `sendRetryTimeoutMs` (default `60000`, set `0` to disable) is exhausted; catching it lets the endpoint return an HTTP `503` instead of parking the request and failing unhandled. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 ## What to Observe
 
