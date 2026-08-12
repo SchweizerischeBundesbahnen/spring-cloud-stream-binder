@@ -7,6 +7,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,12 +35,18 @@ public class ConcurrencyApp {
     @Scheduled(initialDelay = 1000, fixedDelay = 60000)
     public void publishBurst() {
         if (burstPublished.compareAndSet(false, true)) {
+            // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window
+            // is exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
             for (int messageIndex = 1; messageIndex <= 20; messageIndex++) {
                 String payload = "msg-" + messageIndex;
-                streamBridge.send("fastPublisher-out-0", MessageBuilder.withPayload(payload)
-                        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-                        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                        .build());
+                try {
+                    streamBridge.send("fastPublisher-out-0", MessageBuilder.withPayload(payload)
+                            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                            .build());
+                } catch (MessagingException e) {
+                    log.error("Failed to publish {}", payload, e);
+                }
             }
             log.info("Finished publishing 20 messages in burst");
         }

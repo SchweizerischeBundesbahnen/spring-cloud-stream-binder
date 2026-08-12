@@ -7,6 +7,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,11 +32,17 @@ public class OAuth2App {
 
     @Scheduled(fixedRate = 500)
     public void publish() {
-        streamBridge.send("oauthPublisher-out-0", MessageBuilder.withPayload("oauth-secured-msg")
-                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                .build());
-        log.info("Published authenticated message");
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+        // exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("oauthPublisher-out-0", MessageBuilder.withPayload("oauth-secured-msg")
+                    .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                    .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                    .build());
+            log.info("Published authenticated message");
+        } catch (MessagingException e) {
+            log.error("Failed to publish authenticated message", e);
+        }
     }
 
     @Bean

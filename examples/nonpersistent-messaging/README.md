@@ -82,16 +82,20 @@ public class NonPersistentApp {
     @Scheduled(fixedRate = 500)
     public void publish() {
         String msg = "direct-msg-" + System.currentTimeMillis();
-      streamBridge.send("directPublisher-out-0", MessageBuilder.withPayload(msg)
-          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-          .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-          .build());
+      try {
+        streamBridge.send("directPublisher-out-0", MessageBuilder.withPayload(msg)
+            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+            .build());
         log.info("Published Direct msg: {}", msg);
+      } catch (MessagingException e) {
+        log.error("Failed to publish Direct msg: {}", msg, e);
+      }
     }
 }
 ```
 
-  Publishes a timestamped message as a Direct (non-persistent) message. The sample still sets the standard 30 second TTL and `solace_dmqEligible=true` headers for consistency with the rest of the suite, even though Direct messages are not spooled to a DMQ because no queue is involved.
+  Publishes a timestamped message as a Direct (non-persistent) message. The sample still sets the standard 30 second TTL and `solace_dmqEligible=true` headers for consistency with the rest of the suite, even though Direct messages are not spooled to a DMQ because no queue is involved. `streamBridge.send(...)` is wrapped in a `try/catch` for `org.springframework.messaging.MessagingException` — even for Direct messaging the call is synchronous and can throw once the producer's `sendRetryTimeoutMs` (default `60000`) is exhausted, so producers must always be prepared to catch it. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 ```java
 @Bean
