@@ -11,6 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cloud.stream.binding.BindingsLifecycleController;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -107,11 +108,17 @@ public class MaxUnacknowledgedMessagesApp {
 
         for (int messageIndex = 0; messageIndex < totalMessages; messageIndex++) {
             String payload = "msg-" + messageIndex;
-            streamBridge.send("publisher-out-0", MessageBuilder.withPayload(payload)
-                    .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-                    .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                    .build());
-            log.info("{} published {}", instanceName, payload);
+            // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window
+            // is exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+            try {
+                streamBridge.send("publisher-out-0", MessageBuilder.withPayload(payload)
+                        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                        .build());
+                log.info("{} published {}", instanceName, payload);
+            } catch (MessagingException e) {
+                log.error("{} failed to publish {}", instanceName, payload, e);
+            }
         }
     }
 

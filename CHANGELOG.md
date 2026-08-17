@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## [9.3.0] - 2026-08-11
+
+### Added
+- Added `sendRetryTimeoutMs` producer property (default `60000`). Failed synchronous publishes (`producer.send(...)`) are now retried with a 1 second back-off until this window elapses, after which the failure is re-thrown as an `org.springframework.messaging.MessagingException`. Set `sendRetryTimeoutMs: 0` to disable retrying and propagate failures immediately (previous behaviour).
+
+### Changed
+- Documented that `StreamBridge.send(...)` / the outbound message handler can throw an `org.springframework.messaging.MessagingException` (including in the binder examples). Producers must always catch it, even with `sendRetryTimeoutMs` enabled.
 
 ## [9.2.0] - 2026-06-25
 

@@ -521,6 +521,14 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: `null` (If unconfigured, the producer flow inherits `solace.java.apiProperties.PUB_ACK_WINDOW_SIZE` / the JCSMP session default.)
     See: [ProducerFlowProperties.setWindowSize(int)](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/com/solacesystems/jcsmp/ProducerFlowProperties.html#setWindowSize(int))
 
+`sendRetryTimeoutMs`
+:   Time window in milliseconds during which a failed synchronous publish is retried before the send ultimately fails. When a publish attempt throws, the binder keeps retrying (with a 1 second back-off between attempts) until this duration elapses, after which it re-throws the failure as an `org.springframework.messaging.MessagingException`.
+    Set to `0` to disable retrying: the outbound message handler then performs a single publish attempt and immediately propagates any failure as a `org.springframework.messaging.MessagingException`.
+    Default: `60000` (60 seconds)
+
+> [!IMPORTANT]
+> Retrying only mitigates *transient*, synchronous publish failures. Regardless of `sendRetryTimeoutMs`, a call to `StreamBridge.send(...)` (and therefore the binder's outbound message handler) can still throw an `org.springframework.messaging.MessagingException` — for example once the retry window is exhausted, or when the message cannot be mapped/serialized, or when the producer binding is not running. **Producers must always be prepared to catch `org.springframework.messaging.MessagingException`.** See the binder examples for the recommended pattern.
+
 #### Solace Connection Health-Check Properties
 
 The Solace connection health indicator immediately reports `DOWN` status when the connection is down or reconnecting. This ensures that health checks accurately reflect the current connection state without any delay or threshold configuration.
@@ -1046,6 +1054,17 @@ spring:
 By default, asynchronous producer errors aren't handled by the framework. Producer error channels can be enabled using the [`errorChannelEnabled` producer config option](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#_producer_properties).
 
 Beyond that, this binder also supports using a `Future` to wait for publish confirmations. See [Publisher Confirms](#publisher-confirms) for more info.
+
+> [!IMPORTANT]
+> A synchronous call to `StreamBridge.send(...)` (and to any producer binding backed by this binder) can throw an `org.springframework.messaging.MessagingException`. This happens, for example, when the producer binding is not running, when a message cannot be mapped/serialized, or when publishing keeps failing until the [`sendRetryTimeoutMs`](#solace-producer-properties) retry window is exhausted. With `sendRetryTimeoutMs` (default `60000`) the binder first retries transient publish failures; once the window elapses it re-throws the failure as a `MessagingException`. Setting `sendRetryTimeoutMs: 0` disables retrying and propagates the failure immediately. **Regardless of the retry setting, producers must always wrap `StreamBridge.send(...)` in a `try/catch` for `org.springframework.messaging.MessagingException`.**
+>
+> ```java
+> try {
+>     streamBridge.send("output-destination", message);
+> } catch (org.springframework.messaging.MessagingException e) {
+>     // Handle the failed publish (retry at a higher level, alert, drop, ...).
+> }
+> ```
 
 ## Publisher Confirmations
 

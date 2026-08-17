@@ -4,6 +4,29 @@ This document contains migration guides for major version upgrades of the Spring
 
 ---
 
+## 9.x.0 to 9.3.0
+
+### Fix previously unreliable behavior of error handling on sending messages
+If you rely on the behavior that on the first seconds a broker can not be reached your outgoing messages must be lost, you must set the new producer property `sendRetryTimeoutMs: 0` to disable retrying and propagate failures immediately.
+Otherwise, the default behavior is to retry failed synchronous publishes (`producer.send(...)`) with a 1 second back-off until the `sendRetryTimeoutMs` window elapses (default 60000 ms), after which the failure is re-thrown as an `org.springframework.messaging.MessagingException`.
+
+When you have low ttl since your messages will be sent in regular intervals, and the retry is within this range it makes no sense to retry over this, so you might want to disable for such a producer.
+
+Example configuration:
+```yaml
+spring:
+    cloud:
+        stream:
+            bindings:
+                <binding-name-a>:
+                # ... non-solace specific properties
+            solace:
+                bindings:
+                    <binding-name-a>:
+                        producer:
+                            sendRetryTimeoutMs: 0 # Disabled retry of unsuccessful send attempts
+```
+
 ## 8.0.0 to 9.0.0
 
 > [!IMPORTANT]

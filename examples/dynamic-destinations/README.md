@@ -62,18 +62,25 @@ public class DynamicDestinationsApp {
     private final StreamBridge streamBridge;
 
     @PostMapping("/send")
-    public String publish(@RequestParam String destination, @RequestBody String payload) {
+    public ResponseEntity<String> publish(@RequestParam String destination, @RequestBody String payload) {
         log.info("Publishing to dynamic destination '{}': {}", destination, payload);
-      streamBridge.send(destination, MessageBuilder.withPayload(payload)
-          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-          .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-          .build());                         // (1)
-        return "Sent to " + destination;
+        try {
+          streamBridge.send(destination, MessageBuilder.withPayload(payload)
+              .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+              .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+              .build());                         // (1)
+          return ResponseEntity.ok("Sent to " + destination);
+        } catch (MessagingException e) {         // (2)
+          log.error("Failed to publish to dynamic destination '{}': {}", destination, payload, e);
+          return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+              .body("Failed to send to " + destination + ": " + e.getMessage());
+        }
     }
 }
 ```
 
   1. **`streamBridge.send(destination, message)`** — `StreamBridge` is Spring Cloud Stream's API for sending messages without pre-configured bindings. The `destination` parameter becomes the Solace topic the message is published to, while the `Message<?>` envelope lets the sample apply the same 30 second TTL and DMQ-eligibility defaults as the rest of the suite. The binder creates an ephemeral producer binding on the fly.
+  2. **`catch (MessagingException e)`** — `streamBridge.send(...)` is a synchronous call that can throw an `org.springframework.messaging.MessagingException`. Because we publish straight from the request thread, the binder's `sendRetryTimeoutMs` (default `60000`, set `0` to disable) would otherwise park this request for up to a minute before the failure surfaced unhandled. Always catch it and translate the failure into a proper HTTP error response. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 ```java
 @Bean
