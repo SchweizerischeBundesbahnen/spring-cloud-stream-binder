@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -50,8 +51,14 @@ public class DefaultHeadersApp {
                     .build();
         }
 
-        streamBridge.send("headerPublisher-out-0", message);
-        log.info("Published message {}", index);
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+        // exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("headerPublisher-out-0", message);
+            log.info("Published message {}", index);
+        } catch (MessagingException e) {
+            log.error("Failed to publish message {}", index, e);
+        }
     }
 
     @Bean

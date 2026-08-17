@@ -70,10 +70,14 @@ public class ConcurrencyApp {
         if (burstPublished.compareAndSet(false, true)) {
             for (int messageIndex = 1; messageIndex <= 20; messageIndex++) {
           String payload = "msg-" + messageIndex;
-          streamBridge.send("fastPublisher-out-0", MessageBuilder.withPayload(payload)
-              .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-              .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-              .build());
+          try {
+            streamBridge.send("fastPublisher-out-0", MessageBuilder.withPayload(payload)
+                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                .build());
+          } catch (MessagingException e) {
+            log.error("Failed to publish {}", payload, e);
+          }
             }
             log.info("Finished publishing 20 messages in burst");
         }
@@ -81,7 +85,7 @@ public class ConcurrencyApp {
 }
 ```
 
-  Publishes a single 20-message burst shortly after startup, then stops. The burst messages carry a 30 second TTL and `solace_dmqEligible=true`, which keeps the example aligned with the durable-message header guidance while still creating enough backlog for parallel processing.
+  Publishes a single 20-message burst shortly after startup, then stops. The burst messages carry a 30 second TTL and `solace_dmqEligible=true`, which keeps the example aligned with the durable-message header guidance while still creating enough backlog for parallel processing. Each `streamBridge.send(...)` is wrapped in a `try/catch` for `org.springframework.messaging.MessagingException` — the call is synchronous and can throw once the producer's `sendRetryTimeoutMs` (default `60000`) is exhausted, so guarding it per message keeps one failed publish from aborting the rest of the burst. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 ```java
 @Bean

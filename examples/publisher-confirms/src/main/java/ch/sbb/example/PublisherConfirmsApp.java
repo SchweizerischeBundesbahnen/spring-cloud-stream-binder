@@ -12,6 +12,7 @@ import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Service;
 
@@ -55,12 +56,13 @@ public class PublisherConfirmsApp {
 
 @Service
 class PublishService {
+    private static final Logger log = LoggerFactory.getLogger(PublishService.class);
     private final StreamBridge streamBridge;
-    
+
     public PublishService(StreamBridge streamBridge) {
         this.streamBridge = streamBridge;
     }
-    
+
     public boolean publishAndWait(String payload) throws Exception {
         CorrelationData correlationData = new CorrelationData();
         Message<String> msg = MessageBuilder.withPayload(payload)
@@ -68,9 +70,16 @@ class PublishService {
                 .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
                 .setHeader(SolaceBinderHeaders.CONFIRM_CORRELATION, correlationData)
                 .build();
-        
-        streamBridge.send("confirmPublisher-out-0", msg);
-        
+
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+        // exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("confirmPublisher-out-0", msg);
+        } catch (MessagingException e) {
+            log.error("Failed to publish: {}", payload, e);
+            throw e;
+        }
+
         try {
             // Wait for broker ACK
             correlationData.getFuture().get(5, TimeUnit.SECONDS);

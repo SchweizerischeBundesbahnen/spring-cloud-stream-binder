@@ -110,22 +110,33 @@ public class MultiBinderApp {
     @Scheduled(fixedRate = 1000)
     public void publishToBrokers() {
         int c = count.getAndIncrement();
+        // streamBridge.send(...) can throw a MessagingException, so guard every publish.
         String msg1 = "msg-to-broker1-" + c;
-      streamBridge.send("fromBroker1-out-0", MessageBuilder.withPayload(msg1)
-        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-        .build());
-        log.info("Published to Broker 1: {}", msg1);
+        try {
+          streamBridge.send("fromBroker1-out-0", MessageBuilder.withPayload(msg1)
+            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+            .build());
+          log.info("Published to Broker 1: {}", msg1);
+        } catch (MessagingException e) {
+          log.error("Failed to publish to Broker 1: {}", msg1, e);
+        }
 
         String msg2 = "msg-to-broker2-" + c;
-      streamBridge.send("fromBroker2-out-0", MessageBuilder.withPayload(msg2)
-        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-        .build());
-        log.info("Published to Broker 2: {}", msg2);
+        try {
+          streamBridge.send("fromBroker2-out-0", MessageBuilder.withPayload(msg2)
+            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+            .build());
+          log.info("Published to Broker 2: {}", msg2);
+        } catch (MessagingException e) {
+          log.error("Failed to publish to Broker 2: {}", msg2, e);
+        }
     }
 }
 ```
+
+> Each `streamBridge.send(...)` is synchronous and can throw an `org.springframework.messaging.MessagingException` (for example once the producer's `sendRetryTimeoutMs`, default `60000`, is exhausted). Guard every publish independently so a failure against one broker does not skip the other. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 - `fromBroker1` publishes to broker 1.
 - `toBroker1` consumes from broker 1 — it receives messages from `fromBroker1`.

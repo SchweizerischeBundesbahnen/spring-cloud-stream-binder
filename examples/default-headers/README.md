@@ -82,13 +82,14 @@ public void publish() {
                 .build();
     }
 
-    streamBridge.send("headerPublisher-out-0", message);
+    streamBridge.send("headerPublisher-out-0", message); // (3)
     log.info("Published message {}", index);
 }
 ```
 
 1. **Fallback to default** — Even-indexed messages do not set `custom-default-header`, so the binder fills it in from `default-header.custom-default-header`. The Solace headers `solace_timeToLive` and `solace_senderId` are also injected automatically.
 2. **Override** — Odd-indexed messages set `custom-default-header` explicitly. The configured default is silently skipped for that header on that message; other defaults still apply.
+3. **Wrap the publish in `try/catch`** — `streamBridge.send(...)` is synchronous and can throw an `org.springframework.messaging.MessagingException` (for example once the producer's `sendRetryTimeoutMs`, default `60000`, is exhausted). The full sample wraps the call in a `try/catch (MessagingException e)` and logs the failure; producers must always be prepared to catch it. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 ### Consumer — Reading the Resulting Headers
 

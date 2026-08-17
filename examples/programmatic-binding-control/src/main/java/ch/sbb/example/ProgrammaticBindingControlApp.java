@@ -8,6 +8,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.stream.binding.BindingsLifecycleController;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,13 +43,22 @@ public class ProgrammaticBindingControlApp {
     }
 
     @PostMapping("/send")
-    public String publish(@RequestBody String payload) {
-        streamBridge.send("controlledPublisher-out-0", MessageBuilder.withPayload(payload)
-                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                .build());
-        log.info("Published to controlled topic: {}", payload);
-        return "Sent " + payload;
+    public ResponseEntity<String> publish(@RequestBody String payload) {
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+        // exhausted, or while the producer binding is stopped). Publishing straight from this request thread, so always
+        // catch it and return a proper HTTP error response instead of letting the request fail unhandled.
+        try {
+            streamBridge.send("controlledPublisher-out-0", MessageBuilder.withPayload(payload)
+                    .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                    .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                    .build());
+            log.info("Published to controlled topic: {}", payload);
+            return ResponseEntity.ok("Sent " + payload);
+        } catch (MessagingException e) {
+            log.error("Failed to publish to controlled topic: {}", payload, e);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Failed to send " + payload + ": " + e.getMessage());
+        }
     }
 
     @PostMapping("/bindings/start")
