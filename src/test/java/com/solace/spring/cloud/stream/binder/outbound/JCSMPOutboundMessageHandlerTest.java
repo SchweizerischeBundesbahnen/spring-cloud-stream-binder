@@ -266,6 +266,8 @@ public class JCSMPOutboundMessageHandlerTest {
         if (success) {
             messageHandler.handleMessage(message);
         } else {
+            // Disable send retry so this test exercises the immediate-throw path without the default 60s retry window.
+            producerProperties.getExtension().setSendRetryTimeoutMs(0);
             JCSMPException exception = new JCSMPException("Expected exception");
             Mockito.doThrow(exception)
                     .when(messageProducer)
@@ -277,6 +279,64 @@ public class JCSMPOutboundMessageHandlerTest {
 
         Mockito.verify(solaceMeterAccessor, Mockito.times(1))
                 .recordMessage(Mockito.eq(producerProperties.getBindingName()), any());
+    }
+
+    @Test
+    public void test_send_retriedThenSucceeds() throws Exception {
+        producerProperties.getExtension().setSendRetryTimeoutMs(30000);
+        messageHandler.start();
+
+        // Fail the first publish attempt, then succeed on the retry.
+        Mockito.doThrow(new JCSMPException("transient"))
+                .doNothing()
+                .when(messageProducer)
+                .send(any(XMLMessage.class), any(Destination.class));
+
+        Message<String> message = MessageBuilder.withPayload(RandomStringUtils.randomAlphanumeric(100)).build();
+        assertDoesNotThrow(() -> messageHandler.handleMessage(message));
+
+        Mockito.verify(messageProducer, Mockito.times(2))
+                .send(any(XMLMessage.class), any(Destination.class));
+    }
+
+    @Test
+    public void test_send_retryDisabled_throwsImmediately() throws Exception {
+        producerProperties.getExtension().setSendRetryTimeoutMs(0);
+        messageHandler.start();
+
+        JCSMPException exception = new JCSMPException("boom");
+        Mockito.doThrow(exception)
+                .when(messageProducer)
+                .send(any(XMLMessage.class), any(Destination.class));
+
+        Message<String> message = MessageBuilder.withPayload(RandomStringUtils.randomAlphanumeric(100)).build();
+        assertThatThrownBy(() -> messageHandler.handleMessage(message))
+                .isInstanceOf(MessagingException.class)
+                .hasCause(exception);
+
+        // With retry disabled only a single publish attempt is made.
+        Mockito.verify(messageProducer, Mockito.times(1))
+                .send(any(XMLMessage.class), any(Destination.class));
+    }
+
+    @Test
+    public void test_send_retryExhausted_throwsMessagingException() throws Exception {
+        producerProperties.getExtension().setSendRetryTimeoutMs(100);
+        messageHandler.start();
+
+        JCSMPException exception = new JCSMPException("boom");
+        Mockito.doThrow(exception)
+                .when(messageProducer)
+                .send(any(XMLMessage.class), any(Destination.class));
+
+        Message<String> message = MessageBuilder.withPayload(RandomStringUtils.randomAlphanumeric(100)).build();
+        assertThatThrownBy(() -> messageHandler.handleMessage(message))
+                .isInstanceOf(MessagingException.class)
+                .hasCause(exception);
+
+        // The publish is retried at least once before the retry window is exhausted.
+        Mockito.verify(messageProducer, Mockito.atLeast(2))
+                .send(any(XMLMessage.class), any(Destination.class));
     }
 
     @Test

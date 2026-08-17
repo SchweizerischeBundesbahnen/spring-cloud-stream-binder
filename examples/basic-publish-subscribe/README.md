@@ -73,16 +73,25 @@ public class BasicApp {
     @Scheduled(fixedRate = 2000)
     public void publish() {
         String msg = "Hello from Solace #" + count.getAndIncrement();
-      streamBridge.send("source-out-0", MessageBuilder.withPayload(msg)
-          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis()) // Prefer always Duration over raw millis for readability and avoid confusion about time units.
-          .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-          .build());
-        log.info("Published: {}", msg);
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs
+        // window is exhausted), so always wrap the publish in a try/catch even though the binder retries
+        // transient failures for up to `sendRetryTimeoutMs` (default 60000).
+        try {
+          streamBridge.send("source-out-0", MessageBuilder.withPayload(msg)
+              .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis()) // Prefer always Duration over raw millis for readability and avoid confusion about time units.
+              .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+              .build());
+          log.info("Published: {}", msg);
+        } catch (MessagingException e) {
+          log.error("Failed to publish: {}", msg, e);
+        }
     }
 }
 ```
 
   A scheduled task executes every 2 seconds, independently publishing messages using the injected `StreamBridge`. Each outbound message gets a 30 second TTL and `solace_dmqEligible=true`, so expired durable messages remain eligible for a DMQ.
+
+  Note that `streamBridge.send(...)` is wrapped in a `try/catch` for `org.springframework.messaging.MessagingException`. The binder retries transient publish failures for up to the producer's `sendRetryTimeoutMs` (default `60000`, set `0` to disable), but once that window is exhausted the failure is re-thrown as a `MessagingException` — so producers must always be prepared to catch it. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 ```java
 @Bean

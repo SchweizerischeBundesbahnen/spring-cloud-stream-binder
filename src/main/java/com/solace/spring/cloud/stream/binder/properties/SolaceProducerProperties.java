@@ -73,4 +73,19 @@ public class SolaceProducerProperties extends SolaceCommonProperties {
      * Default: null (inherit {@code JCSMPProperties.PUB_ACK_WINDOW_SIZE})
      */
     private Integer pubAckWindowSize;
+
+    /**
+     * Time window in milliseconds during which a failed synchronous publish ({@code producer.send(...)}) is retried
+     * before the send ultimately fails. When a publish attempt throws, the binder keeps retrying until this duration
+     * elapses, after which it re-throws the failure as an {@link org.springframework.messaging.MessagingException}.
+     * <p>
+     * Set to {@code 0} to disable retrying: the message handler then performs a single publish attempt and immediately
+     * propagates any failure as a {@link org.springframework.messaging.MessagingException}.
+     * <p>
+     * Note: retrying only mitigates transient, synchronous publish failures. Regardless of this setting,
+     * {@code StreamBridge.send(...)} / the outbound message handler can still throw a
+     * {@link org.springframework.messaging.MessagingException}, so callers must always be prepared to catch it.
+     * Default: 60000 (60 seconds).
+     */
+    private long sendRetryTimeoutMs = 60000;
 }
