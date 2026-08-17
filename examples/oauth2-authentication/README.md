@@ -100,16 +100,20 @@ public class OAuth2App {
 
     @Scheduled(fixedRate = 500)
     public void publish() {
-      streamBridge.send("oauthPublisher-out-0", MessageBuilder.withPayload("oauth-secured-msg")
-          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-          .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-          .build());
+      try {
+        streamBridge.send("oauthPublisher-out-0", MessageBuilder.withPayload("oauth-secured-msg")
+            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+            .build());
         log.info("Published authenticated message");
+      } catch (MessagingException e) {
+        log.error("Failed to publish authenticated message", e);
+      }
     }
 }
 ```
 
-  The application code is still effectively identical to a standard publisher/consumer, apart from the standard 30 second TTL and `solace_dmqEligible=true` headers on outbound messages. OAuth2 authentication is handled entirely by the binder and Spring Security — no authentication code is needed in the application beans.
+  The application code is still effectively identical to a standard publisher/consumer, apart from the standard 30 second TTL and `solace_dmqEligible=true` headers on outbound messages, plus the `try/catch` around `streamBridge.send(...)`. That publish is synchronous and can throw an `org.springframework.messaging.MessagingException` once the producer's `sendRetryTimeoutMs` (default `60000`) is exhausted, so producers must always catch it. OAuth2 authentication is handled entirely by the binder and Spring Security — no authentication code is needed in the application beans. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 **How the authentication flow works:**
 

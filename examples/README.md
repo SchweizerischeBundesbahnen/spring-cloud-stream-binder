@@ -4,6 +4,8 @@ This repository contains **21 distinct, production-ready examples** demonstratin
 
 Unless an example is explicitly demonstrating a different transport behavior, the publisher samples send outbound messages with a 30 second TTL and `solace_dmqEligible=true` so they stay aligned with the binder header guidance in [API.md](../API.md).
 
+Every publisher sample wraps `streamBridge.send(...)` in a `try/catch` for `org.springframework.messaging.MessagingException`. The call is synchronous and can throw once the producer's `sendRetryTimeoutMs` (default `60000`, set `0` to disable) retry window is exhausted, so producers must always be prepared to catch it — the REST-driven samples (`dynamic-destinations`, `pause-resume-bindings`) translate the failure into an HTTP `503` instead of parking the request thread. See [Failed Producer Message Error Handling](../API.md#failed-producer-message-error-handling).
+
 ## Prerequisites
 To run these examples locally without the integration test framework, you will need access to a Solace PubSub+ Event Broker.
 You can easily spin one up via Docker:

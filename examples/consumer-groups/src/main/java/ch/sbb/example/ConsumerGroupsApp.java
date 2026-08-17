@@ -7,6 +7,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.stream.function.StreamBridge;
 import org.springframework.context.annotation.Bean;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -35,11 +36,17 @@ public class ConsumerGroupsApp {
     @Scheduled(fixedRate = 2000)
     public void publish() {
         String msg = "group-msg-" + count.getAndIncrement();
-        streamBridge.send("publisher-out-0", MessageBuilder.withPayload(msg)
-                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                .build());
-        log.info("Published: {}", msg);
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+        // exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("publisher-out-0", MessageBuilder.withPayload(msg)
+                    .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                    .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                    .build());
+            log.info("Published: {}", msg);
+        } catch (MessagingException e) {
+            log.error("Failed to publish: {}", msg, e);
+        }
     }
 
     @Bean

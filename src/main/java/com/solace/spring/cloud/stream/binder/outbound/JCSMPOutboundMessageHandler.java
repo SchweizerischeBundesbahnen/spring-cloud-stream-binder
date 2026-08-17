@@ -24,10 +24,12 @@ import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.MessagingException;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.util.*;
 
 @Slf4j
 public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
+    private static final Duration SEND_RETRY_BACKOFF = Duration.ofSeconds(1);
     private final String id = UUID.randomUUID().toString();
     private final DestinationType configDestinationType;
     private final Destination configDestination;
@@ -122,7 +124,7 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
                 log.debug("Publishing message {} of {} to destination [ {}:{} ] <message handler ID: {}>",
                         i + 1, smfMessages.size(), targetDestination instanceof Topic ? "TOPIC" : "QUEUE",
                         targetDestination, id);
-                producer.send(smfMessage, targetDestination);
+                sendWithRetry(smfMessage, targetDestination);
             }
         } catch (JCSMPException e) {
             throw handleMessagingException(correlationKey, "Unable to send message(s) to destination", e);
@@ -131,6 +133,43 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
                 for (XMLMessage smfMessage : smfMessages) {
                     solaceMeterAccessor.get().recordMessage(properties.getBindingName(), smfMessage);
                 }
+            }
+        }
+    }
+
+    /**
+     * Publishes a single SMF message, retrying transient {@link JCSMPException}s until the configured
+     * {@link SolaceProducerProperties#getSendRetryTimeoutMs() sendRetryTimeoutMs} window is exhausted.
+     * When the retry window is {@code 0} (disabled) or has elapsed, the last failure is propagated so the caller can
+     * surface it as a {@link MessagingException}.
+     */
+    private void sendWithRetry(XMLMessage smfMessage, Destination targetDestination) throws JCSMPException {
+        long retryTimeoutMs = properties.getExtension().getSendRetryTimeoutMs();
+        long deadlineNanos = System.nanoTime() + Duration.ofMillis(Math.max(retryTimeoutMs, 0L)).toNanos();
+        int attempt = 1;
+        while (true) {
+            if (producer.isClosed() || !isRunning()) {
+                throw new ClosedFacilityException("Producer is already closed this can never recover. producer-id=%s".formatted(id));
+            }
+            try {
+                producer.send(smfMessage, targetDestination);
+                return;
+            } catch (JCSMPException e) {
+                // Retry disabled or retry window exhausted -> propagate the failure as a MessagingException.
+                if (retryTimeoutMs <= 0 || System.nanoTime() - deadlineNanos >= 0) {
+                    throw e;
+                }
+                log.info("Failed to publish message to destination [ {} ] on attempt {}. Retrying in {} ms "
+                                + "(retry window: {} ms). <message handler ID: {}>",
+                        targetDestination, attempt, SEND_RETRY_BACKOFF.toMillis(), retryTimeoutMs, id, e);
+                try {
+                    Thread.sleep(SEND_RETRY_BACKOFF.toMillis());
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    e.addSuppressed(ie);
+                    throw e;
+                }
+                attempt++;
             }
         }
     }
