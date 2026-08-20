@@ -57,13 +57,30 @@ mvn spring-boot:run \
 
 ## Configuration Explained
 
+`application.yml` is a multi-document file: a shared base document plus one document per profile (`fast-consumer`, `slow-consumer`, `publisher`).
+
 ```yaml
 spring:
   cloud:
     stream:
       default:
         consumer:
-          autoStartup: false                  # (1)
+          autoStartup: false                    # (1)
+      bindings:
+        publisher-out-0:
+          destination: example/max-unacknowledged/topic
+app:
+  total-messages: 20
+
+---
+spring:
+  config:
+    activate:
+      on-profile: fast-consumer                 # (2)
+  cloud:
+    function:
+      definition: loadBalancedConsumer
+    stream:
       bindings:
         loadBalancedConsumer-in-0:
           destination: example/max-unacknowledged/topic
@@ -72,19 +89,24 @@ spring:
         bindings:
           loadBalancedConsumer-in-0:
             consumer:
-              provisionDurableQueue: false      # (2)
+              provisionDurableQueue: false      # (3)
 app:
-  semp:
-    host: http://localhost:8081                 # (3)
-    username: admin
-    password: admin
-  processing-delay-ms: 2000                     # (4)
+  consumer:
+    enabled: true
+  instance-name: fast-consumer
+  processing-delay-ms: 0                        # (4)
+
+---
+# slow-consumer: identical, but with processing-delay-ms: 2000
+# publisher:     no consumer binding, app.publisher.enabled: true
 ```
 
 1. **`consumer.autoStartup: false`** — The consumer binding is held back until the application has configured the example queue via SEMP.
-2. **`provisionDurableQueue: false`** — The example queue is provisioned explicitly through SEMP so the broker-side `maxDeliveredUnackedMsgsPerFlow` value is set before the consumer starts.
-3. **`app.semp.*`** — Broker management connection settings used to create or recreate the example queue with the required broker-side limit.
-4. **`processing-delay-ms: 2000`** — The slow profile simulates a slow downstream dependency without blocking the Solace dispatcher thread, because the binder is already running the function on its worker thread.
+2. **`on-profile`** — Each profile activates one role. Run the same jar three times with `--spring.profiles.active=<profile>`.
+3. **`provisionDurableQueue: false`** — The example queue is provisioned explicitly through SEMP so the broker-side `maxDeliveredUnackedMsgsPerFlow` value is set before the consumer starts.
+4. **`processing-delay-ms`** — `0` for the fast profile, `2000` for the slow one. The delay simulates a slow downstream dependency without blocking the Solace dispatcher thread, because the binder already runs the function on its own worker thread.
+
+The SEMP connection settings (`app.semp.host`, `app.semp.username`, `app.semp.password`) are not in `application.yml` — they fall back to the `http://localhost:8081` / `admin` / `admin` defaults declared in the application class, and are overridden on the command line as shown above.
 
 Both consumer profiles share the same queue configuration. The fairness effect comes from the broker queue's `maxDeliveredUnackedMsgsPerFlow=1`, not from different per-binding YAML values.
 

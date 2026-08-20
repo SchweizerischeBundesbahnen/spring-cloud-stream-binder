@@ -1,4 +1,4 @@
-## How to contribute to a Solace Project
+## How to contribute to this project
 
 #### **Did you find a bug?**
 
@@ -18,4 +18,5 @@
 
 #### **Do you have questions about the source code?**
 
-* Ask any question about the code or how to use Solace PubSub+ in the [Solace community](https://solace.dev/community/).
+* Open a [question issue](https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/issues/new) on this repository. This binder is an independent fork; questions about it are not answered by Solace.
+* For questions about the Solace PubSub+ broker or the JCSMP API themselves, consult the [Solace product documentation](https://docs.solace.com).

@@ -113,11 +113,16 @@ public Consumer<Message<String>> partitionedConsumer() {
     return msg -> {
         String payload = msg.getPayload();
         String thread = Thread.currentThread().getName();
-        log.info("Received '{}' on thread '{}'", payload, thread);
+        // The partition key of the consumed message is exposed as a header (read from JMSXGroupID),
+        // so the application can see which partition each message belongs to.
+        String partitionKey = (String) msg.getHeaders().get(SolaceBinderHeaders.PARTITION_KEY);
+        log.info("Received '{}' (partitionKey={}) on thread '{}'", payload, partitionKey, thread);
         MSG_TO_THREAD.put(payload, thread);
     };
 }
 ```
+
+The consumer side reads `solace_scst_partitionKey` back off the inbound message — the binder mirrors the producer-side header from the Solace `JMSXGroupID` queue-partition-key property.
 
 ## How Partition Affinity Works in Production
 

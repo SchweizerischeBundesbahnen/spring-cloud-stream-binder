@@ -12,5 +12,5 @@ spring:
           customQueueConsumer-in-0:
             consumer:
               queueNameExpression: "'custom-prefix.' + group + '.v1'"
-              queueAccessType: 0  # EndpointProperties.ACCESSTYPE_EXCLUSIVE
+              queueAccessType: 1
               queueAdditionalSubscriptions: "example/extra/>,example/more"

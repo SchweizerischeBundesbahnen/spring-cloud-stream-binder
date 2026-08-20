@@ -105,9 +105,12 @@ This consumer **always throws an exception**. Since `max-attempts: 1`, no retrie
 ## What to Observe
 
 ```
+INFO  Provisioning error queue scst/error/wk/error-group/plain/example/error/topic
 INFO  Attempt 1 for: fail-me
-WARN  Message processing failed, republishing to error queue...
+INFO  Republishing XMLMessage 1 to error queue scst/error/wk/error-group/plain/example/error/topic - attempt 1 of 3
 ```
+
+The republish attempt counter comes from the consumer property `errorQueueMaxDeliveryAttempts` (default `3`).
 
 **What happens step by step:**
 

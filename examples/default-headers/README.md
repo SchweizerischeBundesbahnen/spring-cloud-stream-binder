@@ -42,10 +42,10 @@ spring:
     stream:
       bindings:
         headerPublisher-out-0:
-          destination: example/headers/topic
+          destination: example/default-headers/topic
         headerConsumer-in-0:
-          destination: example/headers/topic
-          group: headers-group
+          destination: example/default-headers/topic
+          group: default-headers-group
       solace:
         bindings:
           headerPublisher-out-0:
@@ -53,13 +53,13 @@ spring:
               default-header:                              # (1)
                 custom-default-header: my-default-value    # (2)
                 solace_timeToLive: 23000                   # (3)
-                solace_senderId: my-project_${HOSTNAME}    # (4)
+                solace_senderId: my-project_${HOSTNAME:localhost}   # (4)
 ```
 
 1. **`default-header`** — Producer property: a `Map<String, Object>` of headers automatically attached to every message published through this binding. If the message already carries a header with the same name, the configured default is ignored.
 2. **`custom-default-header`** — A user-defined header. Mapped to a Solace user property and delivered to the consumer like any normal header.
-3. **`solace_timeToLive`** — A standard Solace header. This unit is always Defaulting it here means every message gets a 23 s TTL to all messages so producers don't have to set it individually. The value must be an integer in milliseconds.
-4. **`solace_senderId`** — Demonstrates that default header values support Spring property placeholders, so values can be resolved from the environment (e.g. host name, profile, build info).
+3. **`solace_timeToLive`** — A standard Solace header, always expressed in milliseconds. Defaulting it here gives every message published through this binding a 23 s TTL, so individual producers don't have to set it themselves.
+4. **`solace_senderId`** — Demonstrates that default header values support Spring property placeholders, so values can be resolved from the environment (e.g. host name, profile, build info). Give the placeholder a default (`${HOSTNAME:localhost}`): `HOSTNAME` is exported inside containers but is only a shell variable on a plain Linux login shell, so an unguarded `${HOSTNAME}` fails context startup when you run the sample locally.
 
 ## Code Walkthrough
 

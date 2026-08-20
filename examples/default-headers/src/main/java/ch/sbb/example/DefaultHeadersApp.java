@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 @EnableScheduling
 public class DefaultHeadersApp {
     private static final Logger log = LoggerFactory.getLogger(DefaultHeadersApp.class);
-    public record ReceivedHeaders(String customDefaultHeader, String overridingHeader, Long timeToLive, String senderId) {}
+    public record ReceivedHeaders(String customDefaultHeader, Long timeToLive, String senderId) {}
 
     public static final BlockingQueue<ReceivedHeaders> RECEIVED_HEADERS = new LinkedBlockingQueue<>();
     private final AtomicInteger count = new AtomicInteger();
@@ -65,14 +65,13 @@ public class DefaultHeadersApp {
     public Consumer<Message<String>> headerConsumer() {
         return msg -> {
             String customDefaultHeader = msg.getHeaders().get("custom-default-header", String.class);
-            String overridingHeader = customDefaultHeader;
             Long timeToLive = msg.getHeaders().get(SolaceHeaders.TIME_TO_LIVE, Long.class);
             String senderId = msg.getHeaders().get(SolaceHeaders.SENDER_ID, String.class);
 
             log.info("Received {} | custom-default-header={} | timeToLive={} | senderId={}",
                 msg.getPayload(), customDefaultHeader, timeToLive, senderId);
 
-            RECEIVED_HEADERS.offer(new ReceivedHeaders(customDefaultHeader, overridingHeader, timeToLive, senderId));
+            RECEIVED_HEADERS.offer(new ReceivedHeaders(customDefaultHeader, timeToLive, senderId));
         };
     }
 }

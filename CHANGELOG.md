@@ -1,6 +1,19 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Fixed
+- STTRS-2996: Corrected example documentation that contradicted the implementation — worker thread naming in `consumer-concurrency`, the non-existent `RECONNECTING` health status in `health-indicator`, the error-queue republish log output, and the stale configuration excerpts in `max-unacknowledged-messages` and `oauth2-authentication`.
+- STTRS-2996: `queue-provisioning-options` set `queueAccessType: 0` (`ACCESSTYPE_NONEXCLUSIVE`, the default) while documenting it as exclusive. It now sets `1` and publishes one message per subscription, so the documented output is what the sample actually produces.
+- STTRS-2996: `metrics-monitoring` configured `management.metrics.export.prometheus.enabled`, removed in Spring Boot 3.0 and silently ignored since. Replaced with `management.prometheus.metrics.export.enabled`.
+- STTRS-2996: `default-headers` and `solace-headers` shared the destination `example/headers/topic` and the group `headers-group`, so running both against one broker made them consume each other's messages. `default-headers` moved to its own destination and group.
+- STTRS-2996: `default-headers` used an unguarded `${HOSTNAME}` placeholder, which fails context startup outside containers. Now `${HOSTNAME:localhost}`.
+- Fixed two broken cross-references in `API.md` and removed the UTF-8 BOM from `README.md` and `CHANGELOG.md`.
+
+### Changed
+- STTRS-2996: Replaced pointers to Solace's own samples, tutorials, community and support channels with this fork's examples suite and issue tracker. They describe the upstream binder, which differs from this fork.
 
 ## [9.3.0] - 2026-08-11
 

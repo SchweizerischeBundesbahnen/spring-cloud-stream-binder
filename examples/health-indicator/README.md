@@ -101,34 +101,39 @@ The included automated test validates the healthy `UP` path. To observe `RECONNE
 }
 ```
 
-**During reconnection** — If the broker connection drops and the binder is reconnecting:
+**During reconnection** — The binder reports `DOWN` as soon as the session starts reconnecting; there is no separate transitional status. The JCSMP event that triggered it is attached as details:
 
 ```json
 {
-  "status": "UP",
+  "status": "DOWN",
   "components": {
     "binders": {
-      "status": "RECONNECTING"
+      "status": "DOWN",
+      "components": {
+        "solace": {
+          "status": "DOWN",
+          "details": {
+            "responseCode": 503,
+            "info": "Connection to broker lost"
+          }
+        }
+      }
     }
   }
 }
 ```
 
-**Down state** — If all reconnection attempts are exhausted or the session is destroyed:
-
-```json
-{
-  "status": "DOWN"
-}
-```
+**Down state** — If all reconnection attempts are exhausted or the session is destroyed, the response looks the same; only the attached `info`/`error` details differ.
 
 ## Health Status Reference
 
 | Status | Meaning | Typical Cause |
 |---|---|---|
 | **UP** | Binder is connected and functioning normally | Normal operation |
-| **RECONNECTING** | Binder is actively trying to reconnect | Temporary network issue, broker restart |
-| **DOWN** | Binder has suffered an unrecoverable failure | All reconnect attempts exhausted, session destroyed, provisioning failure |
+| **DOWN** | Binder is reconnecting, or has suffered an unrecoverable failure | Temporary network issue, broker restart, all reconnect attempts exhausted, session destroyed, provisioning failure |
+
+> [!IMPORTANT]
+> Reconnecting is reported as `DOWN`, not as a distinct transitional status. A brief broker restart therefore flips `/actuator/health` to `DOWN` even though the binder recovers on its own. Take that into account when wiring this endpoint to a Kubernetes **liveness** probe — a readiness probe (or a liveness probe with a generous `failureThreshold`) avoids restarting a pod that is merely waiting to reconnect.
 
 ## When to Use This Pattern
 

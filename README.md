@@ -1,4 +1,4 @@
-﻿# Spring Cloud Stream Binder for Solace
+# Spring Cloud Stream Binder for Solace
 
 ## Overview
 

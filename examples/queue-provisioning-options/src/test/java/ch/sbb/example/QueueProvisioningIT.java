@@ -1,11 +1,7 @@
 package ch.sbb.example;
 
-import com.solace.spring.cloud.stream.binder.messaging.SolaceHeaders;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.cloud.stream.function.StreamBridge;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -13,7 +9,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.solace.Service;
 import org.testcontainers.solace.SolaceContainer;
 
-import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,18 +33,19 @@ class QueueProvisioningIT {
         r.add("solace.java.reconnectRetries", () -> "0");
     }
 
-    @Autowired
-    private StreamBridge streamBridge;
-
     @Test
-    void consumerReceivesMessagesFromAdditionalSubscriptions() throws InterruptedException {
-        // Send to an additional subscription topic, not the primary destination
-        streamBridge.send("example/extra/test-topic", MessageBuilder.withPayload("test-payload-sub")
-                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                .build());
+    void consumerReceivesMessagesFromDestinationAndAdditionalSubscriptions() throws InterruptedException {
+        Set<String> expectedPayloads = new HashSet<>(QueueProvisioningApp.PAYLOAD_PER_TOPIC.values());
 
-        String msg = QueueProvisioningApp.RECEIVED.poll(30, TimeUnit.SECONDS);
-        assertThat(msg).isNotNull().isEqualTo("test-payload-sub");
+        Set<String> receivedPayloads = new HashSet<>();
+        while (receivedPayloads.size() < expectedPayloads.size()) {
+            String payload = QueueProvisioningApp.RECEIVED.poll(30, TimeUnit.SECONDS);
+            assertThat(payload)
+                    .as("expected one message per subscription, received so far: %s", receivedPayloads)
+                    .isNotNull();
+            receivedPayloads.add(payload);
+        }
+
+        assertThat(receivedPayloads).isEqualTo(expectedPayloads);
     }
 }

@@ -1,6 +1,6 @@
 # Spring Cloud Stream Binder for Solace - Examples
 
-This repository contains **21 distinct, production-ready examples** demonstrating how to properly configure and use the Solace PubSub+ Spring Cloud Stream Binder for various architectural patterns.
+This repository contains **22 distinct, production-ready examples** demonstrating how to properly configure and use the Solace PubSub+ Spring Cloud Stream Binder for various architectural patterns.
 
 Unless an example is explicitly demonstrating a different transport behavior, the publisher samples send outbound messages with a 30 second TTL and `solace_dmqEligible=true` so they stay aligned with the binder header guidance in [API.md](../API.md).
 
@@ -41,11 +41,11 @@ This keeps the broker management UI on `http://localhost:8081` so the web- and a
 
 ### Error Handling
 * [**error-handling-redelivery**](./error-handling-redelivery/README.md): Demonstrates local Spring Retry attempts first, then broker-level redelivery once those retries are exhausted.
-* [**error-handling-error-queue**](./error-handling-error-queue/README.md): Shows how `autoBindErrorQueue: true` instructs the Binder to automatically provision a Solace Dead Letter Queue and route permanent failures to it natively.
+* [**error-handling-error-queue**](./error-handling-error-queue/README.md): Shows how `autoBindErrorQueue: true` instructs the binder to automatically provision a binder-managed error queue and republish permanently failed messages onto it. Not the same as the broker's Dead Message Queue — see the comparison table in the example.
 
 ### Advanced Provisioning & Routing
 * [**dynamic-destinations**](./dynamic-destinations/README.md): Demonstrates programmatic publishing directly to calculated string destinations via Spring `StreamBridge`.
-* [**queue-provisioning-options**](./queue-provisioning-options/README.md): Shows advanced Solace queue tuning via YAML metadata properties (`errorMsgRejected`, access types, etc).
+* [**queue-provisioning-options**](./queue-provisioning-options/README.md): Shows advanced Solace queue tuning via YAML properties (custom `queueNameExpression`, exclusive access type, extra subscriptions).
 * [**partitioned-queues**](./partitioned-queues/README.md): Shows how to publish partition keys and provision the example queue as partitioned via SEMP before starting the consumer binding.
 * [**default-headers**](./default-headers/README.md): Detailed instruction on mapping and reading proprietary or custom default headers directly onto standard Spring `Message<?>` envelopes before they are published.
 * [**solace-headers**](./solace-headers/README.md): Detailed instruction on mapping and reading proprietary Solace-specific headers directly onto standard Spring `Message<?>` envelopes.
