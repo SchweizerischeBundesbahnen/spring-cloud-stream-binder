@@ -633,6 +633,12 @@ Below are the payload types natively supported by this binder (before/after [Con
 > If this occurs, but you wish to publish other message types, then one option is to set `useNativeEncoding=true` on your producer (but read the caveats carefully before enabling this feature), and have your message handler return a payload of one of this binder's supported native payload types; e.g. return `Message<SDTStream>` to publish a stream message.
 > See [Content Type Negotiation](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#content-type-management) for more info on how Spring Cloud Streams converts payloads and other options to control message conversion.
 
+### XML-Content Payloads
+
+An SMF message carries its payload in either the binary attachment or the XML content part. Publishers that only fill the XML content part — Solace's REST/HTTP gateway, JMS clients and MQTT bridges typically do — produce messages whose binary attachment is empty.
+
+When the binary attachment yields no payload but the message has XML content, the binder reads the XML content part and hands it to the application as a `byte[]`. Without this, such messages would surface as empty payloads.
+
 ### Empty Payload VS Null Payload
 
 Spring messages can't contain null payloads, however, message handlers can differentiate between null payloads and empty payloads by looking at the `solace_scst_nullPayload` header. The binder adds the `solace_scst_nullPayload` header when a Solace message with null payload is consumed from the wire. When that is the case, the binder sets the Spring message's payload to a null equivalent payload. Null equivalent payloads are one of the following: empty `byte[]`, empty `String`, empty `SDTMap`, or empty `SDTStream`.
@@ -1205,6 +1211,22 @@ To address issues detected by the watchdog:
 ## Micrometer Tracing
 
 The binder supports Micrometer tracing. To enable, ensure the needed Beans are available: Tracer and Propagator.
+
+## Customizing the Outbound Message Handler
+
+Declare a `ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler>` bean to reach the binder's outbound handler after it has been created for a producer binding. The binder applies it to every producer binding, passing the resolved destination name:
+
+```java
+@Bean
+public ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler> solaceProducerCustomizer() {
+    return (handler, destinationName) -> handler.setErrorMessageStrategy(myErrorMessageStrategy());
+}
+```
+
+`setErrorMessageStrategy` is currently the handler's only mutable setting; the customizer is otherwise an observation point for the handler and its destination.
+
+> [!NOTE]
+> Only one such bean may be declared. There is no equivalent `ConsumerEndpointCustomizer` support yet — such a bean is ignored by this binder.
 
 ## Resources
 

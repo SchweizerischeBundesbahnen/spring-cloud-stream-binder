@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- A `ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler>` bean is now applied to every producer binding. Such a bean was previously created but never handed to the binder, so it silently did nothing. Ported from upstream solace-spring-cloud (#352). Note that `ConsumerEndpointCustomizer` beans are still ignored.
+
 ### Fixed
+- Messages whose payload sits in the SMF XML content part rather than the binary attachment — as published by Solace's REST/HTTP gateway, JMS clients and MQTT bridges — arrived with an empty payload. The binder now falls back to reading the XML content part. Ported from upstream solace-spring-cloud (#351).
 - STTRS-2996: Corrected example documentation that contradicted the implementation — worker thread naming in `consumer-concurrency`, the non-existent `RECONNECTING` health status in `health-indicator`, the error-queue republish log output, and the stale configuration excerpts in `max-unacknowledged-messages` and `oauth2-authentication`.
 - STTRS-2996: `queue-provisioning-options` set `queueAccessType: 0` (`ACCESSTYPE_NONEXCLUSIVE`, the default) while documenting it as exclusive. It now sets `1` and publishes one message per subscription, so the documented output is what the sample actually produces.
 - STTRS-2996: `metrics-monitoring` configured `management.metrics.export.prometheus.enabled`, removed in Spring Boot 3.0 and silently ignored since. Replaced with `management.prometheus.metrics.export.enabled`.

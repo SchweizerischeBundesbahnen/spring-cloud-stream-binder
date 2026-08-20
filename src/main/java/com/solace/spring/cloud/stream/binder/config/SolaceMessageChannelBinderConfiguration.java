@@ -4,6 +4,7 @@ import com.solace.spring.cloud.stream.binder.SolaceMessageChannelBinder;
 import com.solace.spring.cloud.stream.binder.config.autoconfigure.JCSMPSessionConfiguration;
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
 import com.solace.spring.cloud.stream.binder.meter.SolaceMeterAccessor;
+import com.solace.spring.cloud.stream.binder.outbound.JCSMPOutboundMessageHandler;
 import com.solace.spring.cloud.stream.binder.properties.SolaceExtendedBindingProperties;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceEndpointProvisioner;
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
@@ -12,6 +13,7 @@ import com.solacesystems.jcsmp.JCSMPSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.stream.config.ProducerMessageHandlerCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -32,7 +34,8 @@ public class SolaceMessageChannelBinderConfiguration {
                                                           BeanFactory beanFactory,
                                                           Optional<SolaceMeterAccessor> solaceMeterAccessor,
                                                           Optional<TracingProxy> tracingProxy,
-                                                          Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
+                                                          Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor,
+                                                          Optional<ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler>> producerMessageHandlerCustomizer) {
         SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession,
                 context,
                 solaceEndpointProvisioner,
@@ -41,6 +44,7 @@ public class SolaceMessageChannelBinderConfiguration {
                 tracingProxy,
                 solaceBinderHealthAccessor);
         binder.setExtendedBindingProperties(solaceExtendedBindingProperties);
+        producerMessageHandlerCustomizer.ifPresent(binder::setProducerMessageHandlerCustomizer);
         return binder;
     }
 }

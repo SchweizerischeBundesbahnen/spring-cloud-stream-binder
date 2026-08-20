@@ -204,6 +204,15 @@ public class XMLMessageMapper {
             throw exception;
         }
 
+        // An SMF message carries its payload either in the binary attachment or in the XML content part.
+        // Publishers that only fill the XML content part (REST/HTTP gateways, JMS clients, MQTT bridges)
+        // otherwise arrive here with an empty payload.
+        if (payload == null && xmlMessage.hasContent()) {
+            byte[] xmlContent = new byte[xmlMessage.getContentLength()];
+            xmlMessage.readContentBytes(xmlContent);
+            payload = xmlContent;
+        }
+
         boolean isNullPayload = payload == null;
         if (isNullPayload) {
             //Set empty payload equivalent to null
