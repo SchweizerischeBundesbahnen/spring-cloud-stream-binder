@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.3.1] - 2026-08-27
+
+### Fixed
+- STTRS-2707: The published jar now contains `META-INF/spring-configuration-metadata.json`. `annotationProcessorPaths` listed only Lombok, which switches javac to an explicit processor path and silently excluded `spring-boot-configuration-processor`, so no metadata was ever generated. IDEs now offer autocompletion, javadoc and default values for `spring.cloud.stream.solace.*` instead of flagging every binder property as unknown.
+
+### Changed
+- Update spring-boot-starter-parent from 4.1.0 to 4.1.1
+- Update spring-cloud-dependencies from 2025.1.2 to 2025.1.3
+- Update spring-boot-starter-solace-client-config from 3.1.0 to 3.1.1
+- Updated swagger-annotations, swagger-core, swagger-models from 2.2.52 to 2.2.54
+- Updated swagger-codegen-maven-plugin from 3.0.81 to 3.0.82
+
 ## [9.3.0] - 2026-08-11
 
 ### Added
