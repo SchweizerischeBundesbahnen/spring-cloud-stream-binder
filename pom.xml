@@ -11,7 +11,7 @@
     </parent>
     <groupId>ch.sbb</groupId>
     <artifactId>spring-cloud-stream-binder-solace</artifactId>
-    <version>9.3.0</version>
+    <version>9.3.1</version>
 
     <name>Spring Cloud Stream Binder Solace</name>
     <description>A Spring Cloud Stream Binder implementation using the Solace Java API (JCSMP)</description>
@@ -503,6 +503,11 @@
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                            <version>${project.parent.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
