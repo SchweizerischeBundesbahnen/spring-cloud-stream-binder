@@ -88,7 +88,9 @@ public class JCSMPSessionConfiguration {
             os.close();
             String configAsString = os.toString();
             SessionCacheEntry sessionCacheEntry = SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider));
-            binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator).ifPresent(SessionHealthIndicator::up);
+            binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator)
+                    .filter(SessionHealthIndicator::hasNotSeenASessionYet)
+                    .ifPresent(SessionHealthIndicator::up);
             return sessionCacheEntry;
         } catch (Exception ex) {
             throw new RuntimeException(ex);
