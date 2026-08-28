@@ -40,6 +40,24 @@ class SessionHealthIndicatorTest {
     }
 
     @Test
+    void testHasNotSeenASessionYetOnlyHoldsBeforeAnySessionState() {
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
+        assertTrue(healthIndicator.hasNotSeenASessionYet());
+
+        healthIndicator.up();
+        assertFalse(healthIndicator.hasNotSeenASessionYet());
+
+        healthIndicator.down(null);
+        assertFalse(healthIndicator.hasNotSeenASessionYet());
+
+        healthIndicator.reconnecting(null);
+        assertFalse(healthIndicator.hasNotSeenASessionYet());
+
+        healthIndicator.connectFailed(new IllegalStateException("host not resolvable"));
+        assertFalse(healthIndicator.hasNotSeenASessionYet());
+    }
+
+    @Test
     void testUp() {
         SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
         healthIndicator.up();

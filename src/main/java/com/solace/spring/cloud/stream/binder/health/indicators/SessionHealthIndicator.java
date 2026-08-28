@@ -4,6 +4,7 @@ import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.health.contributor.Health;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.lang.Nullable;
 
 @Slf4j
@@ -12,6 +13,10 @@ public class SessionHealthIndicator extends SolaceHealthIndicator {
 
     public SessionHealthIndicator() {
         super(Health.unknown().withDetail(INFO, NO_SESSION_YET).build());
+    }
+
+    public boolean hasNotSeenASessionYet() {
+        return Status.UNKNOWN.equals(health().getStatus());
     }
 
     public void up() {
