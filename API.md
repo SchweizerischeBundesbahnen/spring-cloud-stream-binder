@@ -1108,9 +1108,8 @@ Solace binders can report health statuses via the [Spring Boot Actuator health e
 | Health Status | Description |
 | --- | --- |
 | UP | Status indicating that the binder is functioning as expected. |
-| RECONNECTING | Status indicating that the binder is actively trying to reconnect to the message broker. This is a custom health status. It isn't included in the health severity order list (`management.endpoint.health.status.order`) and returns the default HTTP status code of `200`. To customize these, see [Writing Custom HealthIndicators](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html#actuator.endpoints.health.writing-custom-health-indicators). |
 | UNKNOWN | Status of the connection indicator before any JCSMP session has been connected, carrying the detail `info: no session connected yet`. It is the least severe status in the default severity order and returns the default HTTP status code of `200`. |
-| DOWN | Status indicating that the binder has suffered an unexpected failure. This status is reported when: (1) the initial connect of the JCSMP session failed, (2) all reconnection attempts to the broker have been exhausted, (3) the JCSMP session has been destroyed, or (4) queue/endpoint provisioning has failed. User intervention is likely required. |
+| DOWN | Status indicating that the binder has no usable connection. This status is reported when: (1) the initial connect of the JCSMP session failed, (2) the session or a flow is reconnecting, (3) all reconnection attempts to the broker have been exhausted, (4) the JCSMP session has been destroyed, or (5) queue/endpoint provisioning has failed. A reconnecting session reports `DOWN` immediately rather than a separate status, so that orchestrators react without a delay.
 
 ## Solace Binder Metrics
 
