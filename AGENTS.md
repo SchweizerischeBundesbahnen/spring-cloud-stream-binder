@@ -2,8 +2,6 @@
 
 This document describes specialized AI agents that can work on this codebase. Each agent is designed for specific tasks and has defined capabilities and constraints.
 
-**Project versions:** Spring Boot 4.0.4, Spring Cloud 2025.1.1, Binder 9.0.0, Java 17+.
-
 ---
 
 ## Agent: Binder Core Developer

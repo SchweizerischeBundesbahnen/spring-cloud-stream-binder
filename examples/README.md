@@ -1,6 +1,6 @@
 # Spring Cloud Stream Binder for Solace - Examples
 
-This repository contains **21 distinct, production-ready examples** demonstrating how to properly configure and use the Solace PubSub+ Spring Cloud Stream Binder for various architectural patterns.
+This repository contains **22 distinct, production-ready examples** demonstrating how to properly configure and use the Solace PubSub+ Spring Cloud Stream Binder for various architectural patterns.
 
 Unless an example is explicitly demonstrating a different transport behavior, the publisher samples send outbound messages with a 30 second TTL and `solace_dmqEligible=true` so they stay aligned with the binder header guidance in [API.md](../API.md).
 

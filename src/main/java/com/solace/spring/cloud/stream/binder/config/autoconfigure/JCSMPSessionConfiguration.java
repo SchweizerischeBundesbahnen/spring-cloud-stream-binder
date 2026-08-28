@@ -87,7 +87,9 @@ public class JCSMPSessionConfiguration {
             properties.storeToXML(os, "cached");
             os.close();
             String configAsString = os.toString();
-            return SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider));
+            SessionCacheEntry sessionCacheEntry = SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider));
+            binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator).ifPresent(SessionHealthIndicator::up);
+            return sessionCacheEntry;
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -113,16 +115,13 @@ public class JCSMPSessionConfiguration {
             jcsmpSession = springJCSMPFactory.createSession(context, jcsmpSessionEventHandler);
             log.info("Connecting JCSMP session {}", jcsmpSession.getSessionName());
             jcsmpSession.connect();
-            // after setting the session health indicator status to UP,
-            // we should not be worried about setting its status to DOWN,
-            // as the call closing JCSMP session also delete the context
-            // and terminates the application
-            binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator).ifPresent(SessionHealthIndicator::up);
             solaceSessionEventHandler.ifPresent(jcsmpSessionEventHandler::addSessionEventHandler);
             if (jcsmpSession instanceof JCSMPBasicSession session && !session.isRequiredSettlementCapable(Set.of(ACCEPTED, FAILED, REJECTED))) {
                 log.warn("The connected Solace PubSub+ Broker is not compatible. It doesn't support message NACK capability. Consumer bindings will fail to start.");
             }
         } catch (Exception e) {
+            binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator)
+                    .ifPresent(sessionHealthIndicator -> sessionHealthIndicator.connectFailed(e));
             if (context != null) {
                 context.destroy();
             }

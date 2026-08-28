@@ -14,8 +14,29 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SessionHealthIndicatorTest {
     @Test
-    public void testInitialHealth() {
-        assertNotNull(new SessionHealthIndicator().health());
+    public void testInitialHealthIsUnknownUntilASessionConnects() {
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
+        assertEquals(Status.UNKNOWN, healthIndicator.health().getStatus());
+        assertEquals("no session connected yet", healthIndicator.health(true).getDetails().get("info"));
+    }
+
+    @Test
+    void testConnectFailedReportsTheCause() {
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
+        Exception cause = new IllegalStateException("host not resolvable");
+        healthIndicator.connectFailed(cause);
+        assertEquals(Status.DOWN, healthIndicator.health().getStatus());
+        assertEquals(cause.getClass().getName() + ": " + cause.getMessage(),
+                healthIndicator.health(true).getDetails().get("error"));
+    }
+
+    @Test
+    void testConnectFailedIsOverruledByALaterSuccessfulConnect() {
+        SessionHealthIndicator healthIndicator = new SessionHealthIndicator();
+        healthIndicator.connectFailed(new IllegalStateException("host not resolvable"));
+        healthIndicator.up();
+        assertEquals(Status.UP, healthIndicator.health().getStatus());
+        assertTrue(healthIndicator.health(true).getDetails().isEmpty());
     }
 
     @Test
