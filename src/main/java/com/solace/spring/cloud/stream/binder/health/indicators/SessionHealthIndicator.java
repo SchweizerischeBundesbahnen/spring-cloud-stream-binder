@@ -2,13 +2,17 @@ package com.solace.spring.cloud.stream.binder.health.indicators;
 
 import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import com.solacesystems.jcsmp.SessionEventArgs;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.health.contributor.Health;
 import org.springframework.lang.Nullable;
 
 @Slf4j
-@NoArgsConstructor
 public class SessionHealthIndicator extends SolaceHealthIndicator {
+    private static final String NO_SESSION_YET = "no session connected yet";
+
+    public SessionHealthIndicator() {
+        super(Health.unknown().withDetail(INFO, NO_SESSION_YET).build());
+    }
 
     public void up() {
         super.healthUp();
@@ -23,5 +27,9 @@ public class SessionHealthIndicator extends SolaceHealthIndicator {
 
     public void down(@Nullable SessionEventArgs eventArgs) {
         super.healthDown(eventArgs);
+    }
+
+    public void connectFailed(Throwable cause) {
+        setHealth(Health.down(cause).build());
     }
 }

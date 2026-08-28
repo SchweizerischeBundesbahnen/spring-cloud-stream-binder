@@ -1,7 +1,6 @@
 package com.solace.spring.cloud.stream.binder.health.base;
 
 import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -14,12 +13,19 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Optional;
 
 @Slf4j
-@NoArgsConstructor
 public class SolaceHealthIndicator implements HealthIndicator {
-    private static final String INFO = "info";
+    protected static final String INFO = "info";
     private static final String RESPONSE_CODE = "responseCode";
-    @Setter(AccessLevel.PACKAGE)
-    private volatile Health health = Health.up().build();
+    @Setter(AccessLevel.PROTECTED)
+    private volatile Health health;
+
+    public SolaceHealthIndicator() {
+        this(Health.up().build());
+    }
+
+    protected SolaceHealthIndicator(Health initialHealth) {
+        this.health = initialHealth;
+    }
 
     private static void logDebugStatus(String status) {
         if (log.isDebugEnabled()) {

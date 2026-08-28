@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.4.0] - 2026-08-28
+
+### Changed
+- STTRS-3295: The Solace connection health indicator no longer reports `UP` before a session has been connected. It starts as `UNKNOWN` with the detail `info: no session connected yet` and only turns `UP` once a JCSMP session is connected. A failed *initial* connect now reports `DOWN` together with the cause, where the indicator previously stayed at its optimistic `UP`. This makes a startup failure such as a DNS lookup that times out while the pod's node is still coming up visible on the health endpoint instead of only in the logs.
+- Updated okhttp and logging-interceptor from 5.4.0 to 5.5.0.
+
+### Fixed
+- STTRS-3295: A binder context that reused a cached JCSMP session never marked its connection health as `UP`. The transition to `UP` moved from session creation to the session-cache lookup, so a reused session now reports the same health as a freshly created one.
+
 ## [9.3.1] - 2026-08-27
 
 ### Fixed

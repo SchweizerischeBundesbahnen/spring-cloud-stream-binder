@@ -7,21 +7,21 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
     <groupId>ch.sbb.solace.examples</groupId>
     <artifactId>solace-example-dynamic-destinations</artifactId>
-    <version>9.3.1</version>
+    <version>9.4.0</version>
     <name>Solace Example - Dynamic Destinations</name>
 
     <properties>
         <java.version>17</java.version>
-        <spring-cloud.version>2025.1.2</spring-cloud.version>
-        <solace-binder.version>9.3.1</solace-binder.version>
-        <testcontainers-solace.version>2.0.4</testcontainers-solace.version>
-        <testcontainers.version>2.0.4</testcontainers.version>
+        <spring-cloud.version>2025.1.3</spring-cloud.version>
+        <solace-binder.version>9.4.0</solace-binder.version>
+        <testcontainers-solace.version>2.0.5</testcontainers-solace.version>
+        <testcontainers.version>2.0.5</testcontainers.version>
     </properties>
 
     <dependencyManagement>
@@ -85,7 +85,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>3.5.5</version>
+                <version>3.5.6</version>
                 <configuration>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>

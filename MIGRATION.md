@@ -4,6 +4,24 @@ This document contains migration guides for major version upgrades of the Spring
 
 ---
 
+## 9.3.0 to 9.4.0
+
+### The connection health indicator no longer reports UP before a session is connected
+
+The Solace connection health indicator used to start at `UP`, which meant it reported a healthy
+connection before any connect had even been attempted, and a failed *initial* connect left it at
+`UP`. It now starts at `UNKNOWN` with the detail `info: no session connected yet`, turns `UP` once
+a JCSMP session is connected, and turns `DOWN` with the cause when the initial connect fails.
+
+`UNKNOWN` is the least severe status in Spring Boot's default severity order, so an application
+that never opens a session keeps its previous overall health status. What changes for you: an
+application whose readiness gate includes the binder health will now go unready when the very
+first connect fails, for example when the broker host cannot be resolved at startup, instead of
+reporting `UP` while no session exists. That is the intended behaviour — the pod is restarted or
+taken out of rotation rather than looking healthy without a connection.
+
+No configuration change is required.
+
 ## 9.x.0 to 9.3.0
 
 ### Fix previously unreliable behavior of error handling on sending messages
