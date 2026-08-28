@@ -5,7 +5,7 @@ Demonstrates how to expose the Solace binder's connection health through Spring 
 ## Features Demonstrated
 
 - Enabling the Solace binder health indicator via Actuator
-- The health statuses: `UNKNOWN` before a session is connected, then `UP`, `RECONNECTING`, `DOWN`
+- The health statuses: `UNKNOWN` before a session is connected, then `UP` and `DOWN`
 - Exposing detailed health information with `show-details: always`
 - How health reflects session state, binding status, and provisioning failures
 
@@ -76,7 +76,7 @@ A minimal consumer that establishes a binding to the Solace broker. The health i
 
 ## What to Observe
 
-The included automated test validates the healthy `UP` path. To observe `RECONNECTING` or `DOWN`, interrupt the broker connection while the app is running and query `/actuator/health` again. To observe `DOWN` from a failed *initial* connect, point `spring.cloud.stream.binders.solace.environment.solace.java.host` at a host that does not resolve and start the app.
+The included automated test validates the healthy `UP` path. To observe `DOWN`, interrupt the broker connection while the app is running and query `/actuator/health` again; a reconnecting session reports `DOWN` immediately rather than a separate status. To observe `DOWN` from a failed *initial* connect, point `spring.cloud.stream.binders.solace.environment.solace.java.host` at a host that does not resolve and start the app.
 
 **Healthy state** — `GET /actuator/health`:
 
@@ -105,10 +105,10 @@ The included automated test validates the healthy `UP` path. To observe `RECONNE
 
 ```json
 {
-  "status": "UP",
+  "status": "DOWN",
   "components": {
     "binders": {
-      "status": "RECONNECTING"
+      "status": "DOWN"
     }
   }
 }
@@ -128,8 +128,7 @@ The included automated test validates the healthy `UP` path. To observe `RECONNE
 |---|---|---|
 | **UNKNOWN** | No session has been connected yet, detail `info: no session connected yet` | Application start, before the binder opens its session |
 | **UP** | Binder is connected and functioning normally | Normal operation |
-| **RECONNECTING** | Binder is actively trying to reconnect | Temporary network issue, broker restart |
-| **DOWN** | Binder has suffered an unrecoverable failure | Initial connect failed, all reconnect attempts exhausted, session destroyed, provisioning failure |
+| **DOWN** | Binder has no usable connection | Initial connect failed, session is reconnecting, all reconnect attempts exhausted, session destroyed, provisioning failure |
 
 ## When to Use This Pattern
 

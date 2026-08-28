@@ -117,6 +117,7 @@ public class JCSMPSessionConfiguration {
             jcsmpSession = springJCSMPFactory.createSession(context, jcsmpSessionEventHandler);
             log.info("Connecting JCSMP session {}", jcsmpSession.getSessionName());
             jcsmpSession.connect();
+            binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator).ifPresent(SessionHealthIndicator::up);
             solaceSessionEventHandler.ifPresent(jcsmpSessionEventHandler::addSessionEventHandler);
             if (jcsmpSession instanceof JCSMPBasicSession session && !session.isRequiredSettlementCapable(Set.of(ACCEPTED, FAILED, REJECTED))) {
                 log.warn("The connected Solace PubSub+ Broker is not compatible. It doesn't support message NACK capability. Consumer bindings will fail to start.");
