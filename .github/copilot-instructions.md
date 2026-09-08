@@ -59,7 +59,7 @@ Provide a robust technical checkpoint in your responses using this verification 
 
 When reviewing any PR, **always** verify these documentation requirements and flag violations as **"Documentation/Improvement"** findings:
 
-- **CHANGELOG.md**: If the PR changes any Java source files, adds/removes properties, modifies behavior, fixes a bug, or upgrades a dependency, it MUST include an update to `CHANGELOG.md`. Flag the PR if no `CHANGELOG.md` modification is present. Acceptable format:
+- **CHANGELOG.md**: If the PR changes any Java source files, adds/removes properties, modifies behavior or fixes a bug, it MUST include an update to `CHANGELOG.md`. A plain dependency, plugin, GitHub action or test-broker bump does **not** get an entry — the changelog records what changed for someone using the binder, and `pom.xml` already records the versions. Do not ask for one. Flag the PR if no `CHANGELOG.md` modification is present. A release heading is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form — `## [10.0.0] - 2026-09-07`, with a hyphen and an ISO date. Do not ask for any other heading shape. Under it:
   - `### Added` — new features, properties, headers, metrics
   - `### Changed` — modified behavior, default changes, dependency upgrades
   - `### Removed` — deleted properties, removed deprecated APIs

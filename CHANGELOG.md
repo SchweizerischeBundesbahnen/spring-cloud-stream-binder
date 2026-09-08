@@ -1,6 +1,15 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
+
+## [9.5.0] - 2026-09-08
+
+`/actuator/health` no longer carries a top-level `solaceBinder` component. It reported a connection it had never opened, so nothing could have depended on it; the Solace health is under `binders.solace` as before. See [MIGRATION.md](MIGRATION.md).
+
+### Added (from upstream solace-spring-cloud)
+- A `ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler>` bean is now applied to every producer binding. Such a bean was previously created but never handed to the binder, so it silently did nothing. Ported from upstream solace-spring-cloud (#352).
+- A `ConsumerEndpointCustomizer<MessageProducerSupport>` bean is now applied to every consumer binding, with the same defect and the same fix as its producer-side twin: the binder never called `setConsumerEndpointCustomizer`, so the bean was constructed and then dropped.
+- STTRS-2996: A `null-payload` example. `solace_scst_nullPayload` is documented in `API.md` but no sample showed it, and it is the only way a consumer can tell a payload-less message from an empty one. The upstream Solace sample set covers it; this suite did not.
 
 ## [9.4.0] - 2026-08-28
 

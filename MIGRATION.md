@@ -1,6 +1,33 @@
 # Migration Guide
 
-This document contains migration guides for major version upgrades of the Spring Cloud Stream Binder for Solace PubSub+.
+This document contains migration guides for version upgrades of the Spring Cloud Stream Binder for Solace PubSub+.
+
+---
+
+## 9.4.0 to 9.5.0
+
+### `/actuator/health` no longer carries a top-level `solaceBinder` component
+
+The binder used to publish its health indicator hierarchy twice. `JCSMPSessionConfiguration` is both
+an auto-configuration and the import of the binder's child-context configuration, so the hierarchy
+was built in the application context as well — where no session ever updated it. That second copy
+surfaced as a top-level `solaceBinder` component reporting `UNKNOWN` for the lifetime of the
+application (`UP`, before 9.4.0), regardless of what the broker was doing.
+
+The hierarchy is now built only in the binder's own context, so the Solace health appears once:
+
+```
+components.binders.solace.connection      the JCSMP session
+components.binders.solace.bindings.<name> one entry per consumer binding
+components.binders.solace.provisioning    endpoint provisioning
+```
+
+What changes for you: a probe, dashboard or alert that reads
+`components.solaceBinder.…` finds nothing and must move to `components.binders.solace.…`. Anything
+gated on the removed component was not measuring the connection — it reported the same status
+whether the broker was reachable or not.
+
+The overall `status` of the health page is unaffected, and no configuration change is required.
 
 ---
 

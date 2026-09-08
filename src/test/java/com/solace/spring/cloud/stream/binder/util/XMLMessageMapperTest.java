@@ -1128,6 +1128,20 @@ public class XMLMessageMapperTest {
     }
 
     @Test
+    void testMapXMLMessageToSpringMessage_WithXmlContentInsteadOfBinaryAttachment() {
+        String xmlContent = "<order id=\"" + RandomStringUtils.randomAlphanumeric(10) + "\"/>";
+        BytesMessage xmlMessage = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
+        xmlMessage.writeBytes(xmlContent.getBytes(StandardCharsets.UTF_8));
+        AcknowledgmentCallback acknowledgmentCallback = Mockito.mock(AcknowledgmentCallback.class);
+        SolaceConsumerProperties consumerProperties = new SolaceConsumerProperties();
+
+        Message<?> springMessage = xmlMessageMapper.map(xmlMessage, acknowledgmentCallback, consumerProperties);
+
+        assertEquals(xmlContent, new String((byte[]) springMessage.getPayload(), StandardCharsets.UTF_8));
+        assertNull(springMessage.getHeaders().get(SolaceBinderHeaders.NULL_PAYLOAD));
+    }
+
+    @Test
     void testMapXMLMessageToSpringMessage_WithListPayload() throws Exception {
         BytesMessage xmlMessage = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
         List<SerializableFoo> expectedPayload = Collections.singletonList(new SerializableFoo(

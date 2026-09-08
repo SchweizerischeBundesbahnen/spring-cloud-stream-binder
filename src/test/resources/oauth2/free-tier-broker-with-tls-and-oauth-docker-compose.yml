@@ -19,7 +19,7 @@ services:
       no_cache: true
       # workaround for https://github.com/docker/compose/issues/11867
       dockerfile_inline: |-
-        FROM solace/solace-pubsub-standard:10.25.0
+        FROM solace/solace-pubsub-standard:10.26.0
         COPY ./certs/broker/solbroker.pem /run/secrets/server.pem
     ports:
       - "0:8080"    # HTTP management / PubSub+ Manager / SEMP over HTTP
@@ -29,6 +29,11 @@ services:
     hostname: solaceoauth
     networks:
       - solace_msg_net
+    # nginx resolves the proxy_pass upstream while it parses its config and exits with
+    # "host not found in upstream" if it is missing. Docker registers a container in its DNS when
+    # the container starts, not when it is created, so keycloak has to start first.
+    depends_on:
+      - keycloak
     build:
       no_cache: true
       dockerfile_inline: |-
