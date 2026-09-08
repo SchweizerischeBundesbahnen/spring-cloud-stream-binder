@@ -30,6 +30,13 @@ public interface MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup
     String KEYCLOAK_OAUTH_SERVICE_NAME = "keycloak";
     String DOCKER_COMPOSE_BUILD_PATH = "target/docker-compose-build";
 
+    /**
+     * Every exposed port is waited for separately, and that wait defaults to one minute however long
+     * the per-service waits below allow. Without this, the 220 and 280 second budgets they ask for
+     * cannot be reached.
+     */
+    Duration CONTAINER_STARTUP_TIMEOUT = Duration.ofMinutes(5);
+
     Logger LOGGER = LoggerFactory.getLogger(
             MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup.class);
 
@@ -43,14 +50,16 @@ public interface MessagingServiceFreeTierBrokerTestContainerWithTlsAndOAuthSetup
                 new File(DOCKER_COMPOSE_BUILD_PATH + "/" + DOCKER_COMPOSE_FILENAME))
                 .withPull(true)
 
-                .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 8080)
-                .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 55443)
-                .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 55555)
+                .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT)
 
-                .withExposedService(NGINX_RPROXY_SERVICE_NAME, 10443)
-                .withExposedService(NGINX_RPROXY_SERVICE_NAME, 1080)
+                .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 8080, Wait.forListeningPort().withStartupTimeout(CONTAINER_STARTUP_TIMEOUT))
+                .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 55443, Wait.forListeningPort().withStartupTimeout(CONTAINER_STARTUP_TIMEOUT))
+                .withExposedService(PUBSUB_BROKER_SERVICE_NAME, 55555, Wait.forListeningPort().withStartupTimeout(CONTAINER_STARTUP_TIMEOUT))
 
-                .withExposedService(KEYCLOAK_OAUTH_SERVICE_NAME, 8080)
+                .withExposedService(NGINX_RPROXY_SERVICE_NAME, 10443, Wait.forListeningPort().withStartupTimeout(CONTAINER_STARTUP_TIMEOUT))
+                .withExposedService(NGINX_RPROXY_SERVICE_NAME, 1080, Wait.forListeningPort().withStartupTimeout(CONTAINER_STARTUP_TIMEOUT))
+
+                .withExposedService(KEYCLOAK_OAUTH_SERVICE_NAME, 8080, Wait.forListeningPort().withStartupTimeout(CONTAINER_STARTUP_TIMEOUT))
 
                 .waitingFor(PUBSUB_BROKER_SERVICE_NAME,
                         Wait.forHttp("/").forPort(8080).withStartupTimeout(Duration.ofSeconds(220)))

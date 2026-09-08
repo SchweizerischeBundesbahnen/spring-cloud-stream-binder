@@ -1,7 +1,6 @@
 package com.solace.spring.cloud.stream.binder.config.autoconfigure;
 
 import com.solace.spring.cloud.stream.binder.config.SolaceBinderClientInfoProvider;
-import com.solace.spring.cloud.stream.binder.config.SolaceHealthIndicatorsConfiguration;
 import com.solace.spring.cloud.stream.binder.health.contributors.SolaceBinderHealthContributor;
 import com.solace.spring.cloud.stream.binder.health.handlers.SolaceSessionEventHandler;
 import com.solace.spring.cloud.stream.binder.health.indicators.SessionHealthIndicator;
@@ -15,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Lazy;
 
 import java.io.ByteArrayOutputStream;
@@ -26,7 +24,6 @@ import static com.solacesystems.jcsmp.XMLMessage.Outcome.*;
 @Slf4j
 @RequiredArgsConstructor
 @Configuration
-@Import(SolaceHealthIndicatorsConfiguration.class)
 public class JCSMPSessionConfiguration {
     private final static Map<String, SessionCacheEntry> SESSION_CACHE = new HashMap<>();
 
@@ -87,7 +84,10 @@ public class JCSMPSessionConfiguration {
             properties.storeToXML(os, "cached");
             os.close();
             String configAsString = os.toString();
-            SessionCacheEntry sessionCacheEntry = SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, binderHealthContributor, solaceSessionEventHandler, solaceSessionOAuth2TokenProvider));
+            SessionCacheEntry sessionCacheEntry = SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, binderHealthContributor, solaceSessionOAuth2TokenProvider));
+            // A context that adopts a cached session needs the events too: whichever context connects first
+            // owns the session, and without this the others only ever learn that it was up once.
+            solaceSessionEventHandler.ifPresent(sessionCacheEntry.jcsmpSessionEventHandler()::addSessionEventHandler);
             binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator)
                     .filter(SessionHealthIndicator::hasNotSeenASessionYet)
                     .ifPresent(SessionHealthIndicator::up);
@@ -99,7 +99,6 @@ public class JCSMPSessionConfiguration {
 
     private static SessionCacheEntry createSession(JCSMPProperties jcsmpProperties,
                                                    Optional<SolaceBinderHealthContributor> binderHealthContributor,
-                                                   Optional<SolaceSessionEventHandler> solaceSessionEventHandler,
                                                    Optional<SolaceSessionOAuth2TokenProvider> solaceSessionOAuth2TokenProvider) {
         JCSMPProperties solaceJcsmpProperties = (JCSMPProperties) jcsmpProperties.clone();
         solaceJcsmpProperties.setProperty(JCSMPProperties.CLIENT_INFO_PROVIDER, new SolaceBinderClientInfoProvider());
@@ -118,7 +117,6 @@ public class JCSMPSessionConfiguration {
             log.info("Connecting JCSMP session {}", jcsmpSession.getSessionName());
             jcsmpSession.connect();
             binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator).ifPresent(SessionHealthIndicator::up);
-            solaceSessionEventHandler.ifPresent(jcsmpSessionEventHandler::addSessionEventHandler);
             if (jcsmpSession instanceof JCSMPBasicSession session && !session.isRequiredSettlementCapable(Set.of(ACCEPTED, FAILED, REJECTED))) {
                 log.warn("The connected Solace PubSub+ Broker is not compatible. It doesn't support message NACK capability. Consumer bindings will fail to start.");
             }

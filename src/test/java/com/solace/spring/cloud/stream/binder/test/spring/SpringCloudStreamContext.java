@@ -11,6 +11,7 @@ import com.solacesystems.jcsmp.JCSMPSession;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.springframework.beans.factory.BeanFactory;
@@ -19,9 +20,18 @@ import org.springframework.cloud.stream.config.BindingProperties;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.integration.channel.AbstractSubscribableChannel;
 import org.springframework.integration.channel.DirectChannel;
+import org.springframework.integration.channel.QueueChannel;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
+import org.springframework.messaging.MessageHeaders;
+import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.util.MimeTypeUtils;
 
 import java.util.Objects;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * <p>Spring Cloud Stream Context.</p>
@@ -132,6 +142,64 @@ public class SpringCloudStreamContext extends PartitionCapableBinderTests<Solace
     @Override
     public String getDestinationNameDelimiter() {
         return super.getDestinationNameDelimiter();
+    }
+
+    /**
+     * Same assertions as the inherited test, with one moved: the message sent while the second
+     * consumer is unbound is received on the first consumer before the second one binds again.
+     * <p>Persistent sends are acknowledged asynchronously, so without that the send can still be in
+     * flight while the new anonymous queue and its subscription are created, and the consumer that
+     * is supposed to have missed the message gets it after all.</p>
+     */
+    @Override
+    @Test
+    public void testAnonymousGroup(TestInfo testInfo) throws Exception {
+        SolaceTestBinder binder = getBinder();
+        ExtendedProducerProperties<SolaceProducerProperties> producerProperties = createProducerProperties(testInfo);
+        DirectChannel output = createBindableChannel("output", createProducerBindingProperties(producerProperties));
+        String destination = String.format("defaultGroup%s0", getDestinationNameDelimiter());
+        Binding<MessageChannel> producerBinding = binder.bindProducer(destination, output, producerProperties);
+
+        QueueChannel stayingConsumer = new QueueChannel();
+        Binding<MessageChannel> stayingBinding =
+                binder.bindConsumer(destination, null, stayingConsumer, createConsumerProperties());
+
+        QueueChannel reboundConsumer = new QueueChannel();
+        Binding<MessageChannel> reboundBinding =
+                binder.bindConsumer(destination, null, reboundConsumer, createConsumerProperties());
+
+        String sentToBoth = "foo-" + UUID.randomUUID();
+        output.send(textMessage(sentToBoth));
+        assertThat(payloadOf(receive(stayingConsumer))).isEqualTo(sentToBoth);
+        assertThat(payloadOf(receive(reboundConsumer))).isEqualTo(sentToBoth);
+
+        reboundBinding.unbind();
+
+        String sentWhileUnbound = "foo-" + UUID.randomUUID();
+        output.send(textMessage(sentWhileUnbound));
+        assertThat(payloadOf(receive(stayingConsumer))).isEqualTo(sentWhileUnbound);
+
+        reboundBinding = binder.bindConsumer(destination, null, reboundConsumer, createConsumerProperties());
+
+        String sentAfterRebind = "foo-" + UUID.randomUUID();
+        output.send(textMessage(sentAfterRebind));
+        assertThat(payloadOf(receive(stayingConsumer))).isEqualTo(sentAfterRebind);
+        assertThat(payloadOf(receive(reboundConsumer))).isEqualTo(sentAfterRebind);
+
+        producerBinding.unbind();
+        stayingBinding.unbind();
+        reboundBinding.unbind();
+    }
+
+    private Message<String> textMessage(String payload) {
+        return MessageBuilder.withPayload(payload)
+                .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN)
+                .build();
+    }
+
+    private String payloadOf(Message<?> message) {
+        assertThat(message).isNotNull();
+        return new String((byte[]) message.getPayload());
     }
 
     @Override

@@ -99,6 +99,14 @@ This document describes specialized AI agents that can work on this codebase. Ea
 - Micrometer is optional - code must work without it
 - Time-based distribution summaries must clearly document their base units (e.g. milliseconds)
 - Metrics must be documented in `API.md` (Solace Binder Metrics section)
+- `JCSMPSessionConfiguration` keeps a **static** session cache keyed by the connection properties, so
+  whichever context asks first connects the session and every later context *adopts* it. Anything
+  that has to observe that session — a `SolaceSessionEventHandler` above all — must be attached in
+  `ensureSessionCache`, which runs for creator and adopter alike, never inside `createSession`, which
+  runs only on a cache miss. An observer attached only on creation leaves the adopting context
+  reporting the connection `UP` for the life of the process. `SolaceBinderConfigIT`
+  pins this; registration is idempotent because each context resolves several beans through the same
+  call.
 
 ---
 
@@ -201,8 +209,23 @@ SOLACE_JAVA_HOST=tcp://localhost:55555 mvn verify -P it_tests > maven_it_tests.l
 
 **Constraints:**
 - Integration tests require a PubSub+ broker (Docker or external)
+- **A Solace version ending in `.0` is an LTS release, and the test broker always tracks the latest
+  LTS.** `10.26.0` is an LTS; `10.26.1` through `10.26.5` are not. Bumping to a higher patch is a
+  move *off* the supported line, not an upgrade — check for the next `X.Y.0` instead, and change the
+  image tag in every example IT and the OAuth2 compose file together.
 - Use `@ExtendWith(PubSubPlusExtension.class)` for broker access
 - Follow naming convention: `*Test.java` for unit, `*IT.java` for integration
+- An example README may only describe behavior that the example's `*IT.java` asserts. A documented
+  claim no test covers is exactly the defect STTRS-2996 was raised for: write the assertion, do not
+  soften the sentence.
+- Testcontainers reports a container that **died** with the same `ContainerLaunchException: Timed
+  out waiting for container port to open` it uses for one that is merely slow. Compare the elapsed
+  time with the configured timeout and read the container's own log before touching a wait strategy:
+  a failure well inside the budget is a crash, and raising the timeout will not fix it.
+- A compose service whose configuration resolves a peer while it starts — an nginx `proxy_pass`
+  upstream, for instance — needs `depends_on`. Docker registers a container in its DNS when the
+  container starts, not when it is created, so without it the dependent service can die on a name
+  that is about to exist.
 
 ---
 
@@ -257,6 +280,12 @@ TEST_SOLACE_MGMT_USERNAME=admin
 TEST_SOLACE_MGMT_PASSWORD=admin
 ```
 
+**Continuous integration:** `build.yml` runs on `pull_request` and `workflow_dispatch`. A branch
+without a pull request is not built automatically, and `master` is not built on push — the release
+is `deploy.yml`, which fires on a GitHub release and refuses to publish unless the tag equals the
+pom version. Before calling a build green, check every run listed for the commit rather than the
+first one: `gh run list --branch <branch>`.
+
 ---
 
 ## Code Style & Conventions
@@ -266,3 +295,20 @@ TEST_SOLACE_MGMT_PASSWORD=admin
 - Follow Spring Boot conventions for configuration properties and integration semantics.
 - Prefer `Optional` wrappers over raw `null` checks where appropriate.
 - Deprecations: Use `@Deprecated` annotation combined with thorough JavaDoc highlighting the newly-recommended replacement.
+
+---
+
+## Commit Messages
+
+[Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/), as
+[`CONTRIBUTING.md`](CONTRIBUTING.md) spells out. Two things that are this repository's to decide:
+
+- **`examples` is the only allowed scope**, for changes under `examples/`. The binder itself takes
+  no scope — it would only repeat the repository name. Do not invent others.
+- **Work done at SBB carries its Jira key** immediately after the colon: `fix: STTRS-1234 stop the
+  mapper losing an XML-content payload`. A contribution from outside SBB has no ticket and needs no
+  key.
+
+A change that alters what a consumer sees — a header, a property default, a health component, a
+published signature — is a breaking change, gets `!` and a `BREAKING CHANGE:` footer, and belongs in
+`MIGRATION.md`.

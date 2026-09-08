@@ -16,6 +16,9 @@ public class JCSMPSessionEventHandler implements SessionEventHandler, SolaceOAut
 
     public void addSessionEventHandler(SessionEventHandler sessionEventHandler) {
         synchronized (sessionEventHandlers) {
+            if (sessionEventHandlers.contains(sessionEventHandler)) {
+                return;
+            }
             sessionEventHandlers.add(sessionEventHandler);
             if (jcsmpSession.get() != null && sessionEventHandler instanceof SolaceOAuth2SessionEventHandler sessionEventHandlerOAuth2) {
                 sessionEventHandlerOAuth2.setJcsmpSession(jcsmpSession.get());

@@ -1,0 +1,11 @@
+spring:
+  cloud:
+    function:
+      definition: customizedConsumer
+    stream:
+      bindings:
+        customizedConsumer-in-0:
+          destination: customizer/endpoint/topic
+          group: customizer-group
+        customizedProducer-out-0:
+          destination: customizer/handler/topic
