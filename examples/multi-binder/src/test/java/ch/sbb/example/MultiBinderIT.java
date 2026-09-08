@@ -18,11 +18,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MultiBinderIT {
 
     @Container
-    static SolaceContainer solace1 = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
+    static SolaceContainer solace1 = new SolaceContainer("solace/solace-pubsub-standard:10.26.0")
             .withExposedPorts(8080, 55555);
 
     @Container
-    static SolaceContainer solace2 = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
+    static SolaceContainer solace2 = new SolaceContainer("solace/solace-pubsub-standard:10.26.0")
             .withExposedPorts(8080, 55555);
 
     @DynamicPropertySource

@@ -42,10 +42,10 @@ spring:
     stream:
       bindings:
         headerPublisher-out-0:
-          destination: example/headers/topic
+          destination: example/default-headers/topic
         headerConsumer-in-0:
-          destination: example/headers/topic
-          group: headers-group
+          destination: example/default-headers/topic
+          group: default-headers-group
       solace:
         bindings:
           headerPublisher-out-0:
@@ -53,13 +53,13 @@ spring:
               default-header:                              # (1)
                 custom-default-header: my-default-value    # (2)
                 solace_timeToLive: 23000                   # (3)
-                solace_senderId: my-project_${HOSTNAME}    # (4)
+                solace_senderId: my-project_${HOSTNAME:localhost}   # (4)
 ```
 
 1. **`default-header`** — Producer property: a `Map<String, Object>` of headers automatically attached to every message published through this binding. If the message already carries a header with the same name, the configured default is ignored.
 2. **`custom-default-header`** — A user-defined header. Mapped to a Solace user property and delivered to the consumer like any normal header.
-3. **`solace_timeToLive`** — A standard Solace header. This unit is always Defaulting it here means every message gets a 23 s TTL to all messages so producers don't have to set it individually. The value must be an integer in milliseconds.
-4. **`solace_senderId`** — Demonstrates that default header values support Spring property placeholders, so values can be resolved from the environment (e.g. host name, profile, build info).
+3. **`solace_timeToLive`** — A standard Solace header, always expressed in milliseconds. Defaulting it here gives every message published through this binding a 23 s TTL, so individual producers don't have to set it themselves.
+4. **`solace_senderId`** — Demonstrates that default header values support Spring property placeholders, so values can be resolved from the environment (e.g. host name, profile, build info). Give the placeholder a default (`${HOSTNAME:localhost}`): `HOSTNAME` is exported inside containers but is only a shell variable on a plain Linux login shell, so an unguarded `${HOSTNAME}` fails context startup when you run the sample locally.
 
 ## Code Walkthrough
 
@@ -71,25 +71,31 @@ public void publish() {
     int index = count.getAndIncrement();
     Message<String> message;
 
-    if (index % 2 == 0) {
-        // No header set → the configured default `custom-default-header=my-default-value` is applied. (1)
+    if (index % 2 == 0) {                                     // (1)
+        // Will fallback to default header
         message = MessageBuilder.withPayload("custom-msg-" + index)
                 .build();
-    } else {
-        // Header set explicitly → overrides the configured default. (2)
+    } else {                                                  // (2)
+        // Will override default header
         message = MessageBuilder.withPayload("custom-msg-" + index)
                 .setHeader("custom-default-header", "overridden-value")
                 .build();
     }
 
-    streamBridge.send("headerPublisher-out-0", message); // (3)
-    log.info("Published message {}", index);
+    // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+    // exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+    try {
+        streamBridge.send("headerPublisher-out-0", message); // (3)
+        log.info("Published message {}", index);
+    } catch (MessagingException e) {
+        log.error("Failed to publish message {}", index, e);
+    }
 }
 ```
 
 1. **Fallback to default** — Even-indexed messages do not set `custom-default-header`, so the binder fills it in from `default-header.custom-default-header`. The Solace headers `solace_timeToLive` and `solace_senderId` are also injected automatically.
 2. **Override** — Odd-indexed messages set `custom-default-header` explicitly. The configured default is silently skipped for that header on that message; other defaults still apply.
-3. **Wrap the publish in `try/catch`** — `streamBridge.send(...)` is synchronous and can throw an `org.springframework.messaging.MessagingException` (for example once the producer's `sendRetryTimeoutMs`, default `60000`, is exhausted). The full sample wraps the call in a `try/catch (MessagingException e)` and logs the failure; producers must always be prepared to catch it. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
+3. **Wrap the publish in `try/catch`** — `streamBridge.send(...)` is synchronous and can throw an `org.springframework.messaging.MessagingException` (for example once the producer's `sendRetryTimeoutMs`, default `60000`, is exhausted). Producers must always be prepared to catch it. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 ### Consumer — Reading the Resulting Headers
 
@@ -133,7 +139,7 @@ Notice how `custom-default-header` alternates between the configured default and
 - Stamping every outgoing message with environment-derived identifiers (host name, pod name, build number) via `${...}` placeholders
 - Keeping per-message overrides simple: just set the header on the `Message` and the default steps aside
 
-## Related Documentation
+## Related API Documentation
 
 - [Solace Producer Properties — `defaultHeader`](../../API.md#solace-producer-properties)
 - [Solace Headers](../../API.md#solace-headers) — Full table of `solace_*` headers, including `solace_timeToLive` and `solace_senderId`

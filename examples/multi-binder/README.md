@@ -32,10 +32,10 @@ If you do not already have two local brokers running, start them first:
 # Start two Solace brokers on different ports
 docker run -d -p 8081:8080 -p 55555:55555 --shm-size=2g \
   --env username_admin_globalaccesslevel=admin --env username_admin_password=admin \
-  --name=solace1 solace/solace-pubsub-standard:10.25.0
+  --name=solace1 solace/solace-pubsub-standard:10.26.0
 docker run -d -p 8082:8080 -p 55556:55555 --shm-size=2g \
   --env username_admin_globalaccesslevel=admin --env username_admin_password=admin \
-  --name=solace2 solace/solace-pubsub-standard:10.25.0
+  --name=solace2 solace/solace-pubsub-standard:10.26.0
 
 mvn spring-boot:run -Dspring-boot.run.arguments="--spring.cloud.stream.binders.solace-broker-1.environment.solace.java.host=tcp://localhost:55555 --spring.cloud.stream.binders.solace-broker-1.environment.solace.java.msgVpn=default --spring.cloud.stream.binders.solace-broker-1.environment.solace.java.client-username=default --spring.cloud.stream.binders.solace-broker-1.environment.solace.java.client-password=default --spring.cloud.stream.binders.solace-broker-2.environment.solace.java.host=tcp://localhost:55556 --spring.cloud.stream.binders.solace-broker-2.environment.solace.java.msgVpn=default --spring.cloud.stream.binders.solace-broker-2.environment.solace.java.client-username=default --spring.cloud.stream.binders.solace-broker-2.environment.solace.java.client-password=default"
 ```

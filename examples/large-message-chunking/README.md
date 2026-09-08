@@ -71,13 +71,19 @@ public class LargeMessageApp {
 
     @Scheduled(fixedRate = 5000)
     public void publishLargeMessage() {
-        streamBridge.send("chunkedPublisher-out-0",
-                MessageBuilder.withPayload(largePayload)
-              .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-              .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                        .setHeader(SolaceBinderHeaders.LARGE_MESSAGE_SUPPORT, true)
-                        .build());
-        log.info("Published large message of {} bytes", largePayload.length());
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+        // exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("chunkedPublisher-out-0",
+                    MessageBuilder.withPayload(largePayload)
+                            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                            .setHeader(SolaceBinderHeaders.LARGE_MESSAGE_SUPPORT, true)
+                            .build());
+            log.info("Published large message of {} bytes", largePayload.length());
+        } catch (MessagingException e) {
+            log.error("Failed to publish large message of {} bytes", largePayload.length(), e);
+        }
     }
 }
 ```

@@ -102,14 +102,14 @@ Each invocation logs the thread name. When `concurrency: 4`, you will see 4 diff
 ## What to Observe
 
 ```
-INFO  Thread binding-concurrentConsumer-in-0-1 processing msg-1
-INFO  Thread binding-concurrentConsumer-in-0-3 processing msg-2
-INFO  Thread binding-concurrentConsumer-in-0-2 processing msg-3
-INFO  Thread binding-concurrentConsumer-in-0-4 processing msg-4
-INFO  Thread binding-concurrentConsumer-in-0-1 processing msg-5
+INFO  Thread example/concurrency/topic-0 processing msg-1
+INFO  Thread example/concurrency/topic-1 processing msg-2
+INFO  Thread example/concurrency/topic-2 processing msg-3
+INFO  Thread example/concurrency/topic-3 processing msg-4
+INFO  Thread example/concurrency/topic-0 processing msg-5
 ```
 
-Notice the different thread names (`-1`, `-2`, `-3`, `-4`). Messages are distributed across all 4 worker threads.
+Worker threads are named after the binding's destination followed by a zero-based worker index, so `concurrency: 4` yields `example/concurrency/topic-0` through `example/concurrency/topic-3`. Messages are distributed across all 4 worker threads.
 
 **Internal architecture:**
 
@@ -118,7 +118,11 @@ Notice the different thread names (`-1`, `-2`, `-3`, `-4`). Messages are distrib
 3. When a worker thread picks up a message, it invokes your `Consumer` bean.
 4. After processing completes, the worker thread sends an ACK back to the broker.
 
-> **⚠️ Ordering caveat:** With `concurrency > 1`, there is **no guarantee of message ordering**. That remains true even when consuming from a [Partitioned Queue](../partitioned-queues/). If you need strict ordering, keep the consumer single-threaded with `concurrency: 1` and avoid offloading work asynchronously.
+> **⚠️ Ordering caveat:** With `concurrency > 1` and the default `partitionAware: false`, all worker threads compete for the same shared queue, so there is **no guarantee of message ordering**.
+>
+> To keep parallelism *and* per-partition ordering, set the consumer property `partitionAware: true`: the binder then gives every worker thread its own queue and routes each message by its partition key, so messages sharing a key are processed sequentially by one thread while different keys still run in parallel. See [Partitioned Queues](../partitioned-queues/README.md) and [Consumer Concurrency](../../API.md#consumer-concurrency).
+>
+> For strict global ordering across all messages, keep the consumer single-threaded with `concurrency: 1`. In either case, ordering only holds if your handler does the work inline — offloading to `CompletableFuture` or `@Async` makes it non-deterministic again.
 
 ## When to Use This Pattern
 

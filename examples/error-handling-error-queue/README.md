@@ -78,11 +78,17 @@ public class ErrorQueueApp {
 
     @Scheduled(fixedRate = 5000)
     public void publishErrorTrigger() {
-      streamBridge.send("errorProducer-out-0", MessageBuilder.withPayload("fail-me")
-          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-          .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-          .build());
-        log.info("Published message that will fail");
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+        // exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("errorProducer-out-0", MessageBuilder.withPayload("fail-me")
+                    .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                    .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                    .build());
+            log.info("Published message that will fail");
+        } catch (MessagingException e) {
+            log.error("Failed to publish message that will fail", e);
+        }
     }
 }
 ```
@@ -105,9 +111,12 @@ This consumer **always throws an exception**. Since `max-attempts: 1`, no retrie
 ## What to Observe
 
 ```
+INFO  Provisioning error queue scst/error/wk/error-group/plain/example/error/topic
 INFO  Attempt 1 for: fail-me
-WARN  Message processing failed, republishing to error queue...
+INFO  Republishing XMLMessage 1 to error queue scst/error/wk/error-group/plain/example/error/topic - attempt 1 of 3
 ```
+
+The republish attempt counter comes from the consumer property `errorQueueMaxDeliveryAttempts` (default `3`).
 
 **What happens step by step:**
 

@@ -1,5 +1,6 @@
 package ch.sbb.example;
 
+import ch.sbb.example.NullPayloadApp.ReceivedPayload;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -9,13 +10,20 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.solace.Service;
 import org.testcontainers.solace.SolaceContainer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * The empty payload a producer sends never reaches the consumer as an empty payload: Solace turns it
+ * into a null payload on the wire. This proves that the {@code solace_scst_nullPayload} header is
+ * what tells the two apart, and that the payload itself arrives as the null equivalent.
+ */
 @SpringBootTest
 @Testcontainers
-class NonPersistentIT {
+class NullPayloadIT {
 
     @Container
     static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.26.0")
@@ -31,10 +39,15 @@ class NonPersistentIT {
     }
 
     @Test
-    void directMessagesAreReceived() throws InterruptedException {
-        NonPersistentApp.ReceivedDirectMessage msg = NonPersistentApp.RECEIVED.poll(30, TimeUnit.SECONDS);
-        assertThat(msg).isNotNull();
-        assertThat(msg.payload()).startsWith("direct-msg-");
-        assertThat(msg.discardIndication()).isFalse();
+    void anEmptyStringPayload_publishedNatively_arrivesFlaggedAsANullPayload() throws InterruptedException {
+        List<ReceivedPayload> received = new ArrayList<>();
+        while (received.size() < 2) {
+            ReceivedPayload next = NullPayloadApp.RECEIVED_PAYLOADS.poll(30, TimeUnit.SECONDS);
+            assertThat(next).as("expected two messages, got %s", received).isNotNull();
+            received.add(next);
+        }
+
+        assertThat(received).contains(new ReceivedPayload("order-42", false));
+        assertThat(received).contains(new ReceivedPayload("", true));
     }
 }

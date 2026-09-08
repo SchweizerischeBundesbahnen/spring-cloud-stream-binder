@@ -91,16 +91,27 @@ ApplicationRunner partitionedQueueProvisioner() {
 ```java
 @Scheduled(initialDelay = 1000, fixedRate = 500)
 public void publish() {
+    if (!publisherEnabled.get()) {
+        return;
+    }
+
     int currentCount = count.getAndIncrement();
     if (currentCount < 10) {
         String key = KEYS[currentCount % 2];
         String payload = "msg-" + currentCount;
         Message<String> msg = MessageBuilder.withPayload(payload)
-        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
                 .setHeader(SolaceBinderHeaders.PARTITION_KEY, key)
                 .build();
-        streamBridge.send("partitionedPublisher-out-0", msg);
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window
+        // is exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("partitionedPublisher-out-0", msg);
+            log.info("Published: {} with partitionKey={}", payload, key);
+        } catch (MessagingException e) {
+            log.error("Failed to publish: {} with partitionKey={}", payload, key, e);
+        }
     }
 }
 ```
@@ -113,11 +124,29 @@ public Consumer<Message<String>> partitionedConsumer() {
     return msg -> {
         String payload = msg.getPayload();
         String thread = Thread.currentThread().getName();
-        log.info("Received '{}' on thread '{}'", payload, thread);
+        // The partition key of the consumed message is exposed as a header (read from JMSXGroupID),
+        // so the application can see which partition each message belongs to.
+        String partitionKey = (String) msg.getHeaders().get(SolaceBinderHeaders.PARTITION_KEY);
+        log.info("Received '{}' (partitionKey={}) on thread '{}'", payload, partitionKey, thread);
         MSG_TO_THREAD.put(payload, thread);
+        MSG_TO_PARTITION_KEY.put(payload, Objects.toString(partitionKey, "<absent>"));
     };
 }
 ```
+
+The consumer side reads `solace_scst_partitionKey` back off the inbound message — the binder mirrors the producer-side header from the Solace `JMSXGroupID` queue-partition-key property. `PartitionedQueuesIT` asserts the key that arrives on every message, so this paragraph cannot drift away from the code.
+
+## What to Observe
+
+```
+INFO  Published: msg-0 with partitionKey=Key-A
+INFO  Published: msg-1 with partitionKey=Key-B
+INFO  Received 'msg-0' (partitionKey=Key-A) on thread 'example/partitioned/topic-1'
+INFO  Received 'msg-1' (partitionKey=Key-B) on thread 'example/partitioned/topic-0'
+INFO  Received 'msg-2' (partitionKey=Key-A) on thread 'example/partitioned/topic-0'
+```
+
+The partition key the publisher set arrives back on the consumed message. The worker thread, however, is not tied to it: `msg-0` and `msg-2` carry the same key and are still processed on different threads, because a single application instance opens one flow and the `concurrency` workers share it. The section below explains what partition affinity does and does not guarantee here.
 
 ## How Partition Affinity Works in Production
 
