@@ -12,9 +12,9 @@
     </parent>
 
     <groupId>ch.sbb.solace.examples</groupId>
-    <artifactId>solace-example-basic-publish-subscribe</artifactId>
+    <artifactId>solace-example-null-payload</artifactId>
     <version>9.5.0</version>
-    <name>Solace Example - Basic Publish Subscribe</name>
+    <name>Solace Example - Null Payload</name>
 
     <properties>
         <java.version>17</java.version>
