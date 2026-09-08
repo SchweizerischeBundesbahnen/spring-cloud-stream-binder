@@ -19,7 +19,6 @@ spring:
             authorization-grant-type: client_credentials
         provider:
           mock-oauth:
-            # We don't define the token-uri here because it's dynamic in tests based on the mock server port
             token-uri: http://localhost:8081/solace/token
             
   cloud:

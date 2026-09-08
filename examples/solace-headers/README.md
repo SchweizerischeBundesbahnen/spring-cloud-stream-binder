@@ -65,7 +65,7 @@ spring:
 @EnableScheduling
 public class SolaceHeadersApp {
     private static final Logger log = LoggerFactory.getLogger(SolaceHeadersApp.class);
-    public record ReceivedHeaders(String correlationId, String customOrgId) {}
+    public record ReceivedHeaders(String correlationId, String customOrgId, Long timeToLive, Boolean dmqEligible) {}
 
     public static final BlockingQueue<ReceivedHeaders> RECEIVED_HEADERS = new LinkedBlockingQueue<>();
     private final AtomicInteger count = new AtomicInteger();
@@ -85,14 +85,18 @@ public class SolaceHeadersApp {
                 .setHeader(SolaceHeaders.CORRELATION_ID, "corr-id-" + index)
                 .setHeader(SolaceHeaders.APPLICATION_MESSAGE_TYPE, "Example/Type")
                 .setHeader(SolaceHeaders.PRIORITY, index % 255)
-          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis()) // (1)
-          .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)                               // (2)
+                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis()) // (1)
+                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)                              // (2)
                 // User-defined properties (Spring automatically maps these)
-          .setHeader("custom-org-id", "ORG-" + index)                              // (3)
+                .setHeader("custom-org-id", "ORG-" + index)                               // (3)
                 .build();
-                
-        streamBridge.send("headerPublisher-out-0", message);
-        log.info("Published with CorrelationID: corr-id-{}", index);
+
+        try {
+            streamBridge.send("headerPublisher-out-0", message);                          // (4)
+            log.info("Published with CorrelationID: corr-id-{}", index);
+        } catch (MessagingException e) {
+            log.error("Failed to publish with CorrelationID: corr-id-{}", index, e);
+        }
     }
 }
 ```
@@ -100,6 +104,7 @@ public class SolaceHeadersApp {
 1. **`TIME_TO_LIVE`** — Uses `Duration.ofSeconds(30).toMillis()` instead of a magic number so the intent is explicit.
 2. **`DMQ_ELIGIBLE`** — Keeps the message eligible for a Dead Message Queue. Without this, an expired message cannot be moved to a DMQ.
 3. **`custom-org-id`** — A user-defined property. Spring automatically maps these to Solace user properties. This header will be excluded by the consumer's `headerExclusions` config.
+4. **`try/catch`** — `streamBridge.send(...)` is synchronous and throws an `org.springframework.messaging.MessagingException` once the producer's `sendRetryTimeoutMs` (default `60000`) is exhausted. See [Failed Producer Message Error Handling](../../API.md#failed-producer-message-error-handling).
 
 ### Consumer — Reading Solace Headers
 
@@ -120,7 +125,7 @@ public Consumer<Message<String>> headerConsumer() {
 }
 ```
 
-The consumer receives the message with Solace headers mapped to Spring `Message` headers. The `custom-org-id` header is **excluded** by the `headerExclusions` configuration, so `customOrg` will be `null`. The included test asserts all three pieces: the correlation ID survives, TTL arrives as `30000`, and `solace_dmqEligible` stays `true` while the excluded custom header does not propagate. You can access Solace headers individually:
+The consumer receives the message with Solace headers mapped to Spring `Message` headers. The `custom-org-id` header is **excluded** by the `headerExclusions` configuration, so `customOrg` will be `null`. The included test asserts all four: the correlation ID survives, TTL arrives as `30000`, `solace_dmqEligible` stays `true`, and the excluded custom header does not propagate. You can access Solace headers individually:
 
 ```java
 String correlationId = msg.getHeaders().get(SolaceHeaders.CORRELATION_ID, String.class);

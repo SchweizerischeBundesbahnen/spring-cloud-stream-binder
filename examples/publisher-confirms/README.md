@@ -61,21 +61,28 @@ class PublishService {
     private final StreamBridge streamBridge;
 
     public boolean publishAndWait(String payload) throws Exception {
-        CorrelationData correlationData = new CorrelationData();         // (1)
+        CorrelationData correlationData = new CorrelationData(); // (1)
         Message<String> msg = MessageBuilder.withPayload(payload)
-          .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-          .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                .setHeader(SolaceBinderHeaders.CONFIRM_CORRELATION,
-                           correlationData)                              // (2)
+                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                .setHeader(SolaceBinderHeaders.CONFIRM_CORRELATION, correlationData) // (2)
                 .build();
 
-        streamBridge.send("confirmPublisher-out-0", msg);                // (3)
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+        // exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("confirmPublisher-out-0", msg); // (3)
+        } catch (MessagingException e) {
+            log.error("Failed to publish: {}", payload, e);
+            throw e;
+        }
 
         try {
-            correlationData.getFuture().get(5, TimeUnit.SECONDS);        // (4)
-            return true;  // Broker confirmed receipt
+            // Wait for broker ACK
+            correlationData.getFuture().get(5, TimeUnit.SECONDS); // (4)
+            return true;
         } catch (TimeoutException e) {
-            return false; // Broker did not confirm in time
+            return false;
         }
     }
 }
@@ -103,12 +110,12 @@ A standard consumer that receives the confirmed messages from the queue.
 ```java
 @EventListener(ApplicationReadyEvent.class)
 public void publishStartupSample() {
-  try {
-    boolean confirmed = publishService.publishAndWait("startup-confirm-msg");
-    log.info("Published startup-confirm-msg and broker confirmation result: {}", confirmed);
-  } catch (Exception e) {
-    log.error("Failed to publish startup-confirm-msg", e);
-  }
+    try {
+        boolean confirmed = publishService.publishAndWait("startup-confirm-msg");
+        log.info("Published startup-confirm-msg and broker confirmation result: {}", confirmed);
+    } catch (Exception e) {
+        log.error("Failed to publish startup-confirm-msg", e);
+    }
 }
 ```
 

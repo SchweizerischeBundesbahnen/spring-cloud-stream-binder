@@ -55,7 +55,7 @@ Here is how to include the spring cloud stream starter in your project using Gra
 
 ```groovy
 // Solace Spring Cloud Stream Binder
-implementation("ch.sbb:spring-cloud-stream-binder-solace:9.4.0")
+implementation("ch.sbb:spring-cloud-stream-binder-solace:9.5.0")
 ```
 
 #### Using it with Maven
@@ -65,7 +65,7 @@ implementation("ch.sbb:spring-cloud-stream-binder-solace:9.4.0")
 <dependency>
   <groupId>ch.sbb</groupId>
   <artifactId>spring-cloud-stream-binder-solace</artifactId>
-  <version>9.4.0</version>
+  <version>9.5.0</version>
 </dependency>
 ```
 
@@ -636,6 +636,12 @@ Below are the payload types natively supported by this binder (before/after [Con
 > If this occurs, but you wish to publish other message types, then one option is to set `useNativeEncoding=true` on your producer (but read the caveats carefully before enabling this feature), and have your message handler return a payload of one of this binder's supported native payload types; e.g. return `Message<SDTStream>` to publish a stream message.
 > See [Content Type Negotiation](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#content-type-management) for more info on how Spring Cloud Streams converts payloads and other options to control message conversion.
 
+### XML-Content Payloads
+
+An SMF message carries its payload in either the binary attachment or the XML content part. Publishers that only fill the XML content part — Solace's REST/HTTP gateway, JMS clients and MQTT bridges typically do — produce messages whose binary attachment is empty.
+
+When the binary attachment yields no payload but the message has XML content, the binder reads the XML content part and hands it to the application as a `byte[]`. Without this, such messages would surface as empty payloads.
+
 ### Empty Payload VS Null Payload
 
 Spring messages can't contain null payloads, however, message handlers can differentiate between null payloads and empty payloads by looking at the `solace_scst_nullPayload` header. The binder adds the `solace_scst_nullPayload` header when a Solace message with null payload is consumed from the wire. When that is the case, the binder sets the Spring message's payload to a null equivalent payload. Null equivalent payloads are one of the following: empty `byte[]`, empty `String`, empty `SDTMap`, or empty `SDTStream`.
@@ -751,7 +757,7 @@ By default, raising `concurrency` above `1` removes any ordering guarantee: ever
 
 Set the consumer property [`partitionAware`](#solace-consumer-properties) to `true` to keep per-partition ordering while still processing in parallel:
 
-*   The binder reads each message's Solace partition key (the `JMSXGroupID` queue-partition-key property — the same value the producer sets via the [`solace_scst_partitionKey`](#message-headers) header).
+*   The binder reads each message's Solace partition key (the `JMSXGroupID` queue-partition-key property — the same value the producer sets via the [`solace_scst_partitionKey`](#solace-binder-headers) header).
 *   Instead of one shared queue, the binder creates one queue per worker thread and routes each message to `floorMod(partitionKey.hashCode(), concurrency)`. All messages of a partition key therefore land on the same worker thread and are processed sequentially, in the order the broker delivered them, while different partition keys are spread across the remaining threads and run in parallel.
 *   Messages without a partition key carry no ordering constraint and are distributed round-robin across the worker threads.
 *   This is in-memory dispatch inside one consumer flow; it does not require the broker queue itself to be partitioned, only that the messages carry a partition key.
@@ -1056,7 +1062,7 @@ spring:
 
 By default, asynchronous producer errors aren't handled by the framework. Producer error channels can be enabled using the [`errorChannelEnabled` producer config option](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#_producer_properties).
 
-Beyond that, this binder also supports using a `Future` to wait for publish confirmations. See [Publisher Confirms](#publisher-confirms) for more info.
+Beyond that, this binder also supports using a `Future` to wait for publish confirmations. See [Publisher Confirmations](#publisher-confirmations) for more info.
 
 > [!IMPORTANT]
 > A synchronous call to `StreamBridge.send(...)` (and to any producer binding backed by this binder) can throw an `org.springframework.messaging.MessagingException`. This happens, for example, when the producer binding is not running, when a message cannot be mapped/serialized, or when publishing keeps failing until the [`sendRetryTimeoutMs`](#solace-producer-properties) retry window is exhausted. With `sendRetryTimeoutMs` (default `60000`) the binder first retries transient publish failures; once the window elapses it re-throws the failure as a `MessagingException`. Setting `sendRetryTimeoutMs: 0` disables retrying and propagates the failure immediately. **Regardless of the retry setting, producers must always wrap `StreamBridge.send(...)` in a `try/catch` for `org.springframework.messaging.MessagingException`.**
@@ -1209,6 +1215,33 @@ To address issues detected by the watchdog:
 
 The binder supports Micrometer tracing. To enable, ensure the needed Beans are available: Tracer and Propagator.
 
+## Customizing Bindings
+
+Declare a `ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler>` bean to reach the binder's outbound handler after it has been created for a producer binding. The binder applies it to every producer binding, passing the resolved destination name:
+
+```java
+@Bean
+public ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler> solaceProducerCustomizer() {
+    return (handler, destinationName) -> handler.setErrorMessageStrategy(myErrorMessageStrategy());
+}
+```
+
+`setErrorMessageStrategy` is currently the handler's only mutable setting; the customizer is otherwise an observation point for the handler and its destination.
+
+A `ConsumerEndpointCustomizer<MessageProducerSupport>` bean does the same on the consumer side. The binder applies it to every consumer binding once the endpoint has been created and before it is started, passing the destination and the consumer group:
+
+```java
+@Bean
+public ConsumerEndpointCustomizer<MessageProducerSupport> solaceConsumerCustomizer() {
+    return (endpoint, destinationName, group) -> endpoint.setShouldTrack(true);
+}
+```
+
+The endpoint is a `JCSMPInboundQueueMessageProducer`, or a `JCSMPInboundTopicMessageProducer` when the consumer runs at [`qualityOfService: AT_MOST_ONCE`](#solace-consumer-properties). Type the bean to `MessageProducerSupport` rather than to either of them: a binding of the other kind would otherwise fail with a `ClassCastException`.
+
+> [!NOTE]
+> Only one bean of each kind may be declared.
+
 ## Resources
 
 For more information about Spring Cloud Streams try these resources:
@@ -1220,5 +1253,8 @@ For more information about Spring Cloud Streams try these resources:
 
 For more information about Solace technology in general please visit these resources:
 
-*   The Solace Developer Portal website at: [https://solace.dev](https://solace.dev)
-*   Ask the [Solace community](https://solace.community)
+*   [Solace PubSub+ product documentation](https://docs.solace.com)
+*   [JCSMP Java API reference](https://docs.solace.com/API-Developer-Online-Ref-Documentation/java/index.html)
+
+> [!NOTE]
+> This binder is an independent fork and is not the binder Solace ships. Its properties, headers and behaviour differ from the upstream [SolaceDev/solace-spring-cloud](https://github.com/SolaceDev/solace-spring-cloud) binder — see [COMPARE_WITH_SOLACE.md](COMPARE_WITH_SOLACE.md). Solace's own samples, tutorials and community channels describe the upstream binder and do not apply here; use the [runnable examples suite](examples/README.md) in this repository instead.

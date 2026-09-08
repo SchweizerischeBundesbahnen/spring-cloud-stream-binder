@@ -10,9 +10,9 @@ spring:
           destination: example/metrics/topic
           group: metrics-group
 management:
-  metrics:
-    export:
-      prometheus:
+  prometheus:
+    metrics:
+      export:
         enabled: true
   endpoints:
     web:

@@ -51,9 +51,9 @@ spring:
           destination: example/metrics/topic
           group: metrics-group
 management:
-  metrics:
-    export:
-      prometheus:
+  prometheus:
+    metrics:
+      export:
         enabled: true                             # (1)
   endpoints:
     web:
@@ -61,7 +61,7 @@ management:
         include: metrics,prometheus               # (2)
 ```
 
-1. **`prometheus.enabled: true`** — Enables the Prometheus metrics endpoint for scraping.
+1. **`management.prometheus.metrics.export.enabled: true`** — Enables the Prometheus registry. Mind the property order: the pre-Spring-Boot-3 spelling `management.metrics.export.prometheus.enabled` was removed in Boot 3.0 and is silently ignored.
 2. **`exposure.include: metrics,prometheus`** — Exposes both `/actuator/metrics` and `/actuator/prometheus` over HTTP.
 
 > **For production monitoring**, you would also configure percentile histograms and SLO boundaries:
@@ -97,12 +97,18 @@ public class MetricsMonitoringApp {
     public void publish() {
         if (count.get() < 5) {
             int c = count.incrementAndGet();
-        String payload = "msg-" + c;
-        streamBridge.send("metricsPublisher-out-0", MessageBuilder.withPayload(payload)
-            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-            .build());
-            log.info("Published metric msg: {}", "msg-" + c);
+            String payload = "msg-" + c;
+            // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window
+            // is exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+            try {
+                streamBridge.send("metricsPublisher-out-0", MessageBuilder.withPayload(payload)
+                        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                        .build());
+                log.info("Published metric msg: {}", "msg-" + c);
+            } catch (MessagingException e) {
+                log.error("Failed to publish metric msg: {}", "msg-" + c, e);
+            }
         }
     }
 }

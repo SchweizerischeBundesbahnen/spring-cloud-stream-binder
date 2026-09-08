@@ -62,26 +62,36 @@ private final AtomicBoolean published = new AtomicBoolean();
 
 @Scheduled(initialDelay = 1000, fixedDelay = 60000)
 public void publish() {
-  if (published.compareAndSet(false, true)) {
-    streamBridge.send("retryProducer-out-0", MessageBuilder.withPayload("retry-me")
-      .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-      .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-      .build());
-    log.info("Published message designed for retry and broker redelivery");
-  }
+    if (published.compareAndSet(false, true)) {
+        // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window
+        // is exhausted), so always wrap the publish in a try/catch even though the binder retries transient failures.
+        try {
+            streamBridge.send("retryProducer-out-0", MessageBuilder.withPayload("retry-me")
+                    .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                    .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                    .build());
+            log.info("Published message designed for retry and broker redelivery");
+        } catch (MessagingException e) {
+            log.error("Failed to publish message designed for retry and broker redelivery", e);
+        }
+    }
 }
 
 @Bean
 public Consumer<Message<String>> retryConsumer() {
     return msg -> {
-    boolean redelivered = Boolean.TRUE.equals(
-      msg.getHeaders().get(SolaceHeaders.REDELIVERED, Boolean.class));  // (1)
-    int count = TOTAL_ATTEMPTS.incrementAndGet();
-    log.info("Attempt {}: {} (redelivered: {})", count, msg.getPayload(), redelivered);
-    if (!redelivered) {
-      throw new RuntimeException("Force broker redelivery after exhausting local retries"); // (2)
+        boolean redelivered = Boolean.TRUE.equals(msg.getHeaders().get(SolaceHeaders.REDELIVERED, Boolean.class)); // (1)
+        int count = TOTAL_ATTEMPTS.incrementAndGet();
+        if (redelivered) {
+            BROKER_REDELIVERY_COUNT.incrementAndGet();
         }
-    log.info("Succeeded after broker redelivery on attempt {}", count);   // (3)
+
+        log.info("Attempt {}: {} (redelivered: {})", count, msg.getPayload(), redelivered);
+        if (!redelivered) {
+            throw new RuntimeException("Force broker redelivery after exhausting local retries"); // (2)
+        }
+
+        log.info("Succeeded after broker redelivery on attempt {}", count); // (3)
         SUCCESS_COUNT.incrementAndGet();
     };
 }

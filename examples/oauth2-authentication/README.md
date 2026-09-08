@@ -39,17 +39,17 @@ solace:
   java:
     host: tcps://localhost:55443                    # (1)
     msgVpn: default
-    oauth2ClientRegistrationId: solace-broker      # (2)
+    oauth2ClientRegistrationId: solace-broker       # (2)
     apiProperties:
       AUTHENTICATION_SCHEME: AUTHENTICATION_SCHEME_OAUTH2  # (3)
-      ssl_validate_certificate: false              # (4)
+      ssl_validate_certificate: false               # (4)
 
 spring:
   security:
     oauth2:
       client:
         registration:
-          solace-broker:                           # (3)
+          solace-broker:
             provider: mock-oauth
             client-id: test-client
             client-secret: test-secret
@@ -59,8 +59,12 @@ spring:
             token-uri: http://localhost:8081/solace/token  # (5)
 
   cloud:
+    function:
+      definition: oauthConsumer
     stream:
       bindings:
+        oauthPublisher-out-0:
+          destination: example/oauth/topic
         oauthConsumer-in-0:
           destination: example/oauth/topic
           group: oauth-group

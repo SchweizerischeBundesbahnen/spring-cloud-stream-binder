@@ -1,10 +1,10 @@
 # Spring Cloud Stream Binder for Solace - Examples
 
-This repository contains **22 distinct, production-ready examples** demonstrating how to properly configure and use the Solace PubSub+ Spring Cloud Stream Binder for various architectural patterns.
+This repository contains **23 distinct, production-ready examples** demonstrating how to properly configure and use the Solace PubSub+ Spring Cloud Stream Binder for various architectural patterns.
 
 Unless an example is explicitly demonstrating a different transport behavior, the publisher samples send outbound messages with a 30 second TTL and `solace_dmqEligible=true` so they stay aligned with the binder header guidance in [API.md](../API.md).
 
-Every publisher sample wraps `streamBridge.send(...)` in a `try/catch` for `org.springframework.messaging.MessagingException`. The call is synchronous and can throw once the producer's `sendRetryTimeoutMs` (default `60000`, set `0` to disable) retry window is exhausted, so producers must always be prepared to catch it — the REST-driven samples (`dynamic-destinations`, `pause-resume-bindings`) translate the failure into an HTTP `503` instead of parking the request thread. See [Failed Producer Message Error Handling](../API.md#failed-producer-message-error-handling).
+Every publisher sample wraps `streamBridge.send(...)` in a `try/catch` for `org.springframework.messaging.MessagingException`. The call is synchronous and can throw once the producer's `sendRetryTimeoutMs` (default `60000`, set `0` to disable) retry window is exhausted, so producers must always be prepared to catch it — the REST-driven samples (`dynamic-destinations`, `pause-resume-bindings`, `programmatic-binding-control`) translate the failure into an HTTP `503` instead of parking the request thread. See [Failed Producer Message Error Handling](../API.md#failed-producer-message-error-handling).
 
 ## Prerequisites
 To run these examples locally without the integration test framework, you will need access to a Solace PubSub+ Event Broker.
@@ -13,7 +13,7 @@ You can easily spin one up via Docker:
 ```bash
 docker run -d -p 8081:8080 -p 55555:55555 --shm-size=2g \
   --env username_admin_globalaccesslevel=admin --env username_admin_password=admin \
-  --name=solace solace/solace-pubsub-standard:10.25.0
+  --name=solace solace/solace-pubsub-standard:10.26.0
 ```
 
 This keeps the broker management UI on `http://localhost:8081` so the web- and actuator-based examples can keep using `http://localhost:8080` for the Spring Boot application itself.
@@ -41,14 +41,15 @@ This keeps the broker management UI on `http://localhost:8081` so the web- and a
 
 ### Error Handling
 * [**error-handling-redelivery**](./error-handling-redelivery/README.md): Demonstrates local Spring Retry attempts first, then broker-level redelivery once those retries are exhausted.
-* [**error-handling-error-queue**](./error-handling-error-queue/README.md): Shows how `autoBindErrorQueue: true` instructs the Binder to automatically provision a Solace Dead Letter Queue and route permanent failures to it natively.
+* [**error-handling-error-queue**](./error-handling-error-queue/README.md): Shows how `autoBindErrorQueue: true` instructs the binder to automatically provision a binder-managed error queue and republish permanently failed messages onto it. Not the same as the broker's Dead Message Queue — see the comparison table in the example.
 
 ### Advanced Provisioning & Routing
 * [**dynamic-destinations**](./dynamic-destinations/README.md): Demonstrates programmatic publishing directly to calculated string destinations via Spring `StreamBridge`.
-* [**queue-provisioning-options**](./queue-provisioning-options/README.md): Shows advanced Solace queue tuning via YAML metadata properties (`errorMsgRejected`, access types, etc).
+* [**queue-provisioning-options**](./queue-provisioning-options/README.md): Shows advanced Solace queue tuning via YAML properties (custom `queueNameExpression`, exclusive access type, extra subscriptions).
 * [**partitioned-queues**](./partitioned-queues/README.md): Shows how to publish partition keys and provision the example queue as partitioned via SEMP before starting the consumer binding.
 * [**default-headers**](./default-headers/README.md): Detailed instruction on mapping and reading proprietary or custom default headers directly onto standard Spring `Message<?>` envelopes before they are published.
 * [**solace-headers**](./solace-headers/README.md): Detailed instruction on mapping and reading proprietary Solace-specific headers directly onto standard Spring `Message<?>` envelopes.
+* [**null-payload**](./null-payload/README.md): Tells a message that carries no payload apart from one that carries an empty payload, using the `solace_scst_nullPayload` header the binder sets.
 
 ### Architecture & Workflows
 * [**multi-binder**](./multi-binder/README.md): Shows how one application can keep bindings isolated across two independent Solace brokers.

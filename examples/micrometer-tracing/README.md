@@ -62,40 +62,56 @@ management:
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-micrometer-tracing-opentelemetry</artifactId>
 </dependency>
+<dependency>
+    <groupId>io.micrometer</groupId>
+    <artifactId>micrometer-tracing-bridge-otel</artifactId>
+</dependency>
 ```
 
-This brings in the OpenTelemetry bridge for Micrometer Tracing, which provides the `Tracer` and `Propagator` beans that the Solace binder uses.
+These bring in the OpenTelemetry bridge for Micrometer Tracing, which provides the `Tracer` and `Propagator` beans that the Solace binder uses.
 
 ## Code Walkthrough
 
 ```java
 @SpringBootApplication
+@EnableScheduling
 public class MicrometerTracingApp {
-    private final Tracer tracer;                                       // (1)
     public record TraceObservation(String origin, String payload, String traceId, String spanId) {}
 
-    public MicrometerTracingApp(Tracer tracer) {
+    // Spring Boot automatically configures the Tracer
+    private final Tracer tracer;                                       // (1)
+    private final StreamBridge streamBridge;
+
+    public MicrometerTracingApp(Tracer tracer, StreamBridge streamBridge) {
         this.tracer = tracer;
+        this.streamBridge = streamBridge;
     }
 
     @Scheduled(fixedRate = 500)
     public void publish() {
         if (count.get() < 3) {
             int c = count.incrementAndGet();
-            
+            String payload = "msg-" + c;
+
             // Start a new span manually to observe trace propagation
-            io.micrometer.tracing.Span newSpan = tracer.nextSpan().name("send-msg").start();
+            io.micrometer.tracing.Span newSpan = tracer.nextSpan().name("send-msg").start(); // (2)
             try (io.micrometer.tracing.Tracer.SpanInScope ws = tracer.withSpan(newSpan)) {
-                String payload = "msg-" + c;
                 String currentTraceId = newSpan.context().traceId();
                 String currentSpanId = newSpan.context().spanId();
                 log.info("Publishing msg {}. TraceID: {}, SpanID: {}", c, currentTraceId, currentSpanId);
                 TRACING_LOGS.offer(new TraceObservation("PUBLISHER", payload, currentTraceId, currentSpanId));
-                
-                streamBridge.send("tracingPublisher-out-0", MessageBuilder.withPayload(payload)
-                    .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-                    .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-                    .build());
+
+                // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs
+                // window is exhausted), so always wrap the publish in a try/catch even though the binder retries
+                // transient failures.
+                try {
+                    streamBridge.send("tracingPublisher-out-0", MessageBuilder.withPayload(payload)
+                            .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                            .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                            .build());
+                } catch (MessagingException e) {
+                    log.error("Failed to publish msg {}", payload, e);
+                }
             } finally {
                 newSpan.end();
             }
@@ -105,18 +121,16 @@ public class MicrometerTracingApp {
     @Bean
     public Consumer<Message<String>> tracingConsumer() {
         return msg -> {
-            String traceId = tracer.currentSpan() != null
-                ? tracer.currentSpan().context().traceId() : "none";   // (3)
-            String spanId = tracer.currentSpan() != null
-                ? tracer.currentSpan().context().spanId() : "none";
-            log.info("Consumed {}. TraceID: {}, SpanID: {}", msg.getPayload(), traceId, spanId);
-            TRACING_LOGS.offer(new TraceObservation("CONSUMER", msg.getPayload(), traceId, spanId));
+            String currentTraceId = tracer.currentSpan() != null ? tracer.currentSpan().context().traceId() : "none"; // (3)
+            String currentSpanId = tracer.currentSpan() != null ? tracer.currentSpan().context().spanId() : "none";
+            log.info("Consumed {}. TraceID: {}, SpanID: {}", msg.getPayload(), currentTraceId, currentSpanId);
+            TRACING_LOGS.offer(new TraceObservation("CONSUMER", msg.getPayload(), currentTraceId, currentSpanId));
         };
     }
 }
 ```
 
-    The sample adds the same 30 second TTL and DMQ-eligibility headers as the other durable examples; trace propagation still works the same way because those are ordinary message properties.
+The sample adds the same 30 second TTL and DMQ-eligibility headers as the other durable examples; trace propagation still works the same way because those are ordinary message properties.
 
 1. **`Tracer` injection** — Spring Boot auto-configures a `Tracer` bean from the Micrometer Tracing / OpenTelemetry dependencies.
 2. **Producer trace ID** — When the producer sends a message, a trace context is active. The binder automatically injects the trace ID and span ID into the Solace message headers.

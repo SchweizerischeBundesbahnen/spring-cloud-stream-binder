@@ -6,6 +6,7 @@ Demonstrates how to expose the Solace binder's connection health through Spring 
 
 - Enabling the Solace binder health indicator via Actuator
 - The health statuses: `UNKNOWN` before a session is connected, then `UP` and `DOWN`
+- Reading the `connection`, `bindings` and `provisioning` sub-indicators under `binders.solace`
 - Exposing detailed health information with `show-details: always`
 - How health reflects session state, binding status, and provisioning failures
 
@@ -76,9 +77,9 @@ A minimal consumer that establishes a binding to the Solace broker. The health i
 
 ## What to Observe
 
-The included automated test validates the healthy `UP` path. To observe `DOWN`, interrupt the broker connection while the app is running and query `/actuator/health` again; a reconnecting session reports `DOWN` immediately rather than a separate status. To observe `DOWN` from a failed *initial* connect, point `spring.cloud.stream.binders.solace.environment.solace.java.host` at a host that does not resolve and start the app.
+The included automated test validates the healthy `UP` path. To see `DOWN`, stop the broker while the application keeps running and query `/actuator/health` again: a reconnecting session reports `DOWN` immediately rather than through a separate transitional status. A broker that is unreachable *before* the first connect does not produce a `DOWN` response at all — the binder context fails to build and the application does not finish starting.
 
-**Healthy state** — `GET /actuator/health`:
+**Healthy state** — `GET /actuator/health`, binder subtree only:
 
 ```json
 {
@@ -89,10 +90,15 @@ The included automated test validates the healthy `UP` path. To observe `DOWN`, 
       "components": {
         "solace": {
           "status": "UP",
-          "details": {
-            "solaceBinderHealthAccessor": {
-              "status": "UP"
-            }
+          "components": {
+            "connection": { "status": "UP" },
+            "bindings": {
+              "status": "UP",
+              "components": {
+                "healthConsumer-in-0": { "status": "UP" }
+              }
+            },
+            "provisioning": { "status": "UP" }
           }
         }
       }
@@ -101,26 +107,48 @@ The included automated test validates the healthy `UP` path. To observe `DOWN`, 
 }
 ```
 
-**During reconnection** — If the broker connection drops and the binder is reconnecting:
+`connection` follows the JCSMP session, `bindings` carries one entry per consumer binding, and `provisioning` turns `DOWN` when endpoint provisioning fails. The Solace health appears exactly once, under `binders.solace`.
+
+**Broker gone** — after the broker stops, the same subtree reports:
 
 ```json
 {
   "status": "DOWN",
   "components": {
     "binders": {
-      "status": "DOWN"
+      "status": "DOWN",
+      "components": {
+        "solace": {
+          "status": "DOWN",
+          "components": {
+            "connection": {
+              "status": "DOWN",
+              "details": {
+                "error": "com.solacesystems.jcsmp.JCSMPTransportException: Channel is closed by peer"
+              }
+            },
+            "bindings": {
+              "status": "DOWN",
+              "components": {
+                "healthConsumer-in-0": {
+                  "status": "DOWN",
+                  "details": {
+                    "error": "com.solacesystems.jcsmp.JCSMPTransportException: Channel is closed by peer",
+                    "info": "Channel is closed by peer"
+                  }
+                }
+              }
+            },
+            "provisioning": { "status": "UP" }
+          }
+        }
+      }
     }
   }
 }
 ```
 
-**Down state** — If all reconnection attempts are exhausted or the session is destroyed:
-
-```json
-{
-  "status": "DOWN"
-}
-```
+The JCSMP event that caused the transition is attached as `error`, `info` and — when the broker sent one — `responseCode`. A session that is reconnecting and one whose reconnect attempts are exhausted both report `DOWN`; only those details differ.
 
 ## Health Status Reference
 
@@ -128,7 +156,10 @@ The included automated test validates the healthy `UP` path. To observe `DOWN`, 
 |---|---|---|
 | **UNKNOWN** | No session has been connected yet, detail `info: no session connected yet` | Application start, before the binder opens its session |
 | **UP** | Binder is connected and functioning normally | Normal operation |
-| **DOWN** | Binder has no usable connection | Initial connect failed, session is reconnecting, all reconnect attempts exhausted, session destroyed, provisioning failure |
+| **DOWN** | Binder has no usable connection | Session is reconnecting, all reconnect attempts exhausted, session destroyed, provisioning failure |
+
+> [!IMPORTANT]
+> Reconnecting is reported as `DOWN`, not as a distinct transitional status. A brief broker restart therefore flips `/actuator/health` to `DOWN` even though the binder recovers on its own. Take that into account when wiring this endpoint to a Kubernetes **liveness** probe — a readiness probe (or a liveness probe with a generous `failureThreshold`) avoids restarting a pod that is merely waiting to reconnect.
 
 ## When to Use This Pattern
 

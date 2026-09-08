@@ -26,6 +26,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +43,7 @@ public class PartitionedQueuesApp {
 
     private static final Logger log = LoggerFactory.getLogger(PartitionedQueuesApp.class);
     public static final ConcurrentMap<String, String> MSG_TO_THREAD = new ConcurrentHashMap<>();
+    public static final ConcurrentMap<String, String> MSG_TO_PARTITION_KEY = new ConcurrentHashMap<>();
 
     private static final String[] KEYS = {"Key-A", "Key-B"};
 
@@ -119,6 +121,7 @@ public class PartitionedQueuesApp {
             String partitionKey = (String) msg.getHeaders().get(SolaceBinderHeaders.PARTITION_KEY);
             log.info("Received '{}' (partitionKey={}) on thread '{}'", payload, partitionKey, thread);
             MSG_TO_THREAD.put(payload, thread);
+            MSG_TO_PARTITION_KEY.put(payload, Objects.toString(partitionKey, "<absent>"));
         };
     }
 

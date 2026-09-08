@@ -1,0 +1,11 @@
+spring:
+  cloud:
+    function:
+      definition: nullPayloadConsumer
+    stream:
+      bindings:
+        nullPayloadPublisher-out-0:
+          destination: example/nullpayload/topic
+        nullPayloadConsumer-in-0:
+          destination: example/nullpayload/topic
+          group: null-payload-group

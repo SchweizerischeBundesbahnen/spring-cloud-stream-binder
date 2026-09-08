@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PartitionedQueuesIT {
 
     @Container
-    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
+    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.26.0")
             .withExposedPorts(8080, 55555);
 
     @DynamicPropertySource
@@ -41,7 +41,9 @@ class PartitionedQueuesIT {
     @Test
     void messagesWithPartitionKeysAreReceived() throws Exception {
         long end = System.currentTimeMillis() + 30000;
-        while (PartitionedQueuesApp.MSG_TO_THREAD.size() < 10 && System.currentTimeMillis() < end) {
+        while ((PartitionedQueuesApp.MSG_TO_THREAD.size() < 10
+                || PartitionedQueuesApp.MSG_TO_PARTITION_KEY.size() < 10)
+                && System.currentTimeMillis() < end) {
             Thread.sleep(100);
         }
 
@@ -53,6 +55,14 @@ class PartitionedQueuesIT {
             assertThat(PartitionedQueuesApp.MSG_TO_THREAD)
                     .as("msg-%d should have been received", i)
                     .containsKey("msg-" + i);
+        }
+
+        // The publisher alternates Key-A/Key-B, and the binder mirrors that key back onto the
+        // inbound message as solace_scst_partitionKey. Asserting it keeps the README honest.
+        for (int i = 0; i < 10; i++) {
+            assertThat(PartitionedQueuesApp.MSG_TO_PARTITION_KEY)
+                    .as("msg-%d should carry the partition key it was published with", i)
+                    .containsEntry("msg-" + i, i % 2 == 0 ? "Key-A" : "Key-B");
         }
 
         // Verify messages were processed by at least one worker thread

@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HealthIndicatorIT {
 
     @Container
-    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.25.0")
+    static SolaceContainer solace = new SolaceContainer("solace/solace-pubsub-standard:10.26.0")
             .withExposedPorts(8080, 55555);
 
     @DynamicPropertySource
@@ -42,7 +42,7 @@ class HealthIndicatorIT {
 
     @Test
     @SuppressWarnings("unchecked")
-    void actuatorHealthReturnsSolaceBinderUp() throws InterruptedException {
+    void actuatorHealth_withAConnectedSession_reportsConnectionBindingAndProvisioningUpExactlyOnce() throws InterruptedException {
         ResponseEntity<Map> response = null;
         long end = System.currentTimeMillis() + 15000;
         while (System.currentTimeMillis() < end) {
@@ -61,7 +61,7 @@ class HealthIndicatorIT {
         assertThat(body.get("status")).isEqualTo("UP");
 
         Map<String, Object> components = (Map<String, Object>) body.get("components");
-        assertThat(components).containsKey("binders");
+        assertThat(components).containsKey("binders").doesNotContainKey("solaceBinder");
 
         Map<String, Object> binders = (Map<String, Object>) components.get("binders");
         assertThat(binders.get("status")).isEqualTo("UP");
@@ -71,5 +71,14 @@ class HealthIndicatorIT {
 
         Map<String, Object> solaceBinder = (Map<String, Object>) binderComponents.get("solace");
         assertThat(solaceBinder.get("status")).isEqualTo("UP");
+
+        Map<String, Object> solaceBinderComponents = (Map<String, Object>) solaceBinder.get("components");
+        assertThat((Map<String, Object>) solaceBinderComponents.get("connection")).containsEntry("status", "UP");
+        assertThat((Map<String, Object>) solaceBinderComponents.get("provisioning")).containsEntry("status", "UP");
+
+        Map<String, Object> bindings = (Map<String, Object>) solaceBinderComponents.get("bindings");
+        assertThat(bindings.get("status")).isEqualTo("UP");
+        Map<String, Object> bindingComponents = (Map<String, Object>) bindings.get("components");
+        assertThat((Map<String, Object>) bindingComponents.get("healthConsumer-in-0")).containsEntry("status", "UP");
     }
 }

@@ -139,16 +139,22 @@ INFO  Received from pausable consumer: msg2
 curl http://localhost:8080/actuator/bindings | jq .
 ```
 
+Abridged response — Spring Cloud Stream also reports `name`, `binderName`, `binderType` and `extendedInfo`:
+
 ```json
 [
   {
     "bindingName": "pausableConsumer-in-0",
-    "state": "started",      // or "paused"
-    "input": true,
-    "group": "pausable-group"
+    "group": "pausable-group",
+    "pausable": true,
+    "state": "running",
+    "paused": false,
+    "input": true
   }
 ]
 ```
+
+`state` is `running`, `stopped` or `paused` — the `PAUSED` / `RESUMED` values in the POST body are request commands, not the reported state.
 
 ## When to Use This Pattern
 

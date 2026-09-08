@@ -85,12 +85,14 @@ management:
 @PostMapping("/bindings/start")
 public String startBinding() {
     bindingsLifecycleController.start(BINDING_NAME);
+    log.info("Started binding {}", BINDING_NAME);
     return "Started " + BINDING_NAME;
 }
 
 @PostMapping("/bindings/stop")
 public String stopBinding() {
     bindingsLifecycleController.stop(BINDING_NAME);
+    log.info("Stopped binding {}", BINDING_NAME);
     return "Stopped " + BINDING_NAME;
 }
 ```
@@ -98,13 +100,27 @@ public String stopBinding() {
 The application calls Spring Cloud Stream's `BindingsLifecycleController` directly instead of using the actuator endpoint. That keeps the control logic inside the application, which is useful when startup depends on some other programmatic prerequisite.
 
 ```java
-streamBridge.send("controlledPublisher-out-0", MessageBuilder.withPayload(payload)
-        .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
-        .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
-        .build());
+@PostMapping("/send")
+public ResponseEntity<String> publish(@RequestBody String payload) {
+    // StreamBridge.send(...) can throw a MessagingException (e.g. once the producer's sendRetryTimeoutMs window is
+    // exhausted, or while the producer binding is stopped). Publishing straight from this request thread, so always
+    // catch it and return a proper HTTP error response instead of letting the request fail unhandled.
+    try {
+        streamBridge.send("controlledPublisher-out-0", MessageBuilder.withPayload(payload)
+                .setHeader(SolaceHeaders.TIME_TO_LIVE, Duration.ofSeconds(30).toMillis())
+                .setHeader(SolaceHeaders.DMQ_ELIGIBLE, true)
+                .build());
+        log.info("Published to controlled topic: {}", payload);
+        return ResponseEntity.ok("Sent " + payload);
+    } catch (MessagingException e) {
+        log.error("Failed to publish to controlled topic: {}", payload, e);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body("Failed to send " + payload + ": " + e.getMessage());
+    }
+}
 ```
 
-Published messages use a 30 second TTL and set `solace_dmqEligible=true`, matching the recommended header combination for durable traffic.
+Published messages use a 30 second TTL and set `solace_dmqEligible=true`, matching the recommended header combination for durable traffic. `/bindings/stop` stops the *consumer* binding only, so publishing keeps working while it is stopped and the messages wait in the durable queue — that is what `ProgrammaticBindingControlIT` asserts. `streamBridge.send(...)` runs on the request thread and throws a `MessagingException` if the publish itself fails, and the endpoint answers `503` rather than failing the request unhandled.
 
 ## What to Observe
 
