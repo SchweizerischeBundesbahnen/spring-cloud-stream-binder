@@ -2,10 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [9.5.1] - 2026-10-08
+## [9.5.2] - 2026-10-08
 
 ### Changed
 - Updated spring-boot-starter-solace-client-config from 3.1.1 to 3.1.3, which brings sol-jcsmp 10.30.2 in place of 10.30.1.
+
+### Fixed
+- The release workflow builds with Maven 3.9 through the Maven wrapper. Under the Maven 3.10 of the GitHub runner,
+  Maven Central refused the bundle, so 9.5.1 was tagged but never published; 9.5.2 is the same release.
 
 ## [9.5.0] - 2026-09-08
 
