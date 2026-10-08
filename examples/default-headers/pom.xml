@@ -13,13 +13,13 @@
 
     <groupId>ch.sbb.solace.examples</groupId>
     <artifactId>solace-example-default-headers</artifactId>
-    <version>9.5.1</version>
+    <version>9.5.2</version>
     <name>Solace Example - Default Headers</name>
 
     <properties>
         <java.version>17</java.version>
         <spring-cloud.version>2025.1.3</spring-cloud.version>
-        <solace-binder.version>9.5.1</solace-binder.version>
+        <solace-binder.version>9.5.2</solace-binder.version>
         <testcontainers-solace.version>2.0.5</testcontainers-solace.version>
         <testcontainers.version>2.0.5</testcontainers.version>
     </properties>
