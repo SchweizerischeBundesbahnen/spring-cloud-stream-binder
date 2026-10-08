@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.5.1] - 2026-10-08
+
+### Changed
+- Updated spring-boot-starter-solace-client-config from 3.1.1 to 3.1.3, which brings sol-jcsmp 10.30.2 in place of 10.30.1.
+
 ## [9.5.0] - 2026-09-08
 
 `/actuator/health` no longer carries a top-level `solaceBinder` component. It reported a connection it had never opened, so nothing could have depended on it; the Solace health is under `binders.solace` as before. See [MIGRATION.md](MIGRATION.md).
