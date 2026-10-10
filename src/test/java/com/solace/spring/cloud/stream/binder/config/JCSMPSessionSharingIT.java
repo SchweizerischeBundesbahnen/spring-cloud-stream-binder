@@ -72,10 +72,10 @@ public class JCSMPSessionSharingIT {
         Topic topic = JCSMPFactory.onlyInstance().createTopic("jcsmp-session-sharing/" + UUID.randomUUID());
         XMLMessageConsumer receiver = receiverOn(receivingSession, topic);
         JCSMPSessionConfiguration closingContext = aContext();
-        sessionOf(closingContext, jcsmpProperties);
+        SolaceMessageChannelBinder binderOfTheClosingContext = aBinderOn(sessionOf(closingContext, jcsmpProperties));
         XMLMessageProducer producer = sessionOf(aContext(), jcsmpProperties).getMessageProducer(new SimpleJCSMPEventHandler());
 
-        closingContext.destroy();
+        closeTheWaySpringDoes(closingContext, binderOfTheClosingContext);
         TextMessage sent = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         sent.setText("sent after another context closed");
         producer.send(sent, topic);
@@ -113,10 +113,8 @@ public class JCSMPSessionSharingIT {
 
     @Test
     public void testADestroyedBinderLeavesTheSessionOpen(JCSMPProperties jcsmpProperties) {
+        SolaceMessageChannelBinder binder = aBinderOn(sessionOf(aContext(), jcsmpProperties));
         JCSMPSession session = sessionOf(aContext(), jcsmpProperties);
-        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(session,
-                new SolaceEndpointProvisioner(session, Optional.empty()), new DefaultListableBeanFactory(),
-                Optional.empty(), Optional.empty(), Optional.empty());
 
         binder.destroy();
 
@@ -147,6 +145,20 @@ public class JCSMPSessionSharingIT {
 
     private static JCSMPSession sessionOf(JCSMPSessionConfiguration context, JCSMPProperties jcsmpProperties) {
         return context.jcsmpSession(jcsmpProperties, Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    private static SolaceMessageChannelBinder aBinderOn(JCSMPSession session) {
+        return new SolaceMessageChannelBinder(session, new SolaceEndpointProvisioner(session, Optional.empty()),
+                new DefaultListableBeanFactory(), Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    /**
+     * The binder depends on the session bean of its context, so Spring destroys the binder before the configuration
+     * that made the session.
+     */
+    private static void closeTheWaySpringDoes(JCSMPSessionConfiguration context, SolaceMessageChannelBinder binder) {
+        binder.destroy();
+        context.destroy();
     }
 
     private static JCSMPSessionEventHandler sessionEventsSeenBy(JCSMPSessionConfiguration context,
