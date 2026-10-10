@@ -8,7 +8,6 @@ import com.solace.spring.cloud.stream.binder.outbound.JCSMPOutboundMessageHandle
 import com.solace.spring.cloud.stream.binder.properties.SolaceExtendedBindingProperties;
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceEndpointProvisioner;
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
-import com.solacesystems.jcsmp.Context;
 import com.solacesystems.jcsmp.JCSMPSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.BeanFactory;
@@ -29,7 +28,6 @@ import java.util.Optional;
 public class SolaceMessageChannelBinderConfiguration {
     private final SolaceExtendedBindingProperties solaceExtendedBindingProperties;
     private final JCSMPSession jcsmpSession;
-    private final Context context;
 
     @Bean
     SolaceMessageChannelBinder solaceMessageChannelBinder(SolaceEndpointProvisioner solaceEndpointProvisioner,
@@ -40,7 +38,6 @@ public class SolaceMessageChannelBinderConfiguration {
                                                           Optional<ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler>> producerMessageHandlerCustomizer,
                                                           Optional<ConsumerEndpointCustomizer<MessageProducerSupport>> consumerEndpointCustomizer) {
         SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession,
-                context,
                 solaceEndpointProvisioner,
                 beanFactory,
                 solaceMeterAccessor,

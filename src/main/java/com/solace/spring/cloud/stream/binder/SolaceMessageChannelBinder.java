@@ -43,7 +43,6 @@ public class SolaceMessageChannelBinder
 
     private final JCSMPSession jcsmpSession;
     private final JCSMPInboundTopicMessageMultiplexer jcsmpInboundTopicMessageMultiplexer;
-    private final Context jcsmpContext;
     private final JCSMPSessionProducerManager sessionProducerManager;
     private final String errorHandlerProducerKey = UUID.randomUUID().toString();
     private final BeanFactory beanFactory;
@@ -55,8 +54,11 @@ public class SolaceMessageChannelBinder
     private SolaceExtendedBindingProperties extendedBindingProperties = new SolaceExtendedBindingProperties();
     private static final SolaceMessageHeaderErrorMessageStrategy errorMessageStrategy = new SolaceMessageHeaderErrorMessageStrategy();
 
+    /**
+     * The binder works on the session it is handed and never closes it: the session can be shared with the binders
+     * of other Spring contexts, so whoever created it closes it.
+     */
     public SolaceMessageChannelBinder(JCSMPSession jcsmpSession,
-                                      Context jcsmpContext,
                                       SolaceEndpointProvisioner solaceEndpointProvisioner,
                                       BeanFactory beanFactory,
                                       Optional<SolaceMeterAccessor> solaceMeterAccessor,
@@ -64,13 +66,29 @@ public class SolaceMessageChannelBinder
                                       Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
         super(new String[0], solaceEndpointProvisioner);
         this.jcsmpSession = jcsmpSession;
-        this.jcsmpContext = jcsmpContext;
         this.beanFactory = beanFactory;
         this.solaceMeterAccessor = solaceMeterAccessor;
         this.tracingProxy = tracingProxy;
         this.solaceBinderHealthAccessor = solaceBinderHealthAccessor;
         this.sessionProducerManager = new JCSMPSessionProducerManager(jcsmpSession);
         this.jcsmpInboundTopicMessageMultiplexer = new JCSMPInboundTopicMessageMultiplexer(jcsmpSession, beanFactory, this.solaceMeterAccessor, this.tracingProxy);
+    }
+
+    /**
+     * @deprecated The binder no longer closes the session or destroys the context on {@link #destroy()}: the
+     * session can be shared with the binders of other Spring contexts, so whoever created the session and the
+     * context closes them. Use
+     * {@link #SolaceMessageChannelBinder(JCSMPSession, SolaceEndpointProvisioner, BeanFactory, Optional, Optional, Optional)}.
+     */
+    @Deprecated(forRemoval = true)
+    public SolaceMessageChannelBinder(JCSMPSession jcsmpSession,
+                                      Context jcsmpContext,
+                                      SolaceEndpointProvisioner solaceEndpointProvisioner,
+                                      BeanFactory beanFactory,
+                                      Optional<SolaceMeterAccessor> solaceMeterAccessor,
+                                      Optional<TracingProxy> tracingProxy,
+                                      Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
+        this(jcsmpSession, solaceEndpointProvisioner, beanFactory, solaceMeterAccessor, tracingProxy, solaceBinderHealthAccessor);
     }
 
     @Override
@@ -80,17 +98,8 @@ public class SolaceMessageChannelBinder
 
     @Override
     public void destroy() {
-        if (jcsmpSession != null) {
-            log.info("Closing JCSMP session {}", jcsmpSession.getSessionName());
-        }
         if (sessionProducerManager != null) {
             sessionProducerManager.release(errorHandlerProducerKey);
-        }
-        if (jcsmpSession != null) {
-            jcsmpSession.closeSession();
-        }
-        if (jcsmpContext != null) {
-            jcsmpContext.destroy();
         }
     }
 

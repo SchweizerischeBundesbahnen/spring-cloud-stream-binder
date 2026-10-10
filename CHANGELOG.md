@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- STTRS-3449: Closing one Spring context no longer closes the JCSMP session of every other context in the JVM. The contexts share one cached session, and `SolaceMessageChannelBinder#destroy` closed it while `JCSMPSessionConfiguration` cleared the whole cache, so the others failed with `Producer is already closed this can never recover` or `Session is closed`. Each context now holds a share of the session and gives it back when it closes; the last one closes the session. A test suite that caches several contexts, or closes one with `@DirtiesContext`, was hit; an application with a single context was not.
+
+### Deprecated
+- The `SolaceMessageChannelBinder` constructor that takes a `Context`. The binder no longer closes the session or destroys the context it is handed, so it has no use for the context. Use the constructor without it.
+
 ## [9.5.2] - 2026-10-08
 
 ### Changed

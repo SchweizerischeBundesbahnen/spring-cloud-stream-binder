@@ -9,6 +9,7 @@ import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solacesystems.jcsmp.*;
 import com.solacesystems.jcsmp.impl.JCSMPBasicSession;
 import jakarta.annotation.PreDestroy;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -21,15 +22,32 @@ import java.util.*;
 
 import static com.solacesystems.jcsmp.XMLMessage.Outcome.*;
 
+/**
+ * Connects the JCSMP session of a Spring context. Every context of the JVM that connects with the same properties
+ * shares one session, and the session closes when the last of these contexts closes.
+ */
 @Slf4j
 @RequiredArgsConstructor
 @Configuration
 public class JCSMPSessionConfiguration {
-    private final static Map<String, SessionCacheEntry> SESSION_CACHE = new HashMap<>();
+    private final static Map<String, SharedSession> SESSION_CACHE = new HashMap<>();
 
+    /**
+     * Gives back this context's share of every session it took, and closes a session nobody else holds.
+     */
     @PreDestroy
     public void destroy() {
-        SESSION_CACHE.clear();
+        synchronized (SESSION_CACHE) {
+            Iterator<SharedSession> sharedSessions = SESSION_CACHE.values().iterator();
+            while (sharedSessions.hasNext()) {
+                SharedSession sharedSession = sharedSessions.next();
+                sharedSession.release(this);
+                if (sharedSession.isUnheld()) {
+                    sharedSession.close();
+                    sharedSessions.remove();
+                }
+            }
+        }
     }
 
     @Bean
@@ -84,14 +102,16 @@ public class JCSMPSessionConfiguration {
             properties.storeToXML(os, "cached");
             os.close();
             String configAsString = os.toString();
-            SessionCacheEntry sessionCacheEntry = SESSION_CACHE.computeIfAbsent(configAsString, (key) -> createSession(jcsmpProperties, binderHealthContributor, solaceSessionOAuth2TokenProvider));
-            // A context that adopts a cached session needs the events too: whichever context connects first
-            // owns the session, and without this the others only ever learn that it was up once.
-            solaceSessionEventHandler.ifPresent(sessionCacheEntry.jcsmpSessionEventHandler()::addSessionEventHandler);
-            binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator)
-                    .filter(SessionHealthIndicator::hasNotSeenASessionYet)
-                    .ifPresent(SessionHealthIndicator::up);
-            return sessionCacheEntry;
+            synchronized (SESSION_CACHE) {
+                SharedSession sharedSession = SESSION_CACHE.computeIfAbsent(configAsString, (key) -> new SharedSession(createSession(jcsmpProperties, binderHealthContributor, solaceSessionOAuth2TokenProvider)));
+                // A context that adopts a cached session needs the events too: whichever context connects first
+                // owns the session, and without this the others only ever learn that it was up once.
+                sharedSession.hold(this, solaceSessionEventHandler);
+                binderHealthContributor.map(SolaceBinderHealthContributor::getSolaceSessionHealthIndicator)
+                        .filter(SessionHealthIndicator::hasNotSeenASessionYet)
+                        .ifPresent(SessionHealthIndicator::up);
+                return sharedSession.getEntry();
+            }
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -133,5 +153,42 @@ public class JCSMPSessionConfiguration {
     }
 
     private record SessionCacheEntry(JCSMPProperties jcsmpProperties, JCSMPSessionEventHandler jcsmpSessionEventHandler, JCSMPSession jcsmpSession, Context context, SolaceEndpointProvisioner solaceEndpointProvisioner, SolaceSessionOAuth2TokenProvider solaceSessionOAuth2TokenProvider) {
+    }
+
+    /**
+     * A cached session together with the contexts that hold it, and the session event handlers each of them
+     * attached. A context that closes takes its handlers along, so the session no longer reports to a context
+     * that is gone.
+     */
+    @RequiredArgsConstructor
+    private static final class SharedSession {
+        @Getter
+        private final SessionCacheEntry entry;
+        private final Map<JCSMPSessionConfiguration, Set<SessionEventHandler>> handlersByHolder = new HashMap<>();
+
+        private void hold(JCSMPSessionConfiguration holder, Optional<SolaceSessionEventHandler> solaceSessionEventHandler) {
+            Set<SessionEventHandler> handlersOfTheHolder = handlersByHolder.computeIfAbsent(holder, (key) -> new HashSet<>());
+            solaceSessionEventHandler.ifPresent(handler -> {
+                entry.jcsmpSessionEventHandler().addSessionEventHandler(handler);
+                handlersOfTheHolder.add(handler);
+            });
+        }
+
+        private void release(JCSMPSessionConfiguration holder) {
+            Set<SessionEventHandler> handlersOfTheHolder = handlersByHolder.remove(holder);
+            if (handlersOfTheHolder != null) {
+                handlersOfTheHolder.forEach(entry.jcsmpSessionEventHandler()::removeSessionEventHandler);
+            }
+        }
+
+        private boolean isUnheld() {
+            return handlersByHolder.isEmpty();
+        }
+
+        private void close() {
+            log.info("Closing JCSMP session {}", entry.jcsmpSession().getSessionName());
+            entry.jcsmpSession().closeSession();
+            entry.context().destroy();
+        }
     }
 }
