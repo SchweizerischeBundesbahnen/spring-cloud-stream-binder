@@ -10,8 +10,8 @@ import com.solace.spring.cloud.stream.binder.provisioning.SolaceEndpointProvisio
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
 import com.solacesystems.jcsmp.Context;
 import com.solacesystems.jcsmp.JCSMPSession;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.stream.config.ConsumerEndpointCustomizer;
 import org.springframework.cloud.stream.config.ProducerMessageHandlerCustomizer;
@@ -22,14 +22,31 @@ import org.springframework.integration.endpoint.MessageProducerSupport;
 
 import java.util.Optional;
 
-@RequiredArgsConstructor
 @Configuration
 @Import({JCSMPSessionConfiguration.class, SolaceHealthIndicatorsConfiguration.class})
 @EnableConfigurationProperties({SolaceExtendedBindingProperties.class})
 public class SolaceMessageChannelBinderConfiguration {
     private final SolaceExtendedBindingProperties solaceExtendedBindingProperties;
     private final JCSMPSession jcsmpSession;
-    private final Context context;
+
+    @Autowired
+    public SolaceMessageChannelBinderConfiguration(SolaceExtendedBindingProperties solaceExtendedBindingProperties,
+                                                   JCSMPSession jcsmpSession) {
+        this.solaceExtendedBindingProperties = solaceExtendedBindingProperties;
+        this.jcsmpSession = jcsmpSession;
+    }
+
+    /**
+     * @deprecated The binder no longer destroys the {@link Context}: {@link JCSMPSessionConfiguration} closes the
+     * session and the context when the last Spring context that uses them closes. Use
+     * {@link #SolaceMessageChannelBinderConfiguration(SolaceExtendedBindingProperties, JCSMPSession)}.
+     */
+    @Deprecated(forRemoval = true)
+    public SolaceMessageChannelBinderConfiguration(SolaceExtendedBindingProperties solaceExtendedBindingProperties,
+                                                   JCSMPSession jcsmpSession,
+                                                   Context context) {
+        this(solaceExtendedBindingProperties, jcsmpSession);
+    }
 
     @Bean
     SolaceMessageChannelBinder solaceMessageChannelBinder(SolaceEndpointProvisioner solaceEndpointProvisioner,
@@ -40,7 +57,6 @@ public class SolaceMessageChannelBinderConfiguration {
                                                           Optional<ProducerMessageHandlerCustomizer<JCSMPOutboundMessageHandler>> producerMessageHandlerCustomizer,
                                                           Optional<ConsumerEndpointCustomizer<MessageProducerSupport>> consumerEndpointCustomizer) {
         SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession,
-                context,
                 solaceEndpointProvisioner,
                 beanFactory,
                 solaceMeterAccessor,

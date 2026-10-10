@@ -107,6 +107,12 @@ This document describes specialized AI agents that can work on this codebase. Ea
   reporting the connection `UP` for the life of the process. `SolaceBinderConfigIT`
   pins this; registration is idempotent because each context resolves several beans through the same
   call.
+- Each `JCSMPSessionConfiguration` instance — one per context — holds its share of the cached
+  session, and its `@PreDestroy` gives the share back together with the event handlers it attached.
+  The session closes with the last share. Nothing else may close it: `SolaceMessageChannelBinder`
+  works on a session it was handed and leaves it open on `destroy()`, because the binders of other
+  contexts still publish on it — a test suite with a context cache is the usual case.
+  `JCSMPSessionSharingIT` pins this.
 
 ---
 
