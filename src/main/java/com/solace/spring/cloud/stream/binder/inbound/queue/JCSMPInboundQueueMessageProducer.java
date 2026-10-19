@@ -233,6 +233,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             startFlowReceiver();
         } catch (Exception e) {
             log.error("Failed to start flow receiver", e);
+            closeResources();
             throw new MessagingException("Failed to start flow receiver", e);
         }
     }
@@ -251,11 +252,16 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 consumerProperties.getExtension().getWatchdogTimeoutMs(),
                 consumerProperties.getExtension().isPartitionAware());
         this.flowReceiver.set(jcsmpSession.createFlow(flowXMLMessageListener, consumerFlowProperties, endpointProperties, solaceFlowEventHandler));
+        addPostStartToFlowEventHandler();
+        postStart.accept(flowReceiver.get().getEndpoint());
+        startDeliveryUnlessPaused();
+    }
+
+    private void startDeliveryUnlessPaused() throws JCSMPException {
         if (!paused.get()) {
             this.flowReceiver.get().start();
         }
-        addPostStartToFlowEventHandler();
-        postStart.accept(flowReceiver.get().getEndpoint());
+        log.info("Flow receiver binding={} started in state '{}'", consumerDestination.getName(), paused.get() ? "Paused" : "Running");
     }
 
     /**
@@ -295,12 +301,11 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
 
     private ConsumerFlowProperties getConsumerFlowProperties(String endpointName) {
         Endpoint endpoint = JCSMPFactory.onlyInstance().createQueue(endpointName);
-        log.info("Flow receiver binding={} started in state '{}'", consumerDestination.getName(), paused.get() ? "Paused" : "Running");
         ConsumerFlowProperties consumerFlowProperties = SolaceProvisioningUtil.getConsumerFlowProperties(
                         consumerDestination.getBindingDestinationName(), consumerProperties)
                 .setEndpoint(endpoint)
                 .setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
-        consumerFlowProperties.setStartState(!paused.get());
+        consumerFlowProperties.setStartState(false);
         consumerFlowProperties.addRequiredSettlementOutcomes(XMLMessage.Outcome.ACCEPTED, XMLMessage.Outcome.FAILED, XMLMessage.Outcome.REJECTED);
         consumerFlowProperties.setActiveFlowIndication(true); // otherwise no flowEvents will be fired
         return consumerFlowProperties;
@@ -309,6 +314,10 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     @Override
     protected void doStop() {
         if (!isRunning()) return;
+        closeResources();
+    }
+
+    private void closeResources() {
         solaceBinderHealthAccessor.ifPresent(solaceBinderHealth -> solaceBinderHealth.removeBindingHealthIndicator(consumerProperties.getBindingName()));
         FlowReceiver currentFlowReceiver = this.flowReceiver.get();
         if (currentFlowReceiver != null) {
@@ -322,6 +331,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             this.flowReceiver.set(null); // Clear the reference to ensure clean restart
         }
         this.flowXMLMessageListener.stopReceiverThreads();
+        this.solaceFlowEventHandler.clearReconnectRunnables();
     }
 
     @Override
