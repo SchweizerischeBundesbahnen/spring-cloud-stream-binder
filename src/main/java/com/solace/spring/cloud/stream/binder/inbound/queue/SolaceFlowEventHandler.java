@@ -8,8 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -17,10 +17,14 @@ import java.util.List;
 public class SolaceFlowEventHandler implements FlowEventHandler {
     private String bindingName;
     private SolaceHealthIndicator bindingHealthIndicator;
-    private List<Runnable> reconnectRunnables = new ArrayList<>();
+    private List<Runnable> reconnectRunnables = new CopyOnWriteArrayList<>();
 
     public void addReconnectRunnable(Runnable runnable) {
         reconnectRunnables.add(runnable);
+    }
+
+    public void clearReconnectRunnables() {
+        reconnectRunnables.clear();
     }
 
     @Override
