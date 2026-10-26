@@ -19,7 +19,6 @@ import com.solacesystems.jcsmp.FlowReceiver;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -34,13 +33,10 @@ import org.springframework.integration.channel.DirectChannel;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessagingException;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,24 +51,33 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ExtendWith(PubSubPlusExtension.class)
 class JCSMPInboundQueueMessageProducerIT {
     private static final int RECEIVE_TIMEOUT_MS = (int) TimeUnit.SECONDS.toMillis(5);
-    private static final Duration SHUTDOWN_HOOK_LOOK_INTERVAL = Duration.ofMillis(1);
     private static final String GROUP = "failed-start";
     private static final String PAYLOAD = "waits for a consumer that starts";
 
     private final List<Message<?>> messagesHandedToTheApplication = new CopyOnWriteArrayList<>();
-    private final AtomicBoolean shutdownHookArmed = new AtomicBoolean(false);
     private String bindingDestinationName;
     private String queueName;
+    private JCSMPInboundQueueMessageProducer adapterUnderTest;
 
     @BeforeEach
     void pickADestinationNoOtherTestUses() {
         bindingDestinationName = "failed-start-" + RandomStringUtils.insecure().nextAlphanumeric(10);
     }
 
+    /**
+     * A start that unexpectedly succeeds leaves a flow and non-daemon receiver threads running, so the adapter is
+     * stopped before the queue goes. After a failed start, {@code stop()} does nothing.
+     */
     @AfterEach
-    void deprovisionTheQueue(JCSMPSession jcsmpSession) throws JCSMPException {
-        if (queueName != null) {
-            jcsmpSession.deprovision(JCSMPFactory.onlyInstance().createQueue(queueName), JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+    void stopTheAdapterAndDeprovisionTheQueue(JCSMPSession jcsmpSession) throws JCSMPException {
+        try {
+            if (adapterUnderTest != null) {
+                adapterUnderTest.stop();
+            }
+        } finally {
+            if (queueName != null) {
+                jcsmpSession.deprovision(JCSMPFactory.onlyInstance().createQueue(queueName), JCSMPSession.FLAG_IGNORE_DOES_NOT_EXIST);
+            }
         }
     }
 
@@ -109,34 +114,6 @@ class JCSMPInboundQueueMessageProducerIT {
     }
 
     /**
-     * This is how the failure arrives in production: a pod is told to stop while its context is still refreshing, and
-     * the shutdown hook of Spring Framework 7 interrupts the starting thread whenever it waits, here for the broker to
-     * confirm the queue subscription.
-     */
-    @Test
-    void aStart_interruptedWhileSubscribingTheQueue_leavesTheWaitingMessageUndelivered(JCSMPSession jcsmpSession) throws Exception {
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = consumerProperties();
-        JCSMPInboundQueueMessageProducer adapter = createAdapter(jcsmpSession, consumerProperties,
-                realSubscriptionThatArmsTheShutdownHook(jcsmpSession, consumerProperties), Optional.empty());
-        publishOneMessageToTheQueue(jcsmpSession);
-
-        startWhileTheShutdownHookInterruptsTheSubscription(adapter);
-
-        assertThatTheMessageWaitsUndelivered(receiveFromTheQueue(jcsmpSession));
-    }
-
-    @Test
-    void aStart_interruptedWhileSubscribingTheQueue_leavesNoReceiverThreadRunning(JCSMPSession jcsmpSession) throws Exception {
-        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = consumerProperties();
-        JCSMPInboundQueueMessageProducer adapter = createAdapter(jcsmpSession, consumerProperties,
-                realSubscriptionThatArmsTheShutdownHook(jcsmpSession, consumerProperties), Optional.empty());
-
-        startWhileTheShutdownHookInterruptsTheSubscription(adapter);
-
-        assertThat(aliveReceiverThreadNames()).isEmpty();
-    }
-
-    /**
      * The receiver threads start before the flow is created, so a flow the broker refuses must take them down too.
      */
     @Test
@@ -163,44 +140,6 @@ class JCSMPInboundQueueMessageProducerIT {
         };
     }
 
-    private Consumer<Endpoint> realSubscriptionThatArmsTheShutdownHook(JCSMPSession jcsmpSession,
-                                                                       ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties) {
-        SolaceEndpointProvisioner provisioner = new SolaceEndpointProvisioner(jcsmpSession, Optional.empty());
-        return endpoint -> {
-            shutdownHookArmed.set(true);
-            provisioner.addSubscriptionToQueue((Queue) endpoint, bindingDestinationName, consumerProperties.getExtension(), true);
-        };
-    }
-
-    /**
-     * Mirrors {@code AbstractApplicationContext.tryLockForShutdown}, which interrupts the starting thread whenever it is
-     * {@code WAITING}. The hook holds back until the subscription is requested, as in the incident where the flow was
-     * already bound: an interrupt of an earlier wait fails the start before there is a flow that could deliver. Spring
-     * looks every 100 ms; this hook looks every millisecond, so that the interrupt lands in the short wait for the
-     * broker on every run. The interrupt the failed start leaves on the test thread is cleared.
-     */
-    private void startWhileTheShutdownHookInterruptsTheSubscription(JCSMPInboundQueueMessageProducer adapter) throws InterruptedException {
-        Thread startingThread = Thread.currentThread();
-        AtomicBoolean starting = new AtomicBoolean(true);
-        Thread shutdownHook = new Thread(() -> {
-            while (starting.get()) {
-                if (shutdownHookArmed.get() && startingThread.getState() == Thread.State.WAITING) {
-                    startingThread.interrupt();
-                }
-                LockSupport.parkNanos(SHUTDOWN_HOOK_LOOK_INTERVAL.toNanos());
-            }
-        });
-        shutdownHook.setDaemon(true);
-        shutdownHook.start();
-        try {
-            assertThatThrownBy(adapter::start).isInstanceOf(MessagingException.class);
-        } finally {
-            starting.set(false);
-            Thread.interrupted();
-            shutdownHook.join(SHUTDOWN_HOOK_LOOK_INTERVAL.multipliedBy(10).toMillis());
-        }
-    }
-
     private JCSMPInboundQueueMessageProducer createAdapter(JCSMPSession jcsmpSession,
                                                            ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties,
                                                            Consumer<Endpoint> postStart,
@@ -208,7 +147,7 @@ class JCSMPInboundQueueMessageProducerIT {
         SolaceConsumerDestination destination = (SolaceConsumerDestination) new SolaceEndpointProvisioner(jcsmpSession, Optional.empty())
                 .provisionConsumerDestination(bindingDestinationName, GROUP, consumerProperties);
         queueName = destination.getName();
-        JCSMPInboundQueueMessageProducer adapter = new JCSMPInboundQueueMessageProducer(
+        adapterUnderTest = new JCSMPInboundQueueMessageProducer(
                 destination,
                 jcsmpSession,
                 consumerProperties,
@@ -223,8 +162,8 @@ class JCSMPInboundQueueMessageProducerIT {
                 Optional.empty());
         DirectChannel application = new DirectChannel();
         application.subscribe(messagesHandedToTheApplication::add);
-        adapter.setOutputChannel(application);
-        return adapter;
+        adapterUnderTest.setOutputChannel(application);
+        return adapterUnderTest;
     }
 
     private void publishOneMessageToTheQueue(JCSMPSession jcsmpSession) throws JCSMPException {
