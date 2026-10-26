@@ -3,12 +3,12 @@ package com.solace.spring.cloud.stream.binder.health.contributors;
 import com.solace.spring.cloud.stream.binder.health.base.SolaceHealthIndicator;
 import org.springframework.boot.health.contributor.CompositeHealthContributor;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 public class BindingsHealthContributor implements CompositeHealthContributor {
-    private final Map<String, SolaceHealthIndicator> bindingHealthContributor = new HashMap<>();
+    private final Map<String, SolaceHealthIndicator> bindingHealthContributor = new ConcurrentHashMap<>();
 
     public void addBindingContributor(String bindingName, SolaceHealthIndicator bindingHealthIndicator) {
         this.bindingHealthContributor.put(bindingName, bindingHealthIndicator);
