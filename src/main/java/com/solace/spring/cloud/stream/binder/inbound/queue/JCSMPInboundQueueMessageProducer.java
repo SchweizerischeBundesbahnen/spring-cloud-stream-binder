@@ -252,8 +252,9 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 consumerProperties.getExtension().getWatchdogTimeoutMs(),
                 consumerProperties.getExtension().isPartitionAware());
         this.flowReceiver.set(jcsmpSession.createFlow(flowXMLMessageListener, consumerFlowProperties, endpointProperties, solaceFlowEventHandler));
-        addPostStartToFlowEventHandler();
-        postStart.accept(flowReceiver.get().getEndpoint());
+        Endpoint endpoint = flowReceiver.get().getEndpoint();
+        addPostStartToFlowEventHandler(endpoint);
+        postStart.accept(endpoint);
         startDeliveryUnlessPaused();
     }
 
@@ -267,8 +268,8 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     /**
      * Ensures the subscriptions are added after a reconnect
      */
-    private void addPostStartToFlowEventHandler() {
-        solaceFlowEventHandler.addReconnectRunnable(() -> postStart.accept(flowReceiver.get().getEndpoint()));
+    private void addPostStartToFlowEventHandler(Endpoint endpoint) {
+        solaceFlowEventHandler.addReconnectRunnable(() -> postStart.accept(endpoint));
     }
 
     private void checkPropertiesAndBroker() {
@@ -318,6 +319,7 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     }
 
     private void closeResources() {
+        this.solaceFlowEventHandler.clearReconnectRunnables();
         solaceBinderHealthAccessor.ifPresent(solaceBinderHealth -> solaceBinderHealth.removeBindingHealthIndicator(consumerProperties.getBindingName()));
         FlowReceiver currentFlowReceiver = this.flowReceiver.get();
         if (currentFlowReceiver != null) {
@@ -331,7 +333,6 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             this.flowReceiver.set(null); // Clear the reference to ensure clean restart
         }
         this.flowXMLMessageListener.stopReceiverThreads();
-        this.solaceFlowEventHandler.clearReconnectRunnables();
     }
 
     @Override
