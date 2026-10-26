@@ -13,6 +13,7 @@ import lombok.Setter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.function.Supplier;
 
 @Slf4j
 public class FlowXMLMessageListener implements XMLMessageListener {
+    private static final Duration RECEIVER_THREAD_STOP_TIMEOUT = Duration.ofSeconds(5);
 
     /**
      * Local queues on the heap that distribute messages to worker threads.
@@ -127,23 +129,39 @@ public class FlowXMLMessageListener implements XMLMessageListener {
 
             // Wait for all threads to finish
             for (Thread thread : receiverThreads) {
-                try {
-                    thread.join(5000); // Wait up to 5 seconds for each thread
-                    if (thread.isAlive()) {
-                        log.warn("Thread {} did not stop within timeout, interrupting", thread.getName());
-                        thread.interrupt();
-                    } else {
-                        log.info("Thread {} stopped successfully", thread.getName());
-                    }
-                } catch (InterruptedException e) {
-                    log.warn("Interrupted while waiting for thread {} to stop", thread.getName());
-                    Thread.currentThread().interrupt();
+                joinThroughInterrupts(thread, RECEIVER_THREAD_STOP_TIMEOUT);
+                if (thread.isAlive()) {
+                    log.warn("Thread {} did not stop within timeout, interrupting", thread.getName());
+                    thread.interrupt();
+                } else {
+                    log.info("Thread {} stopped successfully", thread.getName());
                 }
             }
 
-            // Clear the thread tracking
-            receiverThreads.clear();
-            log.info("All receiver threads stopped and cleared");
+            receiverThreads.removeIf(thread -> !thread.isAlive());
+            log.info("Receiver threads stopped, {} still running", receiverThreads.size());
+        }
+    }
+
+    // The stopping thread can arrive interrupted: Spring's shutdown hook interrupts a context's starting thread whenever
+    // it waits. A plain join would then return at once and leave receiver threads running untracked, so the wait goes on
+    // and the interrupt is restored once it is over.
+    private static void joinThroughInterrupts(Thread thread, Duration timeout) {
+        long deadlineNanos = System.nanoTime() + timeout.toNanos();
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    TimeUnit.NANOSECONDS.timedJoin(thread, deadlineNanos - System.nanoTime());
+                    return;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
