@@ -666,6 +666,80 @@ class FlowXMLMessageListenerTest {
         }
     }
 
+    @Test
+    void aStop_byAnInterruptedThread_leavesNoReceiverThreadRunning() {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        String threadNamePrefix = "interrupted-stop";
+        try {
+            listener.startReceiverThreads(3, threadNamePrefix, message -> {
+            }, 60000);
+
+            stopWhileInterrupted(listener);
+
+            assertThat(aliveThreadNames(threadNamePrefix)).isEmpty();
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    @Test
+    void aStop_byAnInterruptedThread_leavesTheStoppingThreadInterrupted() {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        try {
+            listener.startReceiverThreads(3, "interrupt-kept", message -> {
+            }, 60000);
+
+            Thread.currentThread().interrupt();
+            listener.stopReceiverThreads();
+
+            assertThat(Thread.interrupted()).isTrue();
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    /**
+     * A stop that gave up on its threads would let the next start revive them, because the old threads read the same
+     * running flag as the new ones.
+     */
+    @Test
+    void aRestart_rightAfterAStopByAnInterruptedThread_runsOnlyTheNewReceiverThreads() {
+        FlowXMLMessageListener listener = new FlowXMLMessageListener();
+        String threadNamePrefix = "restart-after-interrupted-stop";
+        int threadCount = 3;
+        try {
+            listener.startReceiverThreads(threadCount, threadNamePrefix, message -> {
+            }, 60000);
+            stopWhileInterrupted(listener);
+
+            listener.startReceiverThreads(threadCount, threadNamePrefix, message -> {
+            }, 60000);
+
+            assertThat(aliveThreadNames(threadNamePrefix))
+                    .as("the workers and the watchdog of the second start, and none of the first")
+                    .hasSize(threadCount + 1);
+        } finally {
+            listener.stopReceiverThreads();
+        }
+    }
+
+    private static void stopWhileInterrupted(FlowXMLMessageListener listener) {
+        Thread.currentThread().interrupt();
+        try {
+            listener.stopReceiverThreads();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    private static List<String> aliveThreadNames(String threadNamePrefix) {
+        return Thread.getAllStackTraces().keySet().stream()
+                .filter(Thread::isAlive)
+                .map(Thread::getName)
+                .filter(name -> name.startsWith(threadNamePrefix + "-"))
+                .toList();
+    }
+
     @SuppressWarnings("unchecked")
     private static int workerQueueCount(FlowXMLMessageListener listener) throws Exception {
         Field field = FlowXMLMessageListener.class.getDeclaredField("messageQueues");
