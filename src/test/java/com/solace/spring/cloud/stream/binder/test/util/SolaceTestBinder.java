@@ -33,19 +33,17 @@ public class SolaceTestBinder
 
     private final JCSMPSession jcsmpSession;
     private final SempV2Api sempV2Api;
-    private final Context context;
     @Getter
     private final AnnotationConfigApplicationContext applicationContext;
     private final Set<String> endpoints = new HashSet<>();
     private final Map<String, String> bindingNameToQueueName = new HashMap<>();
     private final Map<String, String> bindingNameToErrorQueueName = new HashMap<>();
 
-    public SolaceTestBinder(JCSMPSession jcsmpSession, Context context, SempV2Api sempV2Api, BeanFactory beanFactory) {
+    public SolaceTestBinder(JCSMPSession jcsmpSession, SempV2Api sempV2Api, BeanFactory beanFactory) {
         this.applicationContext = new AnnotationConfigApplicationContext(Config.class);
         this.jcsmpSession = jcsmpSession;
         this.sempV2Api = sempV2Api;
-        this.context = context;
-        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, context, new SolaceEndpointProvisioner(jcsmpSession, Optional.empty()), beanFactory, Optional.empty(), Optional.empty(), Optional.empty());
+        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, new SolaceEndpointProvisioner(jcsmpSession, Optional.empty()), beanFactory, Optional.empty(), Optional.empty(), Optional.empty());
         binder.setApplicationContext(this.applicationContext);
         this.setBinder(binder);
     }
@@ -54,8 +52,7 @@ public class SolaceTestBinder
         this.applicationContext = new AnnotationConfigApplicationContext(Config.class);
         this.jcsmpSession = original.jcsmpSession;
         this.sempV2Api = original.sempV2Api;
-        this.context = original.context;
-        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, this.context, new SolaceEndpointProvisioner(jcsmpSession, Optional.empty()), beanFactory, Optional.empty(), Optional.of(tracingProxy), Optional.empty());
+        SolaceMessageChannelBinder binder = new SolaceMessageChannelBinder(jcsmpSession, new SolaceEndpointProvisioner(jcsmpSession, Optional.empty()), beanFactory, Optional.empty(), Optional.of(tracingProxy), Optional.empty());
         binder.setApplicationContext(this.applicationContext);
         this.setBinder(binder);
     }

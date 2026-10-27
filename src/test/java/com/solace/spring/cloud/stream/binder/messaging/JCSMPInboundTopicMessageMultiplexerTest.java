@@ -37,12 +37,12 @@ public class JCSMPInboundTopicMessageMultiplexerTest {
             return mock(XMLMessageConsumer.class);
         });
 
-        JCSMPInboundTopicMessageMultiplexer multiplexer = new JCSMPInboundTopicMessageMultiplexer(session, beanFactory, Optional.empty(), Optional.empty());
+        JCSMPInboundTopicMessageMultiplexer multiplexer = new JCSMPInboundTopicMessageMultiplexer(session);
         SolaceConsumerDestination consumerDestination = Mockito.mock(SolaceConsumerDestination.class);
         Mockito.when(consumerDestination.getName()).thenReturn("consumer");
         ExtendedConsumerProperties<SolaceConsumerProperties> properties = Mockito.mock(ExtendedConsumerProperties.class);
 
-        multiplexer.createTopicMessageProducer(consumerDestination, "myGroup", properties);
+        multiplexer.createTopicMessageProducer(consumerDestination, "myGroup", properties, beanFactory, Optional.empty(), Optional.empty());
 
         ExecutorService executorService = Executors.newFixedThreadPool(10);
         List<Future<String>> futures = new ArrayList<>();

@@ -33,6 +33,16 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+/**
+ * Binds the channels of a Spring context to a JCSMP session. The binder works on the session it is handed and never
+ * closes it: the session can be shared with the binders of other Spring contexts, so whoever created it closes it.
+ * <p>
+ * Every binder on one session must be handed the same {@link JCSMPSessionProducerManager} and the same
+ * {@link JCSMPInboundTopicMessageMultiplexer}. JCSMP gives each caller the one default producer of the session, and a
+ * manager closes it when its own last binding stops, under the bindings of every other binder on the session. The
+ * session has one default consumer and one set of topic subscriptions as well, and a multiplexer of its own takes them
+ * from every other binder. The constructors without these are for a session no other binder works on.
+ */
 @Slf4j
 public class SolaceMessageChannelBinder
         extends AbstractMessageChannelBinder<ExtendedConsumerProperties<SolaceConsumerProperties>,
@@ -43,7 +53,6 @@ public class SolaceMessageChannelBinder
 
     private final JCSMPSession jcsmpSession;
     private final JCSMPInboundTopicMessageMultiplexer jcsmpInboundTopicMessageMultiplexer;
-    private final Context jcsmpContext;
     private final JCSMPSessionProducerManager sessionProducerManager;
     private final String errorHandlerProducerKey = UUID.randomUUID().toString();
     private final BeanFactory beanFactory;
@@ -56,7 +65,8 @@ public class SolaceMessageChannelBinder
     private static final SolaceMessageHeaderErrorMessageStrategy errorMessageStrategy = new SolaceMessageHeaderErrorMessageStrategy();
 
     public SolaceMessageChannelBinder(JCSMPSession jcsmpSession,
-                                      Context jcsmpContext,
+                                      JCSMPSessionProducerManager sessionProducerManager,
+                                      JCSMPInboundTopicMessageMultiplexer jcsmpInboundTopicMessageMultiplexer,
                                       SolaceEndpointProvisioner solaceEndpointProvisioner,
                                       BeanFactory beanFactory,
                                       Optional<SolaceMeterAccessor> solaceMeterAccessor,
@@ -64,13 +74,39 @@ public class SolaceMessageChannelBinder
                                       Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
         super(new String[0], solaceEndpointProvisioner);
         this.jcsmpSession = jcsmpSession;
-        this.jcsmpContext = jcsmpContext;
         this.beanFactory = beanFactory;
         this.solaceMeterAccessor = solaceMeterAccessor;
         this.tracingProxy = tracingProxy;
         this.solaceBinderHealthAccessor = solaceBinderHealthAccessor;
-        this.sessionProducerManager = new JCSMPSessionProducerManager(jcsmpSession);
-        this.jcsmpInboundTopicMessageMultiplexer = new JCSMPInboundTopicMessageMultiplexer(jcsmpSession, beanFactory, this.solaceMeterAccessor, this.tracingProxy);
+        this.sessionProducerManager = sessionProducerManager;
+        this.jcsmpInboundTopicMessageMultiplexer = jcsmpInboundTopicMessageMultiplexer;
+    }
+
+    public SolaceMessageChannelBinder(JCSMPSession jcsmpSession,
+                                      SolaceEndpointProvisioner solaceEndpointProvisioner,
+                                      BeanFactory beanFactory,
+                                      Optional<SolaceMeterAccessor> solaceMeterAccessor,
+                                      Optional<TracingProxy> tracingProxy,
+                                      Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
+        this(jcsmpSession, new JCSMPSessionProducerManager(jcsmpSession), new JCSMPInboundTopicMessageMultiplexer(jcsmpSession),
+                solaceEndpointProvisioner, beanFactory, solaceMeterAccessor, tracingProxy, solaceBinderHealthAccessor);
+    }
+
+    /**
+     * @deprecated The binder no longer closes the session or destroys the context on {@link #destroy()}: the
+     * session can be shared with the binders of other Spring contexts, so whoever created the session and the
+     * context closes them. Use
+     * {@link #SolaceMessageChannelBinder(JCSMPSession, SolaceEndpointProvisioner, BeanFactory, Optional, Optional, Optional)}.
+     */
+    @Deprecated(forRemoval = true)
+    public SolaceMessageChannelBinder(JCSMPSession jcsmpSession,
+                                      Context jcsmpContext,
+                                      SolaceEndpointProvisioner solaceEndpointProvisioner,
+                                      BeanFactory beanFactory,
+                                      Optional<SolaceMeterAccessor> solaceMeterAccessor,
+                                      Optional<TracingProxy> tracingProxy,
+                                      Optional<SolaceBinderHealthAccessor> solaceBinderHealthAccessor) {
+        this(jcsmpSession, solaceEndpointProvisioner, beanFactory, solaceMeterAccessor, tracingProxy, solaceBinderHealthAccessor);
     }
 
     @Override
@@ -80,17 +116,8 @@ public class SolaceMessageChannelBinder
 
     @Override
     public void destroy() {
-        if (jcsmpSession != null) {
-            log.info("Closing JCSMP session {}", jcsmpSession.getSessionName());
-        }
         if (sessionProducerManager != null) {
             sessionProducerManager.release(errorHandlerProducerKey);
-        }
-        if (jcsmpSession != null) {
-            jcsmpSession.closeSession();
-        }
-        if (jcsmpContext != null) {
-            jcsmpContext.destroy();
         }
     }
 
@@ -177,7 +204,8 @@ public class SolaceMessageChannelBinder
     }
 
     protected MessageProducer createTopicMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
-        JCSMPInboundTopicMessageProducer topicMessageProducer = this.jcsmpInboundTopicMessageMultiplexer.createTopicMessageProducer(destination, group, properties);
+        JCSMPInboundTopicMessageProducer topicMessageProducer = this.jcsmpInboundTopicMessageMultiplexer.createTopicMessageProducer(destination, group, properties,
+                beanFactory, solaceMeterAccessor, tracingProxy);
         AbstractMessageChannelBinder.ErrorInfrastructure errorInfra = registerErrorInfrastructure(destination, group, properties);
 
         topicMessageProducer.setErrorChannel(errorInfra.getErrorChannel());

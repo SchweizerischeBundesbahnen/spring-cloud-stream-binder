@@ -4,6 +4,26 @@ This document contains migration guides for version upgrades of the Spring Cloud
 
 ---
 
+## Unreleased
+
+### `SolaceMessageChannelBinder#destroy` leaves the session and its `Context` open
+
+The JCSMP session can be shared with the binders of other Spring contexts, so a binder never closes the session it
+was handed, whichever constructor built it. An application that gets its binder from Spring Cloud Stream needs no
+change: the session closes with the last Spring context that uses it.
+
+Code that builds a binder by hand:
+
+- uses the constructors of `SolaceMessageChannelBinder` and `SolaceMessageChannelBinderConfiguration` without a
+  `Context`; those with one are deprecated for removal.
+- hands every binder on one session the same `JCSMPSessionProducerManager` and `JCSMPInboundTopicMessageMultiplexer`,
+  through the binder constructor that takes them. Binders that each build their own close the direct producer under
+  each other and take the topic consumer from each other.
+- calls `JCSMPSession#closeSession()` and then `Context#destroy()` once it has destroyed its binders, if it created the
+  session and the context.
+
+---
+
 ## 9.4.0 to 9.5.0
 
 ### `/actuator/health` no longer carries a top-level `solaceBinder` component

@@ -6,7 +6,6 @@ import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestinat
 import com.solace.spring.cloud.stream.binder.tracing.TracingProxy;
 import com.solace.spring.cloud.stream.binder.util.LargeMessageSupport;
 import com.solacesystems.jcsmp.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
@@ -16,8 +15,14 @@ import org.springframework.messaging.MessagingException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Receives the direct messages of a session on its one default consumer, holds the topic subscriptions of the session,
+ * and hands each message to the topic consumers whose topics match.
+ * <p>
+ * JCSMP gives a session one default consumer, and the subscriptions belong to the session, so every binder on one
+ * session must use the same multiplexer.
+ */
 @Slf4j
-@RequiredArgsConstructor
 public class JCSMPInboundTopicMessageMultiplexer {
     private final JCSMPSession jcsmpSession;
     private final BeanFactory beanFactory;
@@ -50,6 +55,27 @@ public class JCSMPInboundTopicMessageMultiplexer {
 
     private final TopicFilterTree<JCSMPInboundTopicMessageProducer> topicFilterTree = new TopicFilterTree<>();
     private final Set<String> appliedSubscriptions = new HashSet<>();
+
+    public JCSMPInboundTopicMessageMultiplexer(JCSMPSession jcsmpSession) {
+        this(jcsmpSession, null, Optional.empty(), Optional.empty());
+    }
+
+    /**
+     * @deprecated The multiplexer serves every binder on its session, so the bean factory, the meter accessor and the
+     * tracing proxy of a binder go with each topic consumer it creates. Use
+     * {@link #JCSMPInboundTopicMessageMultiplexer(JCSMPSession)} and
+     * {@link #createTopicMessageProducer(ConsumerDestination, String, ExtendedConsumerProperties, BeanFactory, Optional, Optional)}.
+     */
+    @Deprecated(forRemoval = true)
+    public JCSMPInboundTopicMessageMultiplexer(JCSMPSession jcsmpSession,
+                                               BeanFactory beanFactory,
+                                               Optional<SolaceMeterAccessor> solaceMeterAccessorSupplier,
+                                               Optional<TracingProxy> tracingProxy) {
+        this.jcsmpSession = jcsmpSession;
+        this.beanFactory = beanFactory;
+        this.solaceMeterAccessorSupplier = solaceMeterAccessorSupplier;
+        this.tracingProxy = tracingProxy;
+    }
 
     private void ensureXMLMessageConsumer() {
         if (msgConsumer.get() != null) {
@@ -100,7 +126,7 @@ public class JCSMPInboundTopicMessageMultiplexer {
         }
     }
 
-    private void updateTopics() {
+    private synchronized void updateTopics() {
         Set<String> allTopics = new HashSet<>();
         synchronized (jcsmpInboundTopicMessageProducers) {
             topicFilterTree.clear();
@@ -142,9 +168,25 @@ public class JCSMPInboundTopicMessageMultiplexer {
         }
     }
 
+    /**
+     * @deprecated Gives the topic consumer the bean factory, the meter accessor and the tracing proxy the multiplexer
+     * was built with, which only one binder can own. Use
+     * {@link #createTopicMessageProducer(ConsumerDestination, String, ExtendedConsumerProperties, BeanFactory, Optional, Optional)}.
+     */
+    @Deprecated(forRemoval = true)
     public JCSMPInboundTopicMessageProducer createTopicMessageProducer(ConsumerDestination destination, String group, ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
+        return createTopicMessageProducer(destination, group, properties, beanFactory, solaceMeterAccessorSupplier, tracingProxy);
+    }
+
+    public JCSMPInboundTopicMessageProducer createTopicMessageProducer(ConsumerDestination destination,
+                                                                       String group,
+                                                                       ExtendedConsumerProperties<SolaceConsumerProperties> properties,
+                                                                       BeanFactory beanFactoryOfTheBinder,
+                                                                       Optional<SolaceMeterAccessor> solaceMeterAccessorOfTheBinder,
+                                                                       Optional<TracingProxy> tracingProxyOfTheBinder) {
         this.ensureXMLMessageConsumer();
-        return new JCSMPInboundTopicMessageProducer((SolaceConsumerDestination) destination, group, properties, beanFactory, this.solaceMeterAccessorSupplier, tracingProxy, livecycleHooks);
+        return new JCSMPInboundTopicMessageProducer((SolaceConsumerDestination) destination, group, properties,
+                beanFactoryOfTheBinder, solaceMeterAccessorOfTheBinder, tracingProxyOfTheBinder, livecycleHooks);
     }
 
     public interface LivecycleHooks {
