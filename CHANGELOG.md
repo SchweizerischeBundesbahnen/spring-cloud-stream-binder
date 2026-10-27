@@ -4,8 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- A constructor of `SolaceMessageChannelBinder` that takes the `JCSMPSessionProducerManager` and the `JCSMPInboundTopicMessageMultiplexer`, for binders that work on one session together.
+
 ### Fixed
 - STTRS-3452: A queue consumer whose start failed kept its flow and receiver threads running. Spring Cloud Stream records such a binding as failed, so neither stopping nor pausing it reached that flow, and it went on taking messages from the queue until the session closed. A failed start now closes the flow, stops the receiver threads and drops the binding health indicator, and a flow delivers messages only once its queue subscriptions are in place. A stop on a thread that Spring's shutdown hook has interrupted, as happens to a context that is still starting, now waits for the receiver threads instead of forgetting them, so a restart can no longer revive them ([#168](https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/issues/168)).
+- STTRS-3449: Closing one Spring context no longer closes the JCSMP session of every other context in the JVM. The contexts share one cached session, and `SolaceMessageChannelBinder#destroy` closed it while `JCSMPSessionConfiguration` cleared the whole cache, so the others failed with `Producer is already closed this can never recover` or `Session is closed`. Each context now holds a share of the session and gives it back when it closes; the last one closes the session. A test suite that caches several contexts, or closes one with `@DirtiesContext`, was hit; an application with a single context was not.
+- STTRS-3449: A binder whose last producer binding stops no longer closes the direct producer of every other binder on the same session. JCSMP hands all of them the one default producer of the session, and each binder managed it on its own. The binders of one session now share the `JCSMPSessionProducerManager` cached with the session.
+- STTRS-3449: A topic consumer (`qualityOfService: AT_MOST_ONCE`) keeps receiving when another binder on the same session binds one, and a second binder can bind a topic consumer on a topic the first one consumes. Each binder fetched the default consumer of the session for itself and held its own topic subscriptions, so the second one took the consumer from the first, and the broker refused its subscription with `400: Subscription Already Exists`. The binders of one session now share the `JCSMPInboundTopicMessageMultiplexer` cached with the session.
+
+### Deprecated
+- The constructor of `JCSMPInboundTopicMessageMultiplexer` that takes a `BeanFactory`, a meter accessor and a tracing proxy, and `createTopicMessageProducer` without them. Use the constructor that takes the session alone, and hand the binder's own bean factory, meter accessor and tracing proxy to `createTopicMessageProducer`.
+- The constructors of `SolaceMessageChannelBinder` and `SolaceMessageChannelBinderConfiguration` that take a `Context`. Use the constructors without it. `SolaceMessageChannelBinder#destroy` no longer closes the session or destroys the context it is handed, whichever constructor built it: code that builds a binder by hand closes its own session and context. See [MIGRATION.md](MIGRATION.md).
 
 ## [9.5.2] - 2026-10-08
 

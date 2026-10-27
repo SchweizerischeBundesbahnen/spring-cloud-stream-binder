@@ -107,6 +107,22 @@ This document describes specialized AI agents that can work on this codebase. Ea
   reporting the connection `UP` for the life of the process. `SolaceBinderConfigIT`
   pins this; registration is idempotent because each context resolves several beans through the same
   call.
+- Each `JCSMPSessionConfiguration` instance — one per context — holds its share of the cached
+  session, and its `@PreDestroy` gives the share back together with the event handlers it attached.
+  The session closes with the last share. Nothing else may close it: `SolaceMessageChannelBinder`
+  works on a session it was handed and leaves it open on `destroy()`, because the binders of other
+  contexts still publish on it — a test suite with a context cache is the usual case.
+  `JCSMPSessionSharingIT` pins this.
+- `JCSMPSession#getMessageProducer` does not open a second default producer, whatever its Javadoc
+  says: closing the producer one caller got closes it for every other caller on the session. The
+  binders of one session therefore share the one `JCSMPSessionProducerManager` cached with the
+  session; a manager of their own closes the direct producer of every other binder when its last
+  binding stops. `JCSMPSessionSharingIT` pins this.
+- The default consumer and the topic subscriptions belong to the session as well: a second
+  `JCSMPSession#getMessageConsumer` takes the consumer away from the first caller, and the broker
+  refuses a second subscription on a topic with `400: Subscription Already Exists`. The binders of
+  one session therefore share the one `JCSMPInboundTopicMessageMultiplexer` cached with the
+  session. `JCSMPSessionSharingIT` pins this.
 
 ---
 

@@ -5,8 +5,6 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceProducerProperties
 import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
 import com.solace.spring.cloud.stream.binder.util.JCSMPSessionEventHandler;
 import com.solace.test.integration.semp.v2.SempV2Api;
-import com.solacesystems.jcsmp.ContextProperties;
-import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPSession;
 import lombok.Getter;
 import lombok.Setter;
@@ -94,7 +92,7 @@ public class SpringCloudStreamContext extends PartitionCapableBinderTests<Solace
             log.info("Creating new test binder");
             GenericApplicationContext context = new GenericApplicationContext();
             BeanFactory beanFactory = context.getBeanFactory();
-            testBinder = new SolaceTestBinder(jcsmpSession, JCSMPFactory.onlyInstance().createContext(new ContextProperties()), sempV2Api, beanFactory);
+            testBinder = new SolaceTestBinder(jcsmpSession, sempV2Api, beanFactory);
         }
         return testBinder;
     }
