@@ -429,11 +429,11 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: Empty `Map<String, Object>`
 
 `nonserializableHeaderConvertToString`
-:   When set to `true`, irreversibly convert non-serializable headers to strings. An exception is thrown otherwise.
+:   When set to `true`, irreversibly convert a header whose value is not a native SMF user property type (for example a `UUID` or an application object) to the String its `toString()` returns. When `false`, such a header makes the publish fail with a `MessagingException`; the binder never Java-serializes it.
     Default: `false`
 
 > [!IMPORTANT]
-> Non-serializable headers should have a meaningful `toString()` implementation. Otherwise enabling this feature may result in potential data loss.
+> Such headers should have a meaningful `toString()` implementation. Otherwise enabling this feature may result in potential data loss.
 
 `provisionDurableQueue`
 :   Whether to provision durable queues for non-anonymous consumer groups or queue destinations. This should only be set to `false` if you have externally pre-provisioned the required queue on the message broker.
@@ -527,7 +527,7 @@ See [SolaceCommonProperties](src/main/java/com/solace/spring/cloud/stream/binder
     Default: `60000` (60 seconds)
 
 > [!IMPORTANT]
-> Retrying only mitigates *transient*, synchronous publish failures. Regardless of `sendRetryTimeoutMs`, a call to `StreamBridge.send(...)` (and therefore the binder's outbound message handler) can still throw an `org.springframework.messaging.MessagingException` — for example once the retry window is exhausted, or when the message cannot be mapped/serialized, or when the producer binding is not running. **Producers must always be prepared to catch `org.springframework.messaging.MessagingException`.** See the binder examples for the recommended pattern.
+> Retrying only mitigates *transient*, synchronous publish failures. Regardless of `sendRetryTimeoutMs`, a call to `StreamBridge.send(...)` (and therefore the binder's outbound message handler) can still throw an `org.springframework.messaging.MessagingException` — for example once the retry window is exhausted, or when the message cannot be mapped, or when the producer binding is not running. **Producers must always be prepared to catch `org.springframework.messaging.MessagingException`.** See the binder examples for the recommended pattern.
 
 #### Solace Connection Health-Check Properties
 
@@ -613,9 +613,9 @@ These can be used for:
 | `solace_scst_messageVersion` | Integer | Read | 1 | A static number set by the publisher to indicate the Spring Cloud Stream Solace message version. |
 | `solace_scst_nullPayload` | Boolean | Read | Absent unless inbound payload was null | Present and true to indicate when the PubSub+ message payload was null. |
 | `solace_scst_partitionKey` | String | Read/Write | Unset | The partition key for PubSub+ partitioned queues. Set it on a produced message to route it to a partition; it is also populated on consumed messages from the Solace `JMSXGroupID` property so applications can read each message's partition key. |
-| `solace_scst_serializedHeaders` | String | Internal Binder Use Only | Unset | A JSON String array of header names where each entry indicates that the header's value was serialized by a Solace Spring Cloud Stream binder before publishing it to a broker. |
-| `solace_scst_serializedHeadersEncoding` | String | Internal Binder Use Only | `"base64"` when serialized headers are present | The encoding algorithm used to encode the headers indicated by `solace_scst_serializedHeaders`. |
-| `solace_scst_serializedPayload` | Boolean | Internal Binder Use Only | Unset | Is `true` if a Solace Spring Cloud Stream binder has serialized the payload before publishing it to a broker. Is undefined otherwise. |
+| `solace_scst_serializedHeaders` | String | Internal Binder Use Only | Unset | Written only by older binders, which Java-serialized headers: a JSON String array of those headers. This binder never writes it and does not deserialize those headers; see [Receiving Java-Serialized Content](#receiving-java-serialized-content). |
+| `solace_scst_serializedHeadersEncoding` | String | Internal Binder Use Only | Unset | Written only by older binders: the encoding of the headers named in `solace_scst_serializedHeaders`. This binder never writes it. |
+| `solace_scst_serializedPayload` | Boolean | Internal Binder Use Only | Unset | Written only by older binders: `true` when they Java-serialized the payload. This binder never writes it and does not deserialize that payload; see [Receiving Java-Serialized Content](#receiving-java-serialized-content). |
 | `solace_scst_targetDestinationType` | String | Write | Binding destination type | Only applicable when `BinderHeaders.TARGET_DESTINATION` (`scst_targetDestination`) is set.<br>`topic`: the dynamic destination is a topic.<br>`queue`: the dynamic destination is a queue.<br>When absent, the binding's configured destination-type is used. |
 
 ## Native Payload Types
@@ -629,12 +629,21 @@ Below are the payload types natively supported by this binder (before/after [Con
 | SDTStream | Stream Message | Basic PubSub+ payload type. |
 | SDTMap | Map Message | Basic PubSub+ payload type. |
 | String | XML-Content Message | Basic PubSub+ payload type. Only available for consumption. |
-| Serializable | Bytes Message | This is not a basic payload type supported by the PubSub+ broker, but is one defined and coordinated by this binder. **Publishing:** When a `Serializable` payload which doesn't satisfy any of the basic PubSub+ payload types is given to the binder to publish, the binder will serialize this payload to a `byte[]` and set the user property, `solace_scst_serializedPayload`, to `true`. **Consuming:** When the binder consumes a binary message which has the `solace_scst_serializedPayload` user property set to `true`, the binder will deserialize the binary attachment. |
+
+Any other payload makes the publish fail with a `MessagingException`. The binder does not Java-serialize payloads: convert an application object to one of the types above first, for example with a JSON message converter, which Spring Cloud Stream applies by default unless `useNativeEncoding=true`.
 
 > [!TIP]
 > Typically, the Spring Cloud Stream framework will convert a published payload into a `byte[]` before giving it to the binder. In which case, this binder will publish a binary message.
 > If this occurs, but you wish to publish other message types, then one option is to set `useNativeEncoding=true` on your producer (but read the caveats carefully before enabling this feature), and have your message handler return a payload of one of this binder's supported native payload types; e.g. return `Message<SDTStream>` to publish a stream message.
 > See [Content Type Negotiation](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#content-type-management) for more info on how Spring Cloud Streams converts payloads and other options to control message conversion.
+
+### Receiving Java-Serialized Content
+
+Older binders Java-serialized a `Serializable` payload or header that is not a native type, and marked it with `solace_scst_serializedPayload` or `solace_scst_serializedHeaders`. This binder does not deserialize such content, because deserializing bytes from the wire can run code from any class on the consumer's classpath. It passes the content on as received and logs the message id, the payload size and the names of the serialized headers at `INFO`:
+
+* a serialized payload arrives as the `byte[]` of the binary attachment;
+* a serialized header arrives as its base64 String, or as a `byte[]` when it was written as a byte array;
+* the marker headers themselves are not passed on.
 
 ### XML-Content Payloads
 
@@ -1065,7 +1074,7 @@ By default, asynchronous producer errors aren't handled by the framework. Produc
 Beyond that, this binder also supports using a `Future` to wait for publish confirmations. See [Publisher Confirmations](#publisher-confirmations) for more info.
 
 > [!IMPORTANT]
-> A synchronous call to `StreamBridge.send(...)` (and to any producer binding backed by this binder) can throw an `org.springframework.messaging.MessagingException`. This happens, for example, when the producer binding is not running, when a message cannot be mapped/serialized, or when publishing keeps failing until the [`sendRetryTimeoutMs`](#solace-producer-properties) retry window is exhausted. With `sendRetryTimeoutMs` (default `60000`) the binder first retries transient publish failures; once the window elapses it re-throws the failure as a `MessagingException`. Setting `sendRetryTimeoutMs: 0` disables retrying and propagates the failure immediately. **Regardless of the retry setting, producers must always wrap `StreamBridge.send(...)` in a `try/catch` for `org.springframework.messaging.MessagingException`.**
+> A synchronous call to `StreamBridge.send(...)` (and to any producer binding backed by this binder) can throw an `org.springframework.messaging.MessagingException`. This happens, for example, when the producer binding is not running, when a message cannot be mapped, or when publishing keeps failing until the [`sendRetryTimeoutMs`](#solace-producer-properties) retry window is exhausted. With `sendRetryTimeoutMs` (default `60000`) the binder first retries transient publish failures; once the window elapses it re-throws the failure as a `MessagingException`. Setting `sendRetryTimeoutMs: 0` disables retrying and propagates the failure immediately. **Regardless of the retry setting, producers must always wrap `StreamBridge.send(...)` in a `try/catch` for `org.springframework.messaging.MessagingException`.**
 >
 > ```java
 > try {

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking Changes
+- STTRS-3496: The binder no longer Java-serializes a payload or header that is not a native SMF type, and no longer deserializes one that an older binder serialized. Deserializing bytes from the wire runs code from any class on the consumer's classpath, and Spring deprecated the `SerializationUtils.deserialize` the binder relied on for exactly that reason. Such a payload, or such a header without `nonserializableHeaderConvertToString`, now makes the publish fail with a `MessagingException`, which goes to the producer's error channel. Java-serialized content from an older binder is passed on as received, and logged at `INFO`. See [MIGRATION.md](MIGRATION.md).
+
+### Changed
+- STTRS-3496: A `contentType` header held as a `MimeType` is written as its String form, and the `deliveryAttempt` header of the inbound message is no longer forwarded, so the receiver always starts its own count.
+
 ### Added
 - A constructor of `SolaceMessageChannelBinder` that takes the `JCSMPSessionProducerManager` and the `JCSMPInboundTopicMessageMultiplexer`, for binders that work on one session together.
 

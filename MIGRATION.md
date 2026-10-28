@@ -6,6 +6,32 @@ This document contains migration guides for version upgrades of the Spring Cloud
 
 ## Unreleased
 
+### Payloads and headers are no longer Java-serialized
+
+The binder used to Java-serialize a `Serializable` payload or header that SMF cannot carry natively and to
+deserialize it again on the consumer. Deserializing bytes from the wire runs code from any class on the consumer's
+classpath, so the binder does neither any more.
+
+When publishing:
+
+- a payload other than `byte[]`, `String`, `SDTStream` or `SDTMap` makes the publish fail with a `MessagingException`.
+  Let Spring Cloud Stream convert the object, for example to JSON, which it does by default unless
+  `useNativeEncoding=true`, or convert it yourself before sending.
+- a header whose value is not a native SMF user property type, such as a `UUID`, a `List` or an application object,
+  makes the publish fail with a `MessagingException` as well. Convert it to a `String` or `byte[]` yourself, or set
+  `nonserializableHeaderConvertToString: true` to have the binder write its `toString()`.
+- a `contentType` header held as a `MimeType` is written as its String form. The `deliveryAttempt` header is not
+  forwarded, so a consumer always starts its own count at zero.
+
+When consuming a message an older binder published with Java-serialized content:
+
+- a serialized payload arrives as the `byte[]` of the binary attachment;
+- a serialized header arrives as its base64 String, or as a `byte[]` when it was written as a byte array;
+- the binder logs the message id, the payload size and the names of the serialized headers at `INFO`.
+
+Upgrade the consumers of such a message only after their producers publish native types, or have the consumer
+convert the received bytes itself.
+
 ### `SolaceMessageChannelBinder#destroy` leaves the session and its `Context` open
 
 The JCSMP session can be shared with the binders of other Spring contexts, so a binder never closes the session it

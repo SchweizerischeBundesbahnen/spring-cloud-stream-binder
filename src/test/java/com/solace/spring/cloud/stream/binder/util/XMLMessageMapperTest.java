@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.function.ThrowingConsumer;
 import org.junit.jupiter.api.function.ThrowingSupplier;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -39,16 +38,13 @@ import org.springframework.messaging.support.GenericMessage;
 import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.SerializationUtils;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.ObjectReader;
-import tools.jackson.databind.ObjectWriter;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -62,7 +58,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @Slf4j
 @ExtendWith(MockitoExtension.class)
 public class XMLMessageMapperTest {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Log logger = LogFactory.getLog(XMLMessageMapperTest.class);
     private static final Set<String> JMS_INVALID_HEADER_NAMES = new HashSet<>(Arrays.asList("~ab;c", "NULL",
             "TRUE", "FALSE", "NOT", "AND", "OR", "BETWEEN", "LIKE", "IN", "IS", "ESCAPE", "JMSX_abc", "JMS_abc"));
@@ -75,8 +70,6 @@ public class XMLMessageMapperTest {
         assertTrue(JMS_INVALID_HEADER_NAMES.stream().anyMatch(h -> h.startsWith("JMS_")));
     }
 
-    private final ObjectWriter objectWriter = OBJECT_MAPPER.writer();
-    private final ObjectReader objectReader = OBJECT_MAPPER.reader();
     @Spy
     private final XMLMessageMapper xmlMessageMapper = new XMLMessageMapper();
 
@@ -92,12 +85,6 @@ public class XMLMessageMapperTest {
                         MimeTypeUtils.TEXT_PLAIN,
                         () -> "testPayload",
                         TextMessage::getText))),
-                Arguments.of(Named.of("SERIALIZABLE", new SpringMessageTypeProvider<>(
-                        BytesMessage.class,
-                        new MimeType("application", "x-java-serialized-object"),
-                        () -> new SerializableFoo("abc123", "HOOPLA!"),
-                        m -> deserialize(m.getData()),
-                        true))),
                 Arguments.of(Named.of("SDT_STREAM", new SpringMessageTypeProvider<>(
                         StreamMessage.class,
                         new MimeType("application", "x-java-serialized-object"),
@@ -132,13 +119,6 @@ public class XMLMessageMapperTest {
                         MimeTypeUtils.APPLICATION_OCTET_STREAM,
                         () -> RandomStringUtils.randomAlphabetic(10).getBytes(StandardCharsets.UTF_8),
                         BytesMessage::setData))),
-                Arguments.of(Named.of("SERIALIZABLE", new XmlMessageTypeProvider<>(
-                        BytesMessage.class,
-                        new MimeType("application", "x-java-serialized-object"),
-                        () -> new SerializableFoo(RandomStringUtils.randomAlphabetic(10),
-                                RandomStringUtils.randomAlphabetic(10)),
-                        (msg, p) -> msg.setData(SerializationUtils.serialize(p)),
-                        props -> props.putBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD, true)))),
                 Arguments.of(Named.of("STRING", new XmlMessageTypeProvider<>(
                         TextMessage.class,
                         MimeTypeUtils.TEXT_PLAIN,
@@ -191,12 +171,6 @@ public class XMLMessageMapperTest {
                 .satisfies(
                         m -> Assertions.assertThat(springMessageTypeProvider.extractSmfPayload(m))
                                 .isEqualTo(testSpringMessage.getPayload()),
-                        m -> {
-                            if (springMessageTypeProvider.serializedPayload()) {
-                                Assertions.assertThat(m.getProperties().getBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD))
-                                        .isTrue();
-                            }
-                        },
                         m -> validateXMLProperties(m, testSpringMessage)
                 );
     }
@@ -310,9 +284,6 @@ public class XMLMessageMapperTest {
             messageBuilder.setHeader(header.getKey(), new Object());
         }
 
-        // Non serializable header.
-        messageBuilder.setHeader("my-header", UUID.randomUUID());
-
         Message<?> testSpringMessage = messageBuilder.build();
         XMLMessage xmlMessage = xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT);
 
@@ -341,15 +312,7 @@ public class XMLMessageMapperTest {
                             xmlMessage.getProperties().getInteger(header.getKey()));
                     break;
                 case SolaceBinderHeaders.SERIALIZED_HEADERS:
-                    String serializedHeadersJson = xmlMessage.getProperties().getString(header.getKey());
-                    assertThat(serializedHeadersJson, not(emptyString()));
-                    assertThat(objectReader.forType(new TypeReference<Set<String>>() {
-                            })
-                            .readValue(serializedHeadersJson), not(empty()));
-                    break;
                 case SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING:
-                    assertEquals("base64", xmlMessage.getProperties().getString(header.getKey()));
-                    break;
                 case SolaceBinderHeaders.SERIALIZED_PAYLOAD:
                 case SolaceBinderHeaders.CONFIRM_CORRELATION:
                 case SolaceBinderHeaders.NULL_PAYLOAD:
@@ -379,31 +342,56 @@ public class XMLMessageMapperTest {
 
     @Test
     void testMapSpringMessageToXMLMessage_WriteUndefinedSolaceHeader() throws Exception {
-        String undefinedSolaceHeader1 = "abc1234";
-        SerializableFoo undefinedSolaceHeader2 = new SerializableFoo("abc", "123");
+        String undefinedSolaceHeader = "abc1234";
         Message<?> testSpringMessage = new DefaultMessageBuilderFactory()
                 .withPayload("")
                 .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
-                .setHeader("solace_foo1", undefinedSolaceHeader1)
-                .setHeader("solace_foo2", undefinedSolaceHeader2)
+                .setHeader("solace_foo1", undefinedSolaceHeader)
                 .build();
 
         XMLMessage xmlMessage = xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT);
 
-        assertEquals(undefinedSolaceHeader1, xmlMessage.getProperties().getString("solace_foo1"));
-        assertEquals(undefinedSolaceHeader2, deserialize(Base64.getDecoder()
-                .decode(xmlMessage.getProperties().getString("solace_foo2"))));
-
-        assertEquals("base64", xmlMessage.getProperties().getString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING));
-        String serializedHeadersJson = xmlMessage.getProperties().getString(SolaceBinderHeaders.SERIALIZED_HEADERS);
-        assertThat(serializedHeadersJson, not(emptyString()));
-        Set<String> serializedHeaders = objectReader.forType(new TypeReference<Set<String>>() {
-                })
-                .readValue(serializedHeadersJson);
-        assertThat(serializedHeaders, not(empty()));
-        assertThat(serializedHeaders, hasItem("solace_foo2"));
-
+        assertEquals(undefinedSolaceHeader, xmlMessage.getProperties().getString("solace_foo1"));
         validateXMLProperties(xmlMessage, testSpringMessage);
+    }
+
+    @Test
+    void sendingASerializablePayloadIsRejectedInsteadOfJavaSerialized() {
+        Message<?> testSpringMessage = new DefaultMessageBuilderFactory()
+                .withPayload(new SerializableFoo("abc", "123"))
+                .build();
+
+        SolaceMessageConversionException exception = assertThrows(SolaceMessageConversionException.class,
+                () -> xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT));
+
+        Assertions.assertThat(exception).hasMessage(String.format(
+                "Invalid payload received. Expected byte[], String, SDTStream, SDTMap. Received: %s",
+                SerializableFoo.class.getName()));
+    }
+
+    @Test
+    void sendingAMimeTypeContentTypeWritesItsStringForm() throws Exception {
+        Message<?> testSpringMessage = new DefaultMessageBuilderFactory()
+                .withPayload("test")
+                .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.APPLICATION_JSON)
+                .build();
+
+        XMLMessage xmlMessage = xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT);
+
+        assertEquals(MimeTypeUtils.APPLICATION_JSON_VALUE,
+                xmlMessage.getProperties().getString(MessageHeaders.CONTENT_TYPE));
+    }
+
+    @Test
+    void sendingDoesNotForwardTheDeliveryAttemptOfTheInboundMessage() {
+        Message<?> testSpringMessage = new DefaultMessageBuilderFactory()
+                .withPayload("test")
+                .setHeader(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT, new AtomicInteger(3))
+                .build();
+
+        XMLMessage xmlMessage = xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT);
+
+        assertFalse(xmlMessage.getProperties().containsKey(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT));
     }
 
     @Test
@@ -583,13 +571,13 @@ public class XMLMessageMapperTest {
     @Test
     void testMapProducerSpringMessageToXMLMessage_WithExcludedHeader_ShouldNotFilterSolaceHeader() throws SDTException {
         MessageBuilder<?> messageBuilder = new DefaultMessageBuilderFactory()
-                .withPayload(new SerializableFoo("a", "b"))
+                .withPayload("test")
                 .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
                 .setHeader(SolaceBinderHeaders.LARGE_MESSAGE_SUPPORT, true)
                 .setHeader(SolaceBinderHeaders.CHUNK_ID, 123L)
                 .setHeader(SolaceBinderHeaders.CHUNK_COUNT, 2)
                 .setHeader(SolaceBinderHeaders.CHUNK_INDEX, 0)
-                .setHeader("test-serializable-header", new SerializableFoo("a", "b"));
+                .setHeader("test-header", "test");
 
         Set<Map.Entry<String, ? extends HeaderMeta<?>>> writeableHeaders = Stream.of(
                         SolaceHeaderMeta.META.entrySet().stream(),
@@ -665,13 +653,8 @@ public class XMLMessageMapperTest {
             }
         }
 
-        Assertions.assertThat(SolaceBinderHeaderMeta.META
-                        .entrySet()
-                        .stream()
-                        .filter(e -> SolaceHeaderMeta.Scope.WIRE.equals(e.getValue().getScope()))
-                        .filter(e -> !e.getValue().isWritable()) // already tested earlier in this test
-                        .map(Map.Entry::getKey))
-                .allSatisfy(h -> Assertions.assertThat(xmlMessage.getProperties().get(h)).isNotNull());
+        assertEquals((Integer) XMLMessageMapper.MESSAGE_VERSION,
+                xmlMessage.getProperties().getInteger(SolaceBinderHeaders.MESSAGE_VERSION));
 
         Mockito.verify(xmlMessageMapper).map(testSpringMessage, excludedHeaders, false, DeliveryMode.PERSISTENT);
     }
@@ -688,7 +671,6 @@ public class XMLMessageMapperTest {
         metadata.putString(MessageHeaders.CONTENT_TYPE, xmlMessageTypeProvider.getMimeType().toString());
         metadata.putString("test-header-1", "test-header-val-1");
         metadata.putString("test-header-2", "test-header-val-2");
-        xmlMessageTypeProvider.injectAdditionalXMLMessageProperties(metadata);
         xmlMessage.setProperties(metadata);
 
         AcknowledgmentCallback acknowledgmentCallback = Mockito.mock(AcknowledgmentCallback.class);
@@ -713,7 +695,6 @@ public class XMLMessageMapperTest {
         metadata.putString(MessageHeaders.CONTENT_TYPE, xmlMessageTypeProvider.getMimeType().toString());
         metadata.putString("test-header-1", "test-header-val-1");
         metadata.putString("test-header-2", "test-header-val-2");
-        xmlMessageTypeProvider.injectAdditionalXMLMessageProperties(metadata);
         xmlMessage.setProperties(metadata);
 
         AcknowledgmentCallback acknowledgmentCallback = Mockito.mock(AcknowledgmentCallback.class);
@@ -736,7 +717,6 @@ public class XMLMessageMapperTest {
 
         SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
         metadata.putString(MessageHeaders.CONTENT_TYPE, xmlMessageTypeProvider.getMimeType().toString());
-        xmlMessageTypeProvider.injectAdditionalXMLMessageProperties(metadata);
         xmlMessage.setProperties(metadata);
         xmlMessage.setHTTPContentType(MimeTypeUtils.TEXT_HTML_VALUE);
 
@@ -959,7 +939,7 @@ public class XMLMessageMapperTest {
         for (Map.Entry<String, ? extends HeaderMeta<?>> header : nonReadableHeaders) {
             switch (header.getKey()) {
                 case SolaceBinderHeaders.SERIALIZED_HEADERS:
-                    metadata.putString(header.getKey(), objectWriter.writeValueAsString(Collections.emptyList()));
+                    metadata.putString(header.getKey(), "[]");
                     break;
                 case SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING:
                     metadata.putString(header.getKey(), "base64");
@@ -1087,30 +1067,36 @@ public class XMLMessageMapperTest {
 
     @Test
     void testMapXMLMessageToSpringMessage_ReadUndefinedSolaceHeader() throws Exception {
-        String undefinedSolaceHeader1 = "abc124";
-        SerializableFoo undefinedSolaceHeader2 = new SerializableFoo("a", "b");
+        String undefinedSolaceHeader = "abc124";
         TextMessage xmlMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         xmlMessage.setText("test");
-        Set<String> serializedHeaders = Collections.singleton("solace_foo2");
         SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
-        metadata.putString("solace_foo1", undefinedSolaceHeader1);
-        metadata.putBytes("solace_foo2", SerializationUtils.serialize(undefinedSolaceHeader2));
-        metadata.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, objectWriter.writeValueAsString(serializedHeaders));
+        metadata.putString("solace_foo1", undefinedSolaceHeader);
         metadata.putString(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE);
         xmlMessage.setProperties(metadata);
 
         AcknowledgmentCallback acknowledgmentCallback = Mockito.mock(AcknowledgmentCallback.class);
-        SolaceConsumerProperties consumerProperties = new SolaceConsumerProperties();
+        Message<?> springMessage = xmlMessageMapper.map(xmlMessage, acknowledgmentCallback, new SolaceConsumerProperties());
 
-        Message<?> springMessage;
-        MessageHeaders springMessageHeaders;
-        springMessage = xmlMessageMapper.map(xmlMessage, acknowledgmentCallback, consumerProperties);
-        springMessageHeaders = springMessage.getHeaders();
-
-        assertEquals(undefinedSolaceHeader1, springMessageHeaders.get("solace_foo1", String.class));
-        assertEquals(undefinedSolaceHeader2, springMessageHeaders.get("solace_foo2", SerializableFoo.class));
-
+        assertEquals(undefinedSolaceHeader, springMessage.getHeaders().get("solace_foo1", String.class));
         validateSpringHeaders(springMessage.getHeaders(), xmlMessage);
+    }
+
+    @Test
+    void receivingAJavaSerializedPayloadOfAnOlderBinderPassesItsBytesOnUntouched() throws Exception {
+        byte[] serializedPayload = SerializationUtils.serialize(new SerializableFoo("abc123", "HOOPLA!"));
+        BytesMessage xmlMessage = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
+        xmlMessage.setData(serializedPayload);
+        SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
+        metadata.putString(MessageHeaders.CONTENT_TYPE, "application/x-java-serialized-object");
+        metadata.putBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD, true);
+        xmlMessage.setProperties(metadata);
+
+        Message<?> springMessage = xmlMessageMapper.map(xmlMessage, Mockito.mock(AcknowledgmentCallback.class),
+                new SolaceConsumerProperties());
+
+        Assertions.assertThat(springMessage.getPayload()).isEqualTo(serializedPayload);
+        Assertions.assertThat(springMessage.getHeaders()).doesNotContainKey(SolaceBinderHeaders.SERIALIZED_PAYLOAD);
     }
 
     @Test
@@ -1139,26 +1125,6 @@ public class XMLMessageMapperTest {
 
         assertEquals(xmlContent, new String((byte[]) springMessage.getPayload(), StandardCharsets.UTF_8));
         assertNull(springMessage.getHeaders().get(SolaceBinderHeaders.NULL_PAYLOAD));
-    }
-
-    @Test
-    void testMapXMLMessageToSpringMessage_WithListPayload() throws Exception {
-        BytesMessage xmlMessage = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
-        List<SerializableFoo> expectedPayload = Collections.singletonList(new SerializableFoo(
-                RandomStringUtils.randomAlphanumeric(100), RandomStringUtils.randomAlphanumeric(100)));
-        xmlMessage.setData(SerializationUtils.serialize(expectedPayload));
-        SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
-        metadata.putString(MessageHeaders.CONTENT_TYPE, "application/x-java-serialized-object");
-        metadata.putBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD, true);
-        xmlMessage.setProperties(metadata);
-        AcknowledgmentCallback acknowledgmentCallback = Mockito.mock(AcknowledgmentCallback.class);
-        SolaceConsumerProperties consumerProperties = new SolaceConsumerProperties();
-
-        Message<?> springMessage;
-        springMessage = xmlMessageMapper.map(xmlMessage, acknowledgmentCallback, consumerProperties);
-
-        validateSpringPayload(springMessage.getPayload(), expectedPayload);
-        validateSpringHeaders(springMessage.getHeaders(), xmlMessage);
     }
 
     @Test
@@ -1221,28 +1187,24 @@ public class XMLMessageMapperTest {
     }
 
     @Test
-    void testMapMessageHeadersToSDTMap_Serializable() throws Exception {
-        String key = "a";
+    void mappingASerializableHeaderIsRejectedInsteadOfJavaSerialized() {
+        Map<String, Object> headers = Collections.singletonMap("a", new SerializableFoo("abc123", "HOOPLA!"));
+
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+                () -> xmlMessageMapper.map(new MessageHeaders(headers), Collections.emptyList(), false));
+
+        assertThat(thrown.getMessage(), containsString("Invalid type as value - " + SerializableFoo.class.getSimpleName()));
+    }
+
+    @Test
+    void mappingASerializableHeaderWithStringConversionWritesItsToString() throws Exception {
         SerializableFoo value = new SerializableFoo("abc123", "HOOPLA!");
-        Map<String, Object> headers = new HashMap<>();
-        headers.put(key, value);
-        headers.put(BinderHeaders.TARGET_DESTINATION, "redirected-target");
 
-        SDTMap sdtMap = xmlMessageMapper.map(new MessageHeaders(headers), Collections.emptyList(), false);
+        SDTMap sdtMap = xmlMessageMapper.map(new MessageHeaders(Collections.singletonMap("a", value)),
+                Collections.emptyList(), true);
 
-        assertThat(sdtMap.keySet(), hasItem(key));
-        assertThat(sdtMap.keySet(), hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS));
-        assertThat(sdtMap.keySet(), hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING));
-        assertEquals("base64", sdtMap.getString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING));
-        assertThat(sdtMap.keySet(), not(hasItem(BinderHeaders.TARGET_DESTINATION)));
-        assertEquals(value, deserialize(Base64.getDecoder().decode(sdtMap.getString(key))));
-        String serializedHeadersJson = sdtMap.getString(SolaceBinderHeaders.SERIALIZED_HEADERS);
-        assertThat(serializedHeadersJson, not(emptyString()));
-        Set<String> serializedHeaders = objectReader.forType(new TypeReference<Set<String>>() {
-                })
-                .readValue(serializedHeadersJson);
-        assertThat(serializedHeaders, hasSize(1));
-        assertThat(serializedHeaders, hasItem(key));
+        assertEquals(value.toString(), sdtMap.getString("a"));
+        assertThat(sdtMap.keySet(), not(hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS)));
     }
 
     @Test
@@ -1287,20 +1249,20 @@ public class XMLMessageMapperTest {
     }
 
     @Test
-    void testMapSDTMapToMessageHeaders_Serializable() throws Exception {
-        String key = "a";
-        SerializableFoo value = new SerializableFoo("abc123", "HOOPLA!");
+    void receivingJavaSerializedHeadersOfAnOlderBinderPassesTheirValuesOnUntouched() throws Exception {
+        byte[] serializedValue = SerializationUtils.serialize(new SerializableFoo("abc123", "HOOPLA!"));
         SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
-        sdtMap.putObject(key, SerializationUtils.serialize(value));
-        List<String> serializedHeaders = Arrays.asList(key, key);
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, objectWriter.writeValueAsString(serializedHeaders));
+        sdtMap.putBytes("raw", serializedValue);
+        sdtMap.putString("encoded", Base64.getEncoder().encodeToString(serializedValue));
+        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, "[\"raw\",\"encoded\"]");
+        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, "base64");
 
         MessageHeaders messageHeaders = xmlMessageMapper.map(sdtMap, List.of());
 
-        assertThat(messageHeaders.keySet(), hasItem(key));
+        assertArrayEquals(serializedValue, messageHeaders.get("raw", byte[].class));
+        assertEquals(Base64.getEncoder().encodeToString(serializedValue), messageHeaders.get("encoded"));
         assertThat(messageHeaders.keySet(), not(hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS)));
-        assertEquals(value, messageHeaders.get(key));
-        assertNull(messageHeaders.get(SolaceBinderHeaders.SERIALIZED_HEADERS));
+        assertThat(messageHeaders.keySet(), not(hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING)));
     }
 
     @Test
@@ -1406,68 +1368,6 @@ public class XMLMessageMapperTest {
     }
 
     @Test
-    void testMapSDTMapToMessageHeaders_EncodedSerializable() throws Exception {
-        String key = "a";
-        SerializableFoo value = new SerializableFoo("abc123", "HOOPLA!");
-        SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
-        sdtMap.putString(key, Base64.getEncoder().encodeToString(SerializationUtils.serialize(value)));
-        Set<String> serializedHeaders = Collections.singleton(key);
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, objectWriter.writeValueAsString(serializedHeaders));
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, "base64");
-
-        MessageHeaders messageHeaders = xmlMessageMapper.map(sdtMap, List.of());
-
-        assertThat(messageHeaders.keySet(), hasItem(key));
-        assertThat(messageHeaders.keySet(), not(hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS)));
-        assertEquals(value, messageHeaders.get(key));
-        assertNull(messageHeaders.get(SolaceBinderHeaders.SERIALIZED_HEADERS));
-    }
-
-    @Test
-    void testMapSDTMapToMessageHeaders_ExtraSerializableHeader() throws Exception {
-        String key = "a";
-        SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
-        Set<String> serializedHeaders = Collections.singleton(key);
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, objectWriter.writeValueAsString(serializedHeaders));
-
-        MessageHeaders messageHeaders = xmlMessageMapper.map(sdtMap, List.of());
-
-        assertThat(messageHeaders.keySet(), not(hasItem(key)));
-        assertThat(messageHeaders.keySet(), not(hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS)));
-    }
-
-    @Test
-    void testMapSDTMapToMessageHeaders_NullSerializableHeader() throws Exception {
-        String key = "a";
-        SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
-        sdtMap.putObject(key, null);
-        Set<String> serializedHeaders = Collections.singleton(key);
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, objectWriter.writeValueAsString(serializedHeaders));
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, "base64");
-
-        MessageHeaders messageHeaders = xmlMessageMapper.map(sdtMap, List.of());
-
-        assertThat(messageHeaders.keySet(), hasItem(key));
-        assertNull(messageHeaders.get(key));
-        assertThat(messageHeaders.keySet(), not(hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS)));
-    }
-
-    @Test
-    void testFailMapSDTMapToMessageHeaders_InvalidEncoding() throws Exception {
-        String key = "a";
-        SerializableFoo value = new SerializableFoo("abc123", "HOOPLA!");
-        SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
-        sdtMap.putString(key, Base64.getEncoder().encodeToString(SerializationUtils.serialize(value)));
-        Set<String> serializedHeaders = Collections.singleton(key);
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, objectWriter.writeValueAsString(serializedHeaders));
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, "abc");
-
-        SolaceMessageConversionException exception = assertThrows(SolaceMessageConversionException.class,
-                () -> xmlMessageMapper.map(sdtMap, List.of()));
-        assertThat(exception.getMessage(), containsString("encoding is not supported"));
-    }
-
-    @Test
     void testMapSDTMapToMessageHeaders_NonJmsCompatible() throws Exception {
         byte[] value = "test".getBytes(); // byte[] values are not supported by JMS
         SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
@@ -1552,30 +1452,6 @@ public class XMLMessageMapperTest {
 
         assertEquals((Integer) XMLMessageMapper.MESSAGE_VERSION, metadata.getInteger(SolaceBinderHeaders.MESSAGE_VERSION));
 
-        Set<String> serializedHeaders = new HashSet<>();
-
-        if (metadata.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS)) {
-            XMLMessageMapper.Encoder encoder = XMLMessageMapper.Encoder
-                    .getByName(metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING));
-            Set<String> serializedHeadersSet = objectReader.forType(new TypeReference<Set<String>>() {
-                    })
-                    .readValue(metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS));
-            Assertions.assertThat(serializedHeadersSet)
-                    .isNotEmpty()
-                    .allSatisfy(h -> Assertions.assertThat(metadata.keySet()).contains(h))
-                    .allSatisfy(h -> {
-                        Object headerValue = deserialize(encoder != null ?
-                                encoder.decode(metadata.getString(h)) :
-                                metadata.getBytes(h));
-                        if (expectedHeaders.containsKey(h)) {
-                            assertEquals(expectedHeaders.get(h), headerValue);
-                        } else {
-                            assertNotNull(headerValue);
-                        }
-                    });
-            serializedHeaders.addAll(serializedHeadersSet);
-        }
-
         Map<String, SolaceHeaderMeta<?>> readWriteableSolaceHeaders = SolaceHeaderMeta.META
                 .entrySet()
                 .stream()
@@ -1588,7 +1464,7 @@ public class XMLMessageMapperTest {
                     if (readWriteableSolaceHeaders.containsKey(headerKey)) {
                         Object value = readWriteableSolaceHeaders.get(headerKey).getReadAction().apply(xmlMessage);
                         assertEquals(headerValue, value);
-                    } else if (!serializedHeaders.contains(headerKey)) {
+                    } else {
                         switch (headerKey) {
                             case SolaceBinderHeaders.PARTITION_KEY -> headerKey = XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY;
                             case XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY -> headerValue = expectedHeaders.getOrDefault(SolaceBinderHeaders.PARTITION_KEY, headerValue);
@@ -1628,25 +1504,8 @@ public class XMLMessageMapperTest {
                 .allSatisfy(customHeaderName ->
                         Assertions.assertThat(messageHeaders).doesNotContainKey(customHeaderName));
 
-        Set<String> serializedHeaders = new HashSet<>();
-        if (expectedHeaders.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS)) {
-            String serializedHeaderJson = expectedHeaders.getString(SolaceBinderHeaders.SERIALIZED_HEADERS);
-            Assertions.assertThat(serializedHeaderJson).isNotEmpty();
-            Set<String> serializedHeaderSet = objectReader.forType(new TypeReference<Set<String>>() {
-                    })
-                    .readValue(serializedHeaderJson);
-            Assertions.assertThat(serializedHeaderSet)
-                    .isNotEmpty()
-                    .allSatisfy(h -> Assertions.assertThat(expectedHeaders.keySet()).contains(h))
-                    .allSatisfy(h -> Assertions.assertThat(messageHeaders.keySet()).contains(h))
-                    .allSatisfy(h -> Assertions.assertThat(deserialize(expectedHeaders.getBytes(h)))
-                            .isEqualTo(messageHeaders.get(h)));
-
-            serializedHeaders.addAll(serializedHeaderSet);
-        }
-
         Assertions.assertThat(expectedHeaders.keySet())
-                .filteredOn(h -> !(nonReadableBinderHeaderMeta.contains(h) || serializedHeaders.contains(h)))
+                .filteredOn(h -> !nonReadableBinderHeaderMeta.contains(h))
                 .allSatisfy(h -> assertEquals(expectedHeaders.get(h), messageHeaders.get(h)));
 
         Assertions.assertThat(messageHeaders)
@@ -1690,23 +1549,11 @@ public class XMLMessageMapperTest {
         }
     }
 
-    @SuppressWarnings("deprecation")
-    private static Object deserialize(byte[] serialized) {
-        return SerializationUtils.deserialize(serialized);
-    }
-
     private record SpringMessageTypeProvider<T, MT extends XMLMessage>(
             Class<MT> expectedXmlMessageType,
             MimeType mimeType,
             ThrowingSupplier<T> createPayloadSupplier,
-            Function<MT, T> xmlMessagePayloadGetter,
-            boolean serializedPayload) {
-        public SpringMessageTypeProvider(Class<MT> expectedXmlMessageType,
-                                         MimeType mimeType,
-                                         ThrowingSupplier<T> createPayloadSupplier,
-                                         Function<MT, T> xmlMessagePayloadGetter) {
-            this(expectedXmlMessageType, mimeType, createPayloadSupplier, xmlMessagePayloadGetter, false);
-        }
+            Function<MT, T> xmlMessagePayloadGetter) {
 
         public T createPayload() {
             try {
@@ -1738,30 +1585,15 @@ public class XMLMessageMapperTest {
         private final MimeType mimeType;
         private final ThrowingSupplier<T> createPayloadSupplier;
         private final BiConsumer<MT, T> setXmlMessagePayloadFnc;
-        private final ThrowingConsumer<SDTMap> injectAdditionalXMLMessageProperties;
 
         private XmlMessageTypeProvider(Class<MT> xmlMessageType,
                                        MimeType mimeType,
                                        ThrowingSupplier<T> createPayloadSupplier,
                                        BiConsumer<MT, T> setXmlMessagePayloadFnc) {
-            this(xmlMessageType,
-                    mimeType,
-                    createPayloadSupplier,
-                    setXmlMessagePayloadFnc,
-                    props -> {
-                    });
-        }
-
-        private XmlMessageTypeProvider(Class<MT> xmlMessageType,
-                                       MimeType mimeType,
-                                       ThrowingSupplier<T> createPayloadSupplier,
-                                       BiConsumer<MT, T> setXmlMessagePayloadFnc,
-                                       ThrowingConsumer<SDTMap> injectAdditionalXMLMessageProperties) {
             this.xmlMessageType = xmlMessageType;
             this.mimeType = mimeType;
             this.createPayloadSupplier = createPayloadSupplier;
             this.setXmlMessagePayloadFnc = setXmlMessagePayloadFnc;
-            this.injectAdditionalXMLMessageProperties = injectAdditionalXMLMessageProperties;
         }
 
         public Class<MT> getXmlMessageType() {
@@ -1782,10 +1614,6 @@ public class XMLMessageMapperTest {
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
-        }
-
-        public void injectAdditionalXMLMessageProperties(SDTMap sdtMap) throws Throwable {
-            injectAdditionalXMLMessageProperties.accept(sdtMap);
         }
     }
 }

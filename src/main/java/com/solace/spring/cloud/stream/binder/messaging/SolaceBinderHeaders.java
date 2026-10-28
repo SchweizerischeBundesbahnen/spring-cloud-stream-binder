@@ -82,8 +82,8 @@ public final class SolaceBinderHeaders {
      * <p><b>Acceptable Value Type:</b> {@link Boolean}</p>
      * <p><b>Access:</b> Internal Binder Use Only</p>
      * <br>
-     * <p>Is {@code true} if a Solace Spring Cloud Stream binder has serialized the payload before publishing
-     * it to a broker. Is undefined otherwise.</p>
+     * <p>Written only by older binders: {@code true} when they Java-serialized the payload. This binder never
+     * writes it and passes such a payload on as the received {@code byte[]}.</p>
      */
     public static final String SERIALIZED_PAYLOAD = PREFIX + "serializedPayload";
 
@@ -91,17 +91,17 @@ public final class SolaceBinderHeaders {
      * <p><b>Acceptable Value Type:</b> {@link String}</p>
      * <p><b>Access:</b> Internal Binder Use Only</p>
      * <br>
-     * <p>A JSON String array of header names where each entry indicates that that header’s value was serialized by a
-     * Solace Spring Cloud Stream binder before publishing it to a broker.</p>
+     * <p>Written only by older binders: a JSON String array of the headers they Java-serialized. This binder never
+     * writes it and passes such headers on as received.</p>
      */
     public static final String SERIALIZED_HEADERS = PREFIX + "serializedHeaders";
 
     /**
      * <p><b>Acceptable Value Type:</b> {@link String}</p>
      * <p><b>Access:</b> Internal Binder Use Only</p>
-     * <p><b>Default Value: </b>{@code "base64"}</p>
      * <br>
-     * <p>The encoding algorithm used to encode the headers indicated by {@link #SERIALIZED_HEADERS}.</p>
+     * <p>Written only by older binders: the encoding of the headers named in {@link #SERIALIZED_HEADERS}. This
+     * binder never writes it.</p>
      */
     public static final String SERIALIZED_HEADERS_ENCODING = PREFIX + "serializedHeadersEncoding";
 
