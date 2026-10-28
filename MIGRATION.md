@@ -4,7 +4,7 @@ This document contains migration guides for version upgrades of the Spring Cloud
 
 ---
 
-## Unreleased
+## 9.5.2 to 9.6.0
 
 ### `SolaceMessageChannelBinder#destroy` leaves the session and its `Context` open
 

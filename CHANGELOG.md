@@ -2,10 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [9.6.0] - 2026-10-28
 
 ### Added
 - A constructor of `SolaceMessageChannelBinder` that takes the `JCSMPSessionProducerManager` and the `JCSMPInboundTopicMessageMultiplexer`, for binders that work on one session together.
+
+### Changed
+- Updated okhttp and logging-interceptor from 5.5.0 to 5.5.1.
 
 ### Fixed
 - STTRS-3452: A queue consumer whose start failed kept its flow and receiver threads running. Spring Cloud Stream records such a binding as failed, so neither stopping nor pausing it reached that flow, and it went on taking messages from the queue until the session closed. A failed start now closes the flow, stops the receiver threads and drops the binding health indicator, and a flow delivers messages only once its queue subscriptions are in place. A stop on a thread that Spring's shutdown hook has interrupted, as happens to a context that is still starting, now waits for the receiver threads instead of forgetting them, so a restart can no longer revive them ([#168](https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/issues/168)).
