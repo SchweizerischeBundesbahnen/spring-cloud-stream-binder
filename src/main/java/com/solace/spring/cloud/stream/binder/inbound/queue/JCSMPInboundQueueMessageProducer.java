@@ -99,36 +99,51 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 long ts = System.currentTimeMillis();
                 sendToConsumerHandler.accept(message);
                 log.trace("handleMessageWithRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
-                ts = System.currentTimeMillis();
-
-                AckUtils.autoAck(acknowledgmentCallback);
-                log.trace("handleMessageWithRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
                 return null;
             });
         } catch (RetryException e) {
             try {
                 AttributeAccessor attributeAccessor = ErrorMessageUtils.getAttributeAccessor(message, null);
                 recoveryCallback.get().recover(attributeAccessor, e.getCause());
-                AckUtils.autoAck(acknowledgmentCallback);
             } catch (Exception ex) {
                 handleException(acknowledgmentCallback, bytesXMLMessage, ex);
+                return;
             }
         }
+        autoAckProcessedMessage(acknowledgmentCallback, bytesXMLMessage);
     }
 
     private static void handleMessageWithoutRetry(Consumer<Message<?>> sendToCustomerConsumer, Message<?> message, BytesXMLMessage bytesXMLMessage, AcknowledgmentCallback acknowledgmentCallback) {
         try {
             long ts = System.currentTimeMillis();
-
             sendToCustomerConsumer.accept(message);
             log.trace("handleMessageWithoutRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
-            ts = System.currentTimeMillis();
-
-            acknowledgmentCallback.acknowledge();
-            log.trace("handleMessageWithoutRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
         } catch (Exception ex) {
             handleException(acknowledgmentCallback, bytesXMLMessage, ex);
+            return;
         }
+        try {
+            long ts = System.currentTimeMillis();
+            acknowledgmentCallback.acknowledge();
+            log.trace("handleMessageWithoutRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+        } catch (SolaceAcknowledgmentException ex) {
+            logLeftForRedelivery(bytesXMLMessage, ex);
+        }
+    }
+
+    private static void autoAckProcessedMessage(AcknowledgmentCallback acknowledgmentCallback, BytesXMLMessage bytesXMLMessage) {
+        try {
+            long ts = System.currentTimeMillis();
+            AckUtils.autoAck(acknowledgmentCallback);
+            log.trace("autoAckProcessedMessage step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+        } catch (SolaceAcknowledgmentException ex) {
+            logLeftForRedelivery(bytesXMLMessage, ex);
+        }
+    }
+
+    private static void logLeftForRedelivery(BytesXMLMessage bytesXMLMessage, SolaceAcknowledgmentException ex) {
+        log.warn("Could not acknowledge processed messageId={}, leaving it to the broker to redeliver",
+                bytesXMLMessage.getMessageId(), ex);
     }
 
     private static void handleException(AcknowledgmentCallback acknowledgmentCallback, BytesXMLMessage bytesXMLMessage, Exception ex) {

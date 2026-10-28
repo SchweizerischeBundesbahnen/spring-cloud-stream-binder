@@ -11,15 +11,28 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
+import org.springframework.core.retry.RetryPolicy;
+import org.springframework.core.retry.RetryTemplate;
 import org.springframework.integration.channel.DirectChannel;
+import org.springframework.integration.channel.QueueChannel;
+import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
 import org.springframework.messaging.MessageHandler;
 
+import java.time.Duration;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+/**
+ * Pins how the inbound queue adapter hands a message to the application and settles it with the broker.
+ * <p>The JCSMP flow is not there: each message is a spy, and an ack that throws stands for a flow that closed
+ * while the message was processed, as it does when a binding stops. The message was processed by then, so it
+ * must neither reach the application again nor be rejected.</p>
+ */
 class JCSMPInboundQueueMessageProducerTest {
+    private static final int MAX_ATTEMPTS = 3;
 
     @Mock
     private SolaceConsumerDestination consumerDestination;
@@ -34,34 +47,75 @@ class JCSMPInboundQueueMessageProducerTest {
     @Mock
     private BeanFactory beanFactory;
 
+    private final DirectChannel outputChannel = new DirectChannel();
+    private final QueueChannel errorChannel = new QueueChannel();
     private JCSMPInboundQueueMessageProducer producer;
     private MessageHandler messageHandler;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        DirectChannel outputChannel = new DirectChannel();
         messageHandler = mock(MessageHandler.class);
         outputChannel.subscribe(messageHandler);
 
         when(consumerProperties.getExtension()).thenReturn(new SolaceConsumerProperties());
 
-        producer = new JCSMPInboundQueueMessageProducer(
-                consumerDestination,
-                jcsmpSession,
-                consumerProperties,
-                endpointProperties,
-                e -> {
-                },
-                beanFactory,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.of(errorQueueInfrastructure)
-        );
-        producer.setOutputChannel(outputChannel);
+        producer = createProducer(Optional.empty(), Optional.empty());
+    }
+
+    @Test
+    void aProcessedMessage_whoseAckFails_reachesTheHandlerOnce() {
+        createRetryingProducer().onReceiveConcurrent(createMessageOnAClosedFlow());
+
+        verify(messageHandler, times(1)).handleMessage(any());
+    }
+
+    @Test
+    void aProcessedMessage_whoseAckFails_staysOffTheErrorChannel() {
+        createRetryingProducer().onReceiveConcurrent(createMessageOnAClosedFlow());
+
+        assertThat(errorChannel.getQueueSize())
+                .as("a message the handler processed must not be recovered when only its ack failed")
+                .isZero();
+    }
+
+    @Test
+    void aFailingMessage_reachesTheHandlerOncePerAttempt() {
+        doThrow(new IllegalStateException("handler failed")).when(messageHandler).handleMessage(any());
+
+        createRetryingProducer().onReceiveConcurrent(createMessage());
+
+        verify(messageHandler, times(MAX_ATTEMPTS)).handleMessage(any());
+    }
+
+    @Test
+    void aFailingMessage_afterItsLastAttempt_reachesTheErrorChannel() {
+        doThrow(new IllegalStateException("handler failed")).when(messageHandler).handleMessage(any());
+
+        createRetryingProducer().onReceiveConcurrent(createMessage());
+
+        assertThat(errorChannel.getQueueSize()).isOne();
+    }
+
+    @Test
+    void aRecoveredMessage_whoseAckFails_isLeftForTheBrokerToRedeliver() throws JCSMPException {
+        doThrow(new IllegalStateException("handler failed")).when(messageHandler).handleMessage(any());
+        BytesMessage message = createMessageOnAClosedFlow();
+
+        createRetryingProducer().onReceiveConcurrent(message);
+
+        verify(errorQueueInfrastructure, never()).createCorrelationKey(any());
+        verify(message, never()).settle(any());
+    }
+
+    @Test
+    void aProcessedMessage_whoseAckFailsWithoutRetries_isLeftForTheBrokerToRedeliver() throws JCSMPException {
+        BytesMessage message = createMessageOnAClosedFlow();
+
+        producer.onReceiveConcurrent(message);
+
+        verify(errorQueueInfrastructure, never()).createCorrelationKey(any());
+        verify(message, never()).settle(any());
     }
 
     @Test
@@ -150,4 +204,45 @@ class JCSMPInboundQueueMessageProducerTest {
         return spy(message);
     }
 
+    private BytesMessage createMessage() {
+        BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
+        message.setData(new byte[]{1, 2, 3});
+        return spy(message);
+    }
+
+    private BytesMessage createMessageOnAClosedFlow() {
+        BytesMessage message = createMessage();
+        doThrow(new IllegalStateException("Attempted an operation on a closed message consumer"))
+                .when(message).ackMessage();
+        return message;
+    }
+
+    private JCSMPInboundQueueMessageProducer createRetryingProducer() {
+        RetryTemplate retryTemplate = new RetryTemplate(RetryPolicy.builder()
+                .maxRetries(MAX_ATTEMPTS - 1)
+                .delay(Duration.ZERO)
+                .build());
+        return createProducer(Optional.of(retryTemplate), Optional.of(new ErrorMessageSendingRecoverer(errorChannel)));
+    }
+
+    private JCSMPInboundQueueMessageProducer createProducer(Optional<RetryTemplate> retryTemplate,
+                                                           Optional<ErrorMessageSendingRecoverer> recoveryCallback) {
+        JCSMPInboundQueueMessageProducer queueMessageProducer = new JCSMPInboundQueueMessageProducer(
+                consumerDestination,
+                jcsmpSession,
+                consumerProperties,
+                endpointProperties,
+                e -> {
+                },
+                beanFactory,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                retryTemplate,
+                recoveryCallback,
+                Optional.of(errorQueueInfrastructure)
+        );
+        queueMessageProducer.setOutputChannel(outputChannel);
+        return queueMessageProducer;
+    }
 }
