@@ -96,7 +96,7 @@ public class XMLMessageMapperTest {
                         BytesMessage.class,
                         new MimeType("application", "x-java-serialized-object"),
                         () -> new SerializableFoo("abc123", "HOOPLA!"),
-                        m -> SerializationUtils.deserialize(m.getData()),
+                        m -> deserialize(m.getData()),
                         true))),
                 Arguments.of(Named.of("SDT_STREAM", new SpringMessageTypeProvider<>(
                         StreamMessage.class,
@@ -391,7 +391,7 @@ public class XMLMessageMapperTest {
         XMLMessage xmlMessage = xmlMessageMapper.map(testSpringMessage, null, false, DeliveryMode.PERSISTENT);
 
         assertEquals(undefinedSolaceHeader1, xmlMessage.getProperties().getString("solace_foo1"));
-        assertEquals(undefinedSolaceHeader2, SerializationUtils.deserialize(Base64.getDecoder()
+        assertEquals(undefinedSolaceHeader2, deserialize(Base64.getDecoder()
                 .decode(xmlMessage.getProperties().getString("solace_foo2"))));
 
         assertEquals("base64", xmlMessage.getProperties().getString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING));
@@ -1235,7 +1235,7 @@ public class XMLMessageMapperTest {
         assertThat(sdtMap.keySet(), hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING));
         assertEquals("base64", sdtMap.getString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING));
         assertThat(sdtMap.keySet(), not(hasItem(BinderHeaders.TARGET_DESTINATION)));
-        assertEquals(value, SerializationUtils.deserialize(Base64.getDecoder().decode(sdtMap.getString(key))));
+        assertEquals(value, deserialize(Base64.getDecoder().decode(sdtMap.getString(key))));
         String serializedHeadersJson = sdtMap.getString(SolaceBinderHeaders.SERIALIZED_HEADERS);
         assertThat(serializedHeadersJson, not(emptyString()));
         Set<String> serializedHeaders = objectReader.forType(new TypeReference<Set<String>>() {
@@ -1564,7 +1564,7 @@ public class XMLMessageMapperTest {
                     .isNotEmpty()
                     .allSatisfy(h -> Assertions.assertThat(metadata.keySet()).contains(h))
                     .allSatisfy(h -> {
-                        Object headerValue = SerializationUtils.deserialize(encoder != null ?
+                        Object headerValue = deserialize(encoder != null ?
                                 encoder.decode(metadata.getString(h)) :
                                 metadata.getBytes(h));
                         if (expectedHeaders.containsKey(h)) {
@@ -1639,7 +1639,7 @@ public class XMLMessageMapperTest {
                     .isNotEmpty()
                     .allSatisfy(h -> Assertions.assertThat(expectedHeaders.keySet()).contains(h))
                     .allSatisfy(h -> Assertions.assertThat(messageHeaders.keySet()).contains(h))
-                    .allSatisfy(h -> Assertions.assertThat(SerializationUtils.deserialize(expectedHeaders.getBytes(h)))
+                    .allSatisfy(h -> Assertions.assertThat(deserialize(expectedHeaders.getBytes(h)))
                             .isEqualTo(messageHeaders.get(h)));
 
             serializedHeaders.addAll(serializedHeaderSet);
@@ -1688,6 +1688,11 @@ public class XMLMessageMapperTest {
         } else {
             assertEquals(expectedPayload, springMessagePayload);
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Object deserialize(byte[] serialized) {
+        return SerializationUtils.deserialize(serialized);
     }
 
     private record SpringMessageTypeProvider<T, MT extends XMLMessage>(

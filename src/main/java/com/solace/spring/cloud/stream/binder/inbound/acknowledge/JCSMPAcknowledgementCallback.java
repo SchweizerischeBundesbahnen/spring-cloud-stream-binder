@@ -10,6 +10,8 @@ import org.springframework.integration.acks.AcknowledgmentCallback;
 
 import java.util.Optional;
 
+import static com.solace.spring.cloud.stream.binder.util.XMLMessageIds.messageIdOf;
+
 @Slf4j
 @RequiredArgsConstructor
 public class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
@@ -22,7 +24,7 @@ public class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
     public void acknowledge(Status status) {
         if (acknowledged) {
             log.debug("{} {} is already acknowledged", XMLMessage.class.getSimpleName(),
-                    message.getMessageId());
+                    messageIdOf(message));
             return;
         }
         try {
@@ -39,14 +41,14 @@ public class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
                     break;
                 case REQUEUE:
                     log.debug("{} {}: Will be re-queued",
-                            XMLMessage.class.getSimpleName(), message.getMessageId());
+                            XMLMessage.class.getSimpleName(), messageIdOf(message));
                     message.settle(XMLMessage.Outcome.FAILED);
             }
         } catch (SolaceAcknowledgmentException e) {
             throw e;
         } catch (Exception e) {
             throw new SolaceAcknowledgmentException(String.format("Failed to acknowledge XMLMessage %s",
-                    message.getMessageId()), e);
+                    messageIdOf(message)), e);
         }
         acknowledged = true;
     }
@@ -63,7 +65,7 @@ public class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
         }
 
         log.debug("{} {}: Will be republished onto error queue {}",
-                XMLMessage.class.getSimpleName(), message.getMessageId(),
+                XMLMessage.class.getSimpleName(), messageIdOf(message),
                 errorQueueInfrastructure.get().getErrorQueueName());
 
         try {
@@ -71,7 +73,7 @@ public class JCSMPAcknowledgementCallback implements AcknowledgmentCallback {
         } catch (Exception e) {
             throw new SolaceAcknowledgmentException(
                     String.format("Failed to send XMLMessage %s to error queue",
-                            message.getMessageId()), e);
+                            messageIdOf(message)), e);
         }
         return true;
     }

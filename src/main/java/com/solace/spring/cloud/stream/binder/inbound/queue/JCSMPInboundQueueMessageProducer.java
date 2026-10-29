@@ -39,6 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import static com.solace.spring.cloud.stream.binder.util.XMLMessageIds.messageIdOf;
+
 @Slf4j
 @Setter
 public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport implements OrderlyShutdownCapable, Pausable {
@@ -98,11 +100,11 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             retryTemplate.get().execute(() -> {
                 long ts = System.currentTimeMillis();
                 sendToConsumerHandler.accept(message);
-                log.trace("handleMessageWithRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+                log.trace("handleMessageWithRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, messageIdOf(bytesXMLMessage));
                 ts = System.currentTimeMillis();
 
                 AckUtils.autoAck(acknowledgmentCallback);
-                log.trace("handleMessageWithRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+                log.trace("handleMessageWithRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, messageIdOf(bytesXMLMessage));
                 return null;
             });
         } catch (RetryException e) {
@@ -121,11 +123,11 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             long ts = System.currentTimeMillis();
 
             sendToCustomerConsumer.accept(message);
-            log.trace("handleMessageWithoutRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+            log.trace("handleMessageWithoutRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, messageIdOf(bytesXMLMessage));
             ts = System.currentTimeMillis();
 
             acknowledgmentCallback.acknowledge();
-            log.trace("handleMessageWithoutRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
+            log.trace("handleMessageWithoutRetry step=ack duration={}ms messageId={}", System.currentTimeMillis() - ts, messageIdOf(bytesXMLMessage));
         } catch (Exception ex) {
             handleException(acknowledgmentCallback, bytesXMLMessage, ex);
         }
@@ -133,9 +135,8 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
 
     private static void handleException(AcknowledgmentCallback acknowledgmentCallback, BytesXMLMessage bytesXMLMessage, Exception ex) {
         if (ExceptionUtils.indexOfType(ex, RequeueCurrentMessageException.class) > -1) {
-            //noinspection deprecation
             log.warn("Exception thrown while processing messageId={}. Message will be requeued.",
-                    bytesXMLMessage.getMessageId(), ex);
+                    messageIdOf(bytesXMLMessage), ex);
             AckUtils.requeue(acknowledgmentCallback);
         } else {
             log.warn("message processing failed, message rejected", ex);
@@ -158,12 +159,12 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         LargeMessageSupport.MessageContext messageContext = largeMessageSupport.assemble(bytesXMLMessageRaw, acknowledgmentCallback);
         // we got an incomplete large message and wait for more chunks
         if (messageContext == null) {
-            log.trace("onReceiveConcurrent step=incompleteLargeMessage messageId={}", bytesXMLMessageRaw.getMessageId());
+            log.trace("onReceiveConcurrent step=incompleteLargeMessage messageId={}", messageIdOf(bytesXMLMessageRaw));
             return;
         }
         BytesXMLMessage bytesXMLMessage = messageContext.bytesMessage();
 
-        log.trace("onReceiveConcurrent step=gatherByteXmlMsg duration={}ms messageId={}", System.currentTimeMillis() - startTs, bytesXMLMessageRaw.getMessageId());
+        log.trace("onReceiveConcurrent step=gatherByteXmlMsg duration={}ms messageId={}", System.currentTimeMillis() - startTs, messageIdOf(bytesXMLMessageRaw));
         long ts = System.currentTimeMillis();
 
         try {
@@ -171,14 +172,14 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             if (message == null) {
                 return;
             }
-            log.trace("onReceiveConcurrent step=convertToSpringMsg duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessageRaw.getMessageId());
+            log.trace("onReceiveConcurrent step=convertToSpringMsg duration={}ms messageId={}", System.currentTimeMillis() - ts, messageIdOf(bytesXMLMessageRaw));
             ts = System.currentTimeMillis();
 
             Consumer<Message<?>> sendToCustomerConsumer = this::sendToConsumer;
             if (tracingProxy.isPresent() && bytesXMLMessage.getProperties() != null && tracingProxy.get().hasTracingHeader(bytesXMLMessage.getProperties())) {
                 sendToCustomerConsumer = tracingProxy.get().wrapInTracingContext(bytesXMLMessage.getProperties(), sendToCustomerConsumer);
             }
-            log.trace("onReceiveConcurrent step=tracing duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessageRaw.getMessageId());
+            log.trace("onReceiveConcurrent step=tracing duration={}ms messageId={}", System.currentTimeMillis() - ts, messageIdOf(bytesXMLMessageRaw));
             ts = System.currentTimeMillis();
 
             if (retryTemplate.isPresent()) {
@@ -186,13 +187,13 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
             } else {
                 handleMessageWithoutRetry(sendToCustomerConsumer, message, bytesXMLMessage, messageContext.acknowledgmentCallback());
             }
-            log.trace("onReceiveConcurrent step=handleWithRetry duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessageRaw.getMessageId());
+            log.trace("onReceiveConcurrent step=handleWithRetry duration={}ms messageId={}", System.currentTimeMillis() - ts, messageIdOf(bytesXMLMessageRaw));
             ts = System.currentTimeMillis();
 
             solaceMeterAccessor.ifPresent(meterAccessor -> meterAccessor.recordMessage(consumerProperties.getBindingName(), bytesXMLMessage));
 
-            log.trace("onReceiveConcurrent step=microMeter duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessageRaw.getMessageId());
-            log.trace("onReceiveConcurrent step=total duration={}ms messageId={}", System.currentTimeMillis() - startTs, bytesXMLMessageRaw.getMessageId());
+            log.trace("onReceiveConcurrent step=microMeter duration={}ms messageId={}", System.currentTimeMillis() - ts, messageIdOf(bytesXMLMessageRaw));
+            log.trace("onReceiveConcurrent step=total duration={}ms messageId={}", System.currentTimeMillis() - startTs, messageIdOf(bytesXMLMessageRaw));
         } catch (Exception ex) {
             log.error("onReceive", ex);
             requeueMessage(bytesXMLMessage);

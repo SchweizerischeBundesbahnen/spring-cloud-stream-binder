@@ -4,16 +4,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.solace.Service;
 import org.testcontainers.solace.SolaceContainer;
+import tools.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,25 +42,27 @@ class HealthIndicatorIT {
     @LocalServerPort
     private int port;
 
-    private RestTemplate restTemplate = new RestTemplate();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     @SuppressWarnings("unchecked")
-    void actuatorHealth_withAConnectedSession_reportsConnectionBindingAndProvisioningUpExactlyOnce() throws InterruptedException {
-        ResponseEntity<Map> response = null;
+    void actuatorHealth_withAConnectedSession_reportsConnectionBindingAndProvisioningUpExactlyOnce() throws IOException, InterruptedException {
+        HttpResponse<String> response = null;
+        Map<String, Object> body = null;
         long end = System.currentTimeMillis() + 15000;
         while (System.currentTimeMillis() < end) {
-            response = restTemplate.getForEntity("http://localhost:" + port + "/actuator/health", Map.class);
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null && "UP".equals(response.getBody().get("status"))) {
+            response = getHealth();
+            body = objectMapper.readValue(response.body(), Map.class);
+            if (response.statusCode() == HttpStatus.OK.value() && body != null && "UP".equals(body.get("status"))) {
                 break;
             }
             Thread.sleep(250);
         }
 
         assertThat(response).isNotNull();
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value());
 
-        Map<String, Object> body = response.getBody();
         assertThat(body).isNotNull();
         assertThat(body.get("status")).isEqualTo("UP");
 
@@ -80,5 +86,12 @@ class HealthIndicatorIT {
         assertThat(bindings.get("status")).isEqualTo("UP");
         Map<String, Object> bindingComponents = (Map<String, Object>) bindings.get("components");
         assertThat((Map<String, Object>) bindingComponents.get("healthConsumer-in-0")).containsEntry("status", "UP");
+    }
+
+    private HttpResponse<String> getHealth() throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/actuator/health"))
+                .GET()
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }
