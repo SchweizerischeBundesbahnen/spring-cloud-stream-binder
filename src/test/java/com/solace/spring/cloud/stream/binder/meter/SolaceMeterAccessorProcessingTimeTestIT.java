@@ -58,6 +58,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(SpringCloudStreamExtension.class)
 @Slf4j
 public class SolaceMeterAccessorProcessingTimeTestIT {
+    private static final long HANDLER_DURATION_MS = 1000L;
+    // The CI runner shares its cores between parallel test forks and their brokers, which can stall
+    // processing by more than half a second beyond the handler's own duration.
+    private static final long RUNNER_STALL_ALLOWANCE_MS = 1000L;
 
     @BeforeAll
     static void beforeAll(@Autowired SolaceMessageMeterBinder messageMeterBinder,
@@ -113,7 +117,7 @@ public class SolaceMeterAccessorProcessingTimeTestIT {
         AtomicReference<Message<?>> result = new AtomicReference<>(null);
         input.subscribe((Message<?> incomingMessage) -> {
             try {
-                Thread.sleep(1000);
+                Thread.sleep(HANDLER_DURATION_MS);
             } catch (InterruptedException e) {
                 log.error("Interrupted while waiting for duration, that should not happen ever.", e);
                 throw new RuntimeException(e);
@@ -136,7 +140,7 @@ public class SolaceMeterAccessorProcessingTimeTestIT {
                     .as("Checking meter %s with name %s",
                             SolaceMessageMeterBinder.METER_NAME_PROCESSING_TIME, consumerProperties.getBindingName())
                     .satisfies(isMeterInGivenRange(consumerProperties.getBindingName(), 1,
-                            1000.0, 1200.0, "ms"));
+                            HANDLER_DURATION_MS, HANDLER_DURATION_MS + RUNNER_STALL_ALLOWANCE_MS, "ms"));
         });
 
         assertThat(result.get()).isNotNull();
