@@ -6,6 +6,7 @@ import com.solace.spring.cloud.stream.binder.test.spring.SpringCloudStreamContex
 import com.solace.spring.cloud.stream.binder.test.util.SolaceTestBinder;
 import com.solace.test.integration.junit.jupiter.extension.PubSubPlusExtension;
 import com.solace.test.integration.semp.v2.SempV2Api;
+import com.solace.test.integration.semp.v2.monitor.ApiException;
 import com.solace.test.integration.semp.v2.monitor.model.MonitorMsgVpnQueueMsg;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
@@ -24,6 +25,8 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.cloud.stream.binder.Binding;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.cloud.stream.config.BindingProperties;
+import org.springframework.integration.StaticMessageHeaderAccessor;
+import org.springframework.integration.acks.AcknowledgmentCallback;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.messaging.Message;
@@ -33,13 +36,18 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.util.MimeTypeUtils;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.random.RandomGenerator;
 import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Integration test for graceful shutdown of an inbound Solace consumer binding.
@@ -58,6 +66,12 @@ import java.util.stream.Collectors;
  * "were all in-flight messages actually settled" — verified here via the SEMP monitor API: after a
  * graceful stop the consumer queue must hold zero spooled messages.
  *
+ * <p>Without {@code drainTimeoutMs}, a message whose handler still runs when the flow closes cannot be
+ * settled any more. The {@code aMessageProcessedWhileItsBindingStops_*} tests pin that the binder then
+ * leaves it on its queue for the broker to redeliver, instead of handing it to the application again
+ * and moving it to the error queue, whether the binder or the application acknowledges it. The handler
+ * holds the message until the broker reports the flow gone, so the ack is certain to meet a closed flow.
+ *
  * <p>Run with: {@code mvn -P it_tests -Dit.test=SolaceBinderGracefulShutdownIT verify} (requires Docker).
  */
 @Slf4j
@@ -71,6 +85,13 @@ public class SolaceBinderGracefulShutdownIT extends SpringCloudStreamContext {
     private static final int MESSAGE_COUNT = 10;
     private static final long HANDLER_PROCESSING_MS = 300L;
     private static final long DRAIN_TIMEOUT_MS = 30_000L;
+    private static final Duration FLOW_CLOSES_WITHIN = Duration.ofSeconds(30);
+    private static final Duration STOP_ENDS_WITHIN = Duration.ofSeconds(30);
+
+    private enum Acknowledgment { BY_THE_BINDER, BY_THE_APPLICATION }
+
+    private record StopDuringProcessing(int handlerInvocations, int messagesOnQueue, int messagesOnErrorQueue) {
+    }
 
     @BeforeEach
     void setUp(JCSMPSession jcsmpSession, SempV2Api sempV2Api) {
@@ -196,6 +217,105 @@ public class SolaceBinderGracefulShutdownIT extends SpringCloudStreamContext {
                 log.warn("[DEBUG_LOG] Exception during producer binding cleanup", e);
             }
         }
+    }
+
+    @Test
+    public void aMessageProcessedWhileItsBindingStops_withAutoAck_reachesTheHandlerOnce(SempV2Api sempV2Api,
+                                                                                      TestInfo testInfo) throws Exception {
+        StopDuringProcessing stop = processOneMessageWhileTheBindingStops(sempV2Api, testInfo, Acknowledgment.BY_THE_BINDER);
+
+        assertThat(stop.handlerInvocations())
+                .as("a processed message must not be handed to the application again because its ack met a closed flow")
+                .isOne();
+    }
+
+    @Test
+    public void aMessageProcessedWhileItsBindingStops_withAutoAck_staysOnItsQueueForRedelivery(SempV2Api sempV2Api,
+                                                                                             TestInfo testInfo) throws Exception {
+        StopDuringProcessing stop = processOneMessageWhileTheBindingStops(sempV2Api, testInfo, Acknowledgment.BY_THE_BINDER);
+
+        assertThat(stop.messagesOnErrorQueue()).as("messages moved to the error queue").isZero();
+        assertThat(stop.messagesOnQueue()).as("messages left on the queue for the broker to redeliver").isOne();
+    }
+
+    @Test
+    public void aMessageProcessedWhileItsBindingStops_withManualAck_reachesTheHandlerOnce(SempV2Api sempV2Api,
+                                                                                        TestInfo testInfo) throws Exception {
+        StopDuringProcessing stop = processOneMessageWhileTheBindingStops(sempV2Api, testInfo, Acknowledgment.BY_THE_APPLICATION);
+
+        assertThat(stop.handlerInvocations())
+                .as("a processed message must not be handed to the application again because its own ack met a closed flow")
+                .isOne();
+    }
+
+    @Test
+    public void aMessageProcessedWhileItsBindingStops_withManualAck_staysOnItsQueueForRedelivery(SempV2Api sempV2Api,
+                                                                                               TestInfo testInfo) throws Exception {
+        StopDuringProcessing stop = processOneMessageWhileTheBindingStops(sempV2Api, testInfo, Acknowledgment.BY_THE_APPLICATION);
+
+        assertThat(stop.messagesOnErrorQueue()).as("messages moved to the error queue").isZero();
+        assertThat(stop.messagesOnQueue()).as("messages left on the queue for the broker to redeliver").isOne();
+    }
+
+    private StopDuringProcessing processOneMessageWhileTheBindingStops(SempV2Api sempV2Api, TestInfo testInfo,
+                                                                       Acknowledgment acknowledgment) throws Exception {
+        SolaceTestBinder binder = getBinder();
+        var consumerInfrastructureUtil = createConsumerInfrastructureUtil(DirectChannel.class);
+        DirectChannel moduleOutputChannel = createBindableChannel("output", new BindingProperties());
+        var moduleInputChannel = consumerInfrastructureUtil.createChannel("input", new BindingProperties());
+        String destination = randomAlphanumeric();
+
+        Binding<MessageChannel> producerBinding =
+                binder.bindProducer(destination, moduleOutputChannel, createProducerProperties(testInfo));
+        ExtendedConsumerProperties<SolaceConsumerProperties> consumerProperties = createConsumerProperties();
+        consumerProperties.setConcurrency(1);
+        consumerProperties.getExtension().setAutoBindErrorQueue(true);
+        var consumerBinding = consumerInfrastructureUtil.createBinding(
+                binder, destination, randomAlphanumeric(), moduleInputChannel, consumerProperties);
+        binderBindUnbindLatency();
+
+        String vpnName = (String) getJcsmpSession().getProperty(JCSMPProperties.VPN_NAME);
+        String queueName = binder.getConsumerQueueName(consumerBinding);
+        String errorQueueName = binder.getConsumerErrorQueueName(consumerBinding);
+        AtomicInteger handlerInvocations = new AtomicInteger();
+        CountDownLatch handlerStarted = new CountDownLatch(1);
+        moduleInputChannel.subscribe(message -> {
+            if (handlerInvocations.incrementAndGet() == 1) {
+                handlerStarted.countDown();
+                await().atMost(FLOW_CLOSES_WITHIN).until(() -> hasNoFlow(sempV2Api, vpnName, queueName));
+            }
+            if (acknowledgment == Acknowledgment.BY_THE_APPLICATION) {
+                AcknowledgmentCallback acknowledgmentCallback = StaticMessageHeaderAccessor.getAcknowledgmentCallback(message);
+                acknowledgmentCallback.noAutoAck();
+                acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.ACCEPT);
+            }
+        });
+
+        try {
+            moduleOutputChannel.send(MessageBuilder.withPayload("stopped-during-processing".getBytes())
+                    .setHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.TEXT_PLAIN_VALUE)
+                    .build());
+            assertThat(handlerStarted.await(STOP_ENDS_WITHIN.toSeconds(), TimeUnit.SECONDS))
+                    .as("the consumer must receive the message").isTrue();
+            CompletableFuture.runAsync(consumerBinding::stop).get(STOP_ENDS_WITHIN.toSeconds(), TimeUnit.SECONDS);
+
+            return new StopDuringProcessing(
+                    handlerInvocations.get(),
+                    countMessages(sempV2Api, vpnName, queueName),
+                    countMessages(sempV2Api, vpnName, errorQueueName));
+        } finally {
+            consumerBinding.unbind();
+            producerBinding.unbind();
+        }
+    }
+
+    private static boolean hasNoFlow(SempV2Api sempV2Api, String vpnName, String queueName) throws ApiException {
+        List<?> flows = sempV2Api.monitor().getMsgVpnQueueTxFlows(vpnName, queueName, null, null, null, null).getData();
+        return flows == null || flows.isEmpty();
+    }
+
+    private static int countMessages(SempV2Api sempV2Api, String vpnName, String queueName) throws ApiException {
+        return sempV2Api.monitor().getMsgVpnQueueMsgs(vpnName, queueName, MESSAGE_COUNT, null, null, null).getData().size();
     }
 
     private static String randomAlphanumeric() {
