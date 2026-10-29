@@ -94,12 +94,13 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
     void handleMessageWithRetry(Message<?> message, Consumer<Message<?>> sendToConsumerHandler,
                                 AcknowledgmentCallback acknowledgmentCallback, BytesXMLMessage bytesXMLMessage)
             throws SolaceAcknowledgmentException {
+        boolean leftForRedelivery = false;
         try {
-            retryTemplate.get().execute(() -> {
+            leftForRedelivery = retryTemplate.get().execute(() -> {
                 long ts = System.currentTimeMillis();
-                sendToConsumerHandler.accept(message);
+                boolean messageLeftForRedelivery = sendToConsumerOrLeaveForRedelivery(sendToConsumerHandler, message, bytesXMLMessage);
                 log.trace("handleMessageWithRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
-                return null;
+                return messageLeftForRedelivery;
             });
         } catch (RetryException e) {
             try {
@@ -110,16 +111,23 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
                 return;
             }
         }
+        if (leftForRedelivery) {
+            return;
+        }
         autoAckProcessedMessage(acknowledgmentCallback, bytesXMLMessage);
     }
 
-    private static void handleMessageWithoutRetry(Consumer<Message<?>> sendToCustomerConsumer, Message<?> message, BytesXMLMessage bytesXMLMessage, AcknowledgmentCallback acknowledgmentCallback) {
+    private void handleMessageWithoutRetry(Consumer<Message<?>> sendToCustomerConsumer, Message<?> message, BytesXMLMessage bytesXMLMessage, AcknowledgmentCallback acknowledgmentCallback) {
+        boolean leftForRedelivery;
         try {
             long ts = System.currentTimeMillis();
-            sendToCustomerConsumer.accept(message);
+            leftForRedelivery = sendToConsumerOrLeaveForRedelivery(sendToCustomerConsumer, message, bytesXMLMessage);
             log.trace("handleMessageWithoutRetry step=processBean duration={}ms messageId={}", System.currentTimeMillis() - ts, bytesXMLMessage.getMessageId());
         } catch (Exception ex) {
             handleException(acknowledgmentCallback, bytesXMLMessage, ex);
+            return;
+        }
+        if (leftForRedelivery) {
             return;
         }
         try {
@@ -129,6 +137,24 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         } catch (SolaceAcknowledgmentException ex) {
             logLeftForRedelivery(bytesXMLMessage, ex);
         }
+    }
+
+    private boolean sendToConsumerOrLeaveForRedelivery(Consumer<Message<?>> sendToConsumerHandler, Message<?> message, BytesXMLMessage bytesXMLMessage) {
+        try {
+            sendToConsumerHandler.accept(message);
+            return false;
+        } catch (RuntimeException ex) {
+            if (ExceptionUtils.indexOfType(ex, SolaceAcknowledgmentException.class) == -1 || !isFlowClosed()) {
+                throw ex;
+            }
+            logLeftForRedelivery(bytesXMLMessage, ex);
+            return true;
+        }
+    }
+
+    private boolean isFlowClosed() {
+        FlowReceiver currentFlowReceiver = this.flowReceiver.get();
+        return currentFlowReceiver == null || currentFlowReceiver.isClosed();
     }
 
     private static void autoAckProcessedMessage(AcknowledgmentCallback acknowledgmentCallback, BytesXMLMessage bytesXMLMessage) {
@@ -141,8 +167,8 @@ public class JCSMPInboundQueueMessageProducer extends MessageProducerSupport imp
         }
     }
 
-    private static void logLeftForRedelivery(BytesXMLMessage bytesXMLMessage, SolaceAcknowledgmentException ex) {
-        log.warn("Could not acknowledge processed messageId={}, leaving it to the broker to redeliver",
+    private static void logLeftForRedelivery(BytesXMLMessage bytesXMLMessage, RuntimeException ex) {
+        log.warn("Could not settle messageId={}, leaving it to the broker to redeliver",
                 bytesXMLMessage.getMessageId(), ex);
     }
 
