@@ -39,6 +39,7 @@ import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.SerializationUtils;
 
+import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
@@ -1083,10 +1084,10 @@ public class XMLMessageMapperTest {
     }
 
     @Test
-    void receivingAJavaSerializedPayloadOfAnOlderBinderPassesItsBytesOnUntouched() throws Exception {
-        byte[] serializedPayload = SerializationUtils.serialize(new SerializableFoo("abc123", "HOOPLA!"));
+    void receivingAJavaSerializedPayloadOfAnOlderBinderDeserializesIt() throws Exception {
+        SerializableFoo payload = new SerializableFoo("abc123", "HOOPLA!");
         BytesMessage xmlMessage = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
-        xmlMessage.setData(serializedPayload);
+        xmlMessage.setData(SerializationUtils.serialize(payload));
         SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
         metadata.putString(MessageHeaders.CONTENT_TYPE, "application/x-java-serialized-object");
         metadata.putBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD, true);
@@ -1095,8 +1096,32 @@ public class XMLMessageMapperTest {
         Message<?> springMessage = xmlMessageMapper.map(xmlMessage, Mockito.mock(AcknowledgmentCallback.class),
                 new SolaceConsumerProperties());
 
-        Assertions.assertThat(springMessage.getPayload()).isEqualTo(serializedPayload);
-        Assertions.assertThat(springMessage.getHeaders()).doesNotContainKey(SolaceBinderHeaders.SERIALIZED_PAYLOAD);
+        assertEquals(payload, springMessage.getPayload());
+    }
+
+    @Test
+    void receivingTheJavaSerializedContentTypeOfAnOlderBinderRestoresItsMimeType() throws Exception {
+        TextMessage xmlMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+        xmlMessage.setText("test");
+        xmlMessage.setProperties(sdtMapWithBase64SerializedHeader(MessageHeaders.CONTENT_TYPE, MimeTypeUtils.APPLICATION_JSON));
+
+        Message<?> springMessage = xmlMessageMapper.map(xmlMessage, Mockito.mock(AcknowledgmentCallback.class),
+                new SolaceConsumerProperties());
+
+        assertEquals(MimeTypeUtils.APPLICATION_JSON, springMessage.getHeaders().get(MessageHeaders.CONTENT_TYPE));
+    }
+
+    @Test
+    void receivingTheJavaSerializedDeliveryAttemptOfAnOlderBinderRestoresItsCounter() throws Exception {
+        TextMessage xmlMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+        xmlMessage.setText("test");
+        xmlMessage.setProperties(sdtMapWithBase64SerializedHeader(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT,
+                new AtomicInteger(3)));
+
+        Message<?> springMessage = xmlMessageMapper.map(xmlMessage, Mockito.mock(AcknowledgmentCallback.class),
+                new SolaceConsumerProperties());
+
+        assertEquals(3, StaticMessageHeaderAccessor.getDeliveryAttempt(springMessage).get());
     }
 
     @Test
@@ -1249,20 +1274,65 @@ public class XMLMessageMapperTest {
     }
 
     @Test
-    void receivingJavaSerializedHeadersOfAnOlderBinderPassesTheirValuesOnUntouched() throws Exception {
-        byte[] serializedValue = SerializationUtils.serialize(new SerializableFoo("abc123", "HOOPLA!"));
+    void receivingBase64JavaSerializedHeadersOfAnOlderBinderDeserializesThem() throws Exception {
+        SerializableFoo value = new SerializableFoo("abc123", "HOOPLA!");
+
+        MessageHeaders messageHeaders = xmlMessageMapper.map(sdtMapWithBase64SerializedHeader("a", value), List.of());
+
+        assertEquals(value, messageHeaders.get("a"));
+    }
+
+    @Test
+    void receivingUnencodedJavaSerializedHeadersOfAnOlderBinderDeserializesThem() throws Exception {
+        SerializableFoo value = new SerializableFoo("abc123", "HOOPLA!");
         SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
-        sdtMap.putBytes("raw", serializedValue);
-        sdtMap.putString("encoded", Base64.getEncoder().encodeToString(serializedValue));
-        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, "[\"raw\",\"encoded\"]");
+        sdtMap.putBytes("a", SerializationUtils.serialize(value));
+        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, "[\"a\"]");
+
+        MessageHeaders messageHeaders = xmlMessageMapper.map(sdtMap, List.of());
+
+        assertEquals(value, messageHeaders.get("a"));
+    }
+
+    @Test
+    void receivingANullJavaSerializedHeaderOfAnOlderBinderKeepsItAsNull() throws Exception {
+        SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
+        sdtMap.putObject("a", null);
+        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, "[\"a\"]");
         sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, "base64");
 
         MessageHeaders messageHeaders = xmlMessageMapper.map(sdtMap, List.of());
 
-        assertArrayEquals(serializedValue, messageHeaders.get("raw", byte[].class));
-        assertEquals(Base64.getEncoder().encodeToString(serializedValue), messageHeaders.get("encoded"));
-        assertThat(messageHeaders.keySet(), not(hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS)));
-        assertThat(messageHeaders.keySet(), not(hasItem(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING)));
+        Assertions.assertThat(messageHeaders).containsEntry("a", null);
+    }
+
+    @Test
+    void receivingASerializedHeaderNameWithoutItsValueAddsNoHeader() throws Exception {
+        SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
+        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, "[\"a\"]");
+
+        MessageHeaders messageHeaders = xmlMessageMapper.map(sdtMap, List.of());
+
+        Assertions.assertThat(messageHeaders).doesNotContainKey("a");
+    }
+
+    @Test
+    void receivingSerializedHeadersInAnUnsupportedEncodingIsRejected() throws Exception {
+        SDTMap sdtMap = sdtMapWithBase64SerializedHeader("a", new SerializableFoo("abc123", "HOOPLA!"));
+        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, "abc");
+
+        SolaceMessageConversionException exception = assertThrows(SolaceMessageConversionException.class,
+                () -> xmlMessageMapper.map(sdtMap, List.of()));
+
+        assertEquals("abc encoding is not supported", exception.getMessage());
+    }
+
+    private static SDTMap sdtMapWithBase64SerializedHeader(String name, Serializable value) throws SDTException {
+        SDTMap sdtMap = JCSMPFactory.onlyInstance().createMap();
+        sdtMap.putString(name, Base64.getEncoder().encodeToString(SerializationUtils.serialize(value)));
+        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, "[\"" + name + "\"]");
+        sdtMap.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, "base64");
+        return sdtMap;
     }
 
     @Test

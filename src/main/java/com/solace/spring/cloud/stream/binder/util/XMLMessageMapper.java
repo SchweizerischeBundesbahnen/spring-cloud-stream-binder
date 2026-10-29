@@ -18,6 +18,10 @@ import org.springframework.integration.support.MessageBuilderFactory;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.util.MimeType;
+import org.springframework.util.SerializationUtils;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
 
 import org.springframework.core.convert.support.DefaultConversionService;
 import java.nio.charset.StandardCharsets;
@@ -25,12 +29,13 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.solace.spring.cloud.stream.binder.util.XMLMessageIds.messageIdOf;
-
 @Slf4j
 public class XMLMessageMapper {
     private static final MessageBuilderFactory MESSAGE_BUILDER_FACTORY = new DefaultMessageBuilderFactory();
     private static final String KAFKA_TOPIC = "k_topic";
+    private static final String LEGACY_HEADER_ENCODING = "base64";
+    private static final ObjectReader HEADER_NAMES_READER = new ObjectMapper().readerFor(new TypeReference<Set<String>>() {
+    });
     static final int MESSAGE_VERSION = 1;
 
     private final Set<String> ignoredHeaderProperties = ConcurrentHashMap.newKeySet();
@@ -164,11 +169,12 @@ public class XMLMessageMapper {
         SDTMap metadata = xmlMessage.getProperties();
         List<String> excludedHeaders = solaceConsumerProperties.getHeaderExclusions();
 
-        logJavaSerializedContent(xmlMessage, metadata);
-
         Object payload;
         if (xmlMessage instanceof BytesMessage) {
             payload = ((BytesMessage) xmlMessage).getData();
+            if (isJavaSerializedPayload(metadata)) {
+                payload = deserialize((byte[]) payload);
+            }
         } else if (xmlMessage instanceof TextMessage) {
             payload = ((TextMessage) xmlMessage).getText();
         } else if (xmlMessage instanceof MapMessage) {
@@ -239,19 +245,10 @@ public class XMLMessageMapper {
         return builder;
     }
 
-    private static void logJavaSerializedContent(XMLMessage xmlMessage, SDTMap metadata) throws SDTException {
-        if (metadata == null) {
-            return;
-        }
-        boolean serializedPayload = metadata.containsKey(SolaceBinderHeaders.SERIALIZED_PAYLOAD) &&
+    private static boolean isJavaSerializedPayload(SDTMap metadata) throws SDTException {
+        return metadata != null &&
+                metadata.containsKey(SolaceBinderHeaders.SERIALIZED_PAYLOAD) &&
                 Boolean.TRUE.equals(metadata.getBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD));
-        String serializedHeaderNames = metadata.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS) ?
-                metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS) : null;
-        if (!serializedPayload && serializedHeaderNames == null) {
-            return;
-        }
-        log.info("Message {} carries Java-serialized content, which is passed on as received and not deserialized: serialized payload={}, payload size={} bytes, serialized headers={}",
-                messageIdOf(xmlMessage), serializedPayload, xmlMessage.getAttachmentContentLength(), serializedHeaderNames);
     }
 
     private void validateExclusiveSolaceHeaders(Map<String, Object> headers, UUID messageId) {
@@ -336,6 +333,9 @@ public class XMLMessageMapper {
         final Collection<String> exclusionList = excludedHeaders != null ? excludedHeaders : Collections.emptyList();
 
         Map<String, Object> headers = new HashMap<>();
+        if (!exclusionList.contains(SolaceBinderHeaders.SERIALIZED_HEADERS)) {
+            headers.putAll(deserializeLegacyHeaders(metadata));
+        }
 
         metadata.keySet().stream().filter(h -> !exclusionList.contains(h)).filter(h -> !headers.containsKey(h)).filter(h -> !SolaceBinderHeaderMeta.META.containsKey(h)).filter(h -> !SolaceHeaderMeta.META.containsKey(h)).forEach(h -> {
             Object value = null;
@@ -377,6 +377,46 @@ public class XMLMessageMapper {
                     metadata.getString(XMLMessage.MessageUserPropertyConstants.QUEUE_PARTITION_KEY));
         }
         return new MessageHeaders(headers);
+    }
+
+    private static Map<String, Object> deserializeLegacyHeaders(SDTMap metadata) throws SDTException {
+        if (!metadata.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS)) {
+            return Collections.emptyMap();
+        }
+        String encoding = metadata.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING) ?
+                metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING) : null;
+        if (encoding != null && !LEGACY_HEADER_ENCODING.equals(encoding)) {
+            String msg = String.format("%s encoding is not supported", encoding);
+            SolaceMessageConversionException exception = new SolaceMessageConversionException(msg);
+            log.warn(msg, exception);
+            throw exception;
+        }
+
+        Set<String> headerNames = HEADER_NAMES_READER.readValue(metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS));
+        Map<String, Object> headers = new HashMap<>();
+        for (String headerName : headerNames) {
+            if (!metadata.containsKey(headerName)) {
+                continue;
+            }
+            byte[] serializedValue = encoding != null ?
+                    decodeBase64(metadata.getString(headerName)) :
+                    metadata.getBytes(headerName);
+            Object value = deserialize(serializedValue);
+            if (value instanceof ByteArray byteArray) {
+                value = byteArray.asBytes();
+            }
+            headers.put(headerName, value);
+        }
+        return headers;
+    }
+
+    private static byte[] decodeBase64(String encodedValue) {
+        return encodedValue != null ? Base64.getDecoder().decode(encodedValue) : null;
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Object deserialize(byte[] serialized) {
+        return SerializationUtils.deserialize(serialized);
     }
 
     @SneakyThrows

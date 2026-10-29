@@ -83,7 +83,7 @@ public final class SolaceBinderHeaders {
      * <p><b>Access:</b> Internal Binder Use Only</p>
      * <br>
      * <p>Written only by older binders: {@code true} when they Java-serialized the payload. This binder never
-     * writes it and passes such a payload on as the received {@code byte[]}.</p>
+     * writes it and deserializes such a payload on receipt.</p>
      */
     public static final String SERIALIZED_PAYLOAD = PREFIX + "serializedPayload";
 
@@ -92,7 +92,7 @@ public final class SolaceBinderHeaders {
      * <p><b>Access:</b> Internal Binder Use Only</p>
      * <br>
      * <p>Written only by older binders: a JSON String array of the headers they Java-serialized. This binder never
-     * writes it and passes such headers on as received.</p>
+     * writes it and deserializes such headers on receipt.</p>
      */
     public static final String SERIALIZED_HEADERS = PREFIX + "serializedHeaders";
 

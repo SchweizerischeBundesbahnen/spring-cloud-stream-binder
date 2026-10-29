@@ -8,9 +8,9 @@ This document contains migration guides for version upgrades of the Spring Cloud
 
 ### Payloads and headers are no longer Java-serialized
 
-The binder used to Java-serialize a `Serializable` payload or header that SMF cannot carry natively and to
-deserialize it again on the consumer. Deserializing bytes from the wire runs code from any class on the consumer's
-classpath, so the binder does neither any more.
+The binder used to Java-serialize a `Serializable` payload or header that SMF cannot carry natively. Deserializing
+bytes from the wire runs code from any class on the consumer's classpath, so the binder no longer writes such
+content. It still reads it, so that a consumer can be upgraded before the producers that publish to it.
 
 When publishing:
 
@@ -21,16 +21,13 @@ When publishing:
   makes the publish fail with a `MessagingException` as well. Convert it to a `String` or `byte[]` yourself, or set
   `nonserializableHeaderConvertToString: true` to have the binder write its `toString()`.
 - a `contentType` header held as a `MimeType` is written as its String form. The `deliveryAttempt` header is not
-  forwarded, so a consumer always starts its own count at zero.
+  forwarded, so the receiver of a message this binder publishes starts its own count at zero.
 
-When consuming a message an older binder published with Java-serialized content:
+When consuming, nothing changes: a payload or header an older binder Java-serialized is deserialized as before, and
+a `contentType` sent as a String by this binder is read as before.
 
-- a serialized payload arrives as the `byte[]` of the binary attachment;
-- a serialized header arrives as its base64 String, or as a `byte[]` when it was written as a byte array;
-- the binder logs the message id, the payload size and the names of the serialized headers at `INFO`.
-
-Upgrade the consumers of such a message only after their producers publish native types, or have the consumer
-convert the received bytes itself.
+Upgrade the producers of a `Serializable` payload or header only after converting it to a native type, and make
+sure every consumer of a payload converted this way, for example to JSON, can read the new format.
 
 ### `SolaceMessageChannelBinder#destroy` leaves the session and its `Context` open
 

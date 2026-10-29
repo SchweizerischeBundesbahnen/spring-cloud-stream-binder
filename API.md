@@ -613,9 +613,9 @@ These can be used for:
 | `solace_scst_messageVersion` | Integer | Read | 1 | A static number set by the publisher to indicate the Spring Cloud Stream Solace message version. |
 | `solace_scst_nullPayload` | Boolean | Read | Absent unless inbound payload was null | Present and true to indicate when the PubSub+ message payload was null. |
 | `solace_scst_partitionKey` | String | Read/Write | Unset | The partition key for PubSub+ partitioned queues. Set it on a produced message to route it to a partition; it is also populated on consumed messages from the Solace `JMSXGroupID` property so applications can read each message's partition key. |
-| `solace_scst_serializedHeaders` | String | Internal Binder Use Only | Unset | Written only by older binders, which Java-serialized headers: a JSON String array of those headers. This binder never writes it and does not deserialize those headers; see [Receiving Java-Serialized Content](#receiving-java-serialized-content). |
+| `solace_scst_serializedHeaders` | String | Internal Binder Use Only | Unset | Written only by older binders, which Java-serialized headers: a JSON String array of those headers. This binder never writes it and deserializes those headers on receipt; see [Receiving Java-Serialized Content](#receiving-java-serialized-content). |
 | `solace_scst_serializedHeadersEncoding` | String | Internal Binder Use Only | Unset | Written only by older binders: the encoding of the headers named in `solace_scst_serializedHeaders`. This binder never writes it. |
-| `solace_scst_serializedPayload` | Boolean | Internal Binder Use Only | Unset | Written only by older binders: `true` when they Java-serialized the payload. This binder never writes it and does not deserialize that payload; see [Receiving Java-Serialized Content](#receiving-java-serialized-content). |
+| `solace_scst_serializedPayload` | Boolean | Internal Binder Use Only | Unset | Written only by older binders: `true` when they Java-serialized the payload. This binder never writes it and deserializes that payload on receipt; see [Receiving Java-Serialized Content](#receiving-java-serialized-content). |
 | `solace_scst_targetDestinationType` | String | Write | Binding destination type | Only applicable when `BinderHeaders.TARGET_DESTINATION` (`scst_targetDestination`) is set.<br>`topic`: the dynamic destination is a topic.<br>`queue`: the dynamic destination is a queue.<br>When absent, the binding's configured destination-type is used. |
 
 ## Native Payload Types
@@ -639,11 +639,13 @@ Any other payload makes the publish fail with a `MessagingException`. The binder
 
 ### Receiving Java-Serialized Content
 
-Older binders Java-serialized a `Serializable` payload or header that is not a native type, and marked it with `solace_scst_serializedPayload` or `solace_scst_serializedHeaders`. This binder does not deserialize such content, because deserializing bytes from the wire can run code from any class on the consumer's classpath. It passes the content on as received and logs the message id, the payload size and the names of the serialized headers at `INFO`:
+Older binders Java-serialized a `Serializable` payload or header that is not a native type, and marked it with `solace_scst_serializedPayload` or `solace_scst_serializedHeaders`. This binder no longer writes such content, but still deserializes it on receipt, so that it can consume what an older binder published:
 
-* a serialized payload arrives as the `byte[]` of the binary attachment;
-* a serialized header arrives as its base64 String, or as a `byte[]` when it was written as a byte array;
+* a serialized payload arrives as the deserialized object;
+* a serialized header arrives as its deserialized value, for example a `contentType` as a `MimeType`;
 * the marker headers themselves are not passed on.
+
+Deserializing bytes from the wire can run code from any class on the consumer's classpath. Only consume Java-serialized content from producers you trust.
 
 ### XML-Content Payloads
 
