@@ -5,6 +5,7 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties
 import com.solace.spring.cloud.stream.binder.provisioning.SolaceConsumerDestination;
 import com.solace.spring.cloud.stream.binder.util.ErrorQueueInfrastructure;
 import com.solacesystems.jcsmp.*;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -13,6 +14,8 @@ import org.springframework.beans.factory.BeanFactory;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
+import org.springframework.integration.StaticMessageHeaderAccessor;
+import org.springframework.integration.acks.AcknowledgmentCallback;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.channel.QueueChannel;
 import org.springframework.integration.handler.advice.ErrorMessageSendingRecoverer;
@@ -29,7 +32,9 @@ import static org.mockito.Mockito.*;
  * Pins how the inbound queue adapter hands a message to the application and settles it with the broker.
  * <p>The JCSMP flow is not there: each message is a spy, and an ack that throws stands for a flow that closed
  * while the message was processed, as it does when a binding stops. The message was processed by then, so it
- * must neither reach the application again nor be rejected.</p>
+ * must neither reach the application again nor be rejected, whether the binder or the application acknowledges
+ * it. On a flow that is still open the broker does not redeliver an unsettled message, so a failing ack there
+ * is retried.</p>
  */
 class JCSMPInboundQueueMessageProducerTest {
     private static final int MAX_ATTEMPTS = 3;
@@ -50,6 +55,7 @@ class JCSMPInboundQueueMessageProducerTest {
     private final DirectChannel outputChannel = new DirectChannel();
     private final QueueChannel errorChannel = new QueueChannel();
     private JCSMPInboundQueueMessageProducer producer;
+    private JCSMPInboundQueueMessageProducer startedProducer;
     private MessageHandler messageHandler;
 
     @BeforeEach
@@ -61,6 +67,13 @@ class JCSMPInboundQueueMessageProducerTest {
         when(consumerProperties.getExtension()).thenReturn(new SolaceConsumerProperties());
 
         producer = createProducer(Optional.empty(), Optional.empty());
+    }
+
+    @AfterEach
+    void stopTheStartedProducer() {
+        if (startedProducer != null) {
+            startedProducer.stop();
+        }
     }
 
     @Test
@@ -106,6 +119,47 @@ class JCSMPInboundQueueMessageProducerTest {
 
         verify(errorQueueInfrastructure, never()).createCorrelationKey(any());
         verify(message, never()).settle(any());
+    }
+
+    @Test
+    void aManuallyAcknowledgedMessage_whoseAckFailsOnAClosedFlow_reachesTheHandlerOnce() {
+        letTheHandlerAcknowledgeManually();
+
+        createRetryingProducer().onReceiveConcurrent(createMessageOnAClosedFlow());
+
+        verify(messageHandler, times(1)).handleMessage(any());
+    }
+
+    @Test
+    void aManuallyAcknowledgedMessage_whoseAckFailsOnAClosedFlow_staysOffTheErrorChannel() {
+        letTheHandlerAcknowledgeManually();
+
+        createRetryingProducer().onReceiveConcurrent(createMessageOnAClosedFlow());
+
+        assertThat(errorChannel.getQueueSize())
+                .as("a message whose own ack failed on a closed flow must be left to the broker, not recovered")
+                .isZero();
+    }
+
+    @Test
+    void aManuallyAcknowledgedMessage_whoseAckFailsOnAClosedFlowWithoutRetries_isLeftForTheBrokerToRedeliver()
+            throws JCSMPException {
+        letTheHandlerAcknowledgeManually();
+        BytesMessage message = createMessageOnAClosedFlow();
+
+        producer.onReceiveConcurrent(message);
+
+        verify(errorQueueInfrastructure, never()).createCorrelationKey(any());
+        verify(message, never()).settle(any());
+    }
+
+    @Test
+    void aManuallyAcknowledgedMessage_whoseAckFailsOnAnOpenFlow_reachesTheHandlerOncePerAttempt() throws JCSMPException {
+        letTheHandlerAcknowledgeManually();
+
+        startRetryingProducerOnAnOpenFlow().onReceiveConcurrent(createMessageOnAClosedFlow());
+
+        verify(messageHandler, times(MAX_ATTEMPTS)).handleMessage(any());
     }
 
     @Test
@@ -215,6 +269,28 @@ class JCSMPInboundQueueMessageProducerTest {
         doThrow(new IllegalStateException("Attempted an operation on a closed message consumer"))
                 .when(message).ackMessage();
         return message;
+    }
+
+    private void letTheHandlerAcknowledgeManually() {
+        doAnswer(invocation -> {
+            AcknowledgmentCallback acknowledgmentCallback =
+                    StaticMessageHeaderAccessor.getAcknowledgmentCallback(invocation.getArgument(0));
+            acknowledgmentCallback.noAutoAck();
+            acknowledgmentCallback.acknowledge(AcknowledgmentCallback.Status.ACCEPT);
+            return null;
+        }).when(messageHandler).handleMessage(any());
+    }
+
+    private JCSMPInboundQueueMessageProducer startRetryingProducerOnAnOpenFlow() throws JCSMPException {
+        when(consumerProperties.getConcurrency()).thenReturn(1);
+        when(consumerDestination.getName()).thenReturn("queue");
+        when(consumerDestination.getBindingDestinationName()).thenReturn("destination");
+        when(jcsmpSession.createFlow(any(XMLMessageListener.class), any(ConsumerFlowProperties.class),
+                any(EndpointProperties.class), any(FlowEventHandler.class)))
+                .thenReturn(mock(FlowReceiver.class));
+        startedProducer = createRetryingProducer();
+        startedProducer.start();
+        return startedProducer;
     }
 
     private JCSMPInboundQueueMessageProducer createRetryingProducer() {
