@@ -4,10 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking Changes
+- STTRS-3496: The binder no longer Java-serializes a payload or header that is not a native SMF type. A consumer that deserializes such bytes runs code from any class on its classpath, and Spring deprecated the `SerializationUtils.deserialize` that consumer relies on for exactly that reason. Such a payload, or such a header without `nonserializableHeaderConvertToString`, now makes the publish fail with a `MessagingException`, which goes to the producer's error channel. Java-serialized content from an older binder is still deserialized on receipt, so consumers can be upgraded before their producers. See [MIGRATION.md](MIGRATION.md).
+
+### Changed
+- STTRS-3496: A `contentType` header held as a `MimeType` is written as its String form, and the `deliveryAttempt` header of the inbound message is no longer forwarded, so the receiver of a message this binder publishes starts its own count.
+
 ### Added
 - A constructor of `SolaceMessageChannelBinder` that takes the `JCSMPSessionProducerManager` and the `JCSMPInboundTopicMessageMultiplexer`, for binders that work on one session together.
 
 ### Fixed
+- STTRS-2635: When the error queue producer could not be obtained, the warning named the id of the error message, which has none before it is sent. It now names the id of the message that failed.
 - STTRS-3452: A queue consumer whose start failed kept its flow and receiver threads running. Spring Cloud Stream records such a binding as failed, so neither stopping nor pausing it reached that flow, and it went on taking messages from the queue until the session closed. A failed start now closes the flow, stops the receiver threads and drops the binding health indicator, and a flow delivers messages only once its queue subscriptions are in place. A stop on a thread that Spring's shutdown hook has interrupted, as happens to a context that is still starting, now waits for the receiver threads instead of forgetting them, so a restart can no longer revive them ([#168](https://github.com/SchweizerischeBundesbahnen/spring-cloud-stream-binder/issues/168)).
 - STTRS-3449: Closing one Spring context no longer closes the JCSMP session of every other context in the JVM. The contexts share one cached session, and `SolaceMessageChannelBinder#destroy` closed it while `JCSMPSessionConfiguration` cleared the whole cache, so the others failed with `Producer is already closed this can never recover` or `Session is closed`. Each context now holds a share of the session and gives it back when it closes; the last one closes the session. A test suite that caches several contexts, or closes one with `@DirtiesContext`, was hit; an application with a single context was not.
 - STTRS-3449: A binder whose last producer binding stops no longer closes the direct producer of every other binder on the same session. JCSMP hands all of them the one default producer of the session, and each binder managed it on its own. The binders of one session now share the `JCSMPSessionProducerManager` cached with the session.

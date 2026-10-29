@@ -7,7 +7,6 @@ import com.solace.spring.cloud.stream.binder.properties.SolaceConsumerProperties
 import com.solacesystems.common.util.ByteArray;
 import com.solacesystems.jcsmp.*;
 import com.solace.spring.cloud.stream.binder.messaging.SolaceHeaders;
-import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.binder.BinderHeaders;
@@ -23,28 +22,22 @@ import org.springframework.util.SerializationUtils;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ObjectReader;
-import tools.jackson.databind.ObjectWriter;
 
 import org.springframework.core.convert.support.DefaultConversionService;
-import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 
 @Slf4j
 public class XMLMessageMapper {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final MessageBuilderFactory MESSAGE_BUILDER_FACTORY = new DefaultMessageBuilderFactory();
     private static final String KAFKA_TOPIC = "k_topic";
+    private static final String LEGACY_HEADER_ENCODING = "base64";
+    private static final ObjectReader HEADER_NAMES_READER = new ObjectMapper().readerFor(new TypeReference<Set<String>>() {
+    });
     static final int MESSAGE_VERSION = 1;
-    static final Encoder DEFAULT_ENCODING = Encoder.BASE64;
 
-    private final ObjectWriter stringSetWriter = OBJECT_MAPPER.writerFor(new TypeReference<Set<String>>() {
-    });
-    private final ObjectReader stringSetReader = OBJECT_MAPPER.readerFor(new TypeReference<Set<String>>() {
-    });
     private final Set<String> ignoredHeaderProperties = ConcurrentHashMap.newKeySet();
 
     public BytesXMLMessage mapError(BytesXMLMessage inputMessage, SolaceConsumerProperties consumerProperties) {
@@ -97,13 +90,8 @@ public class XMLMessageMapper {
             MapMessage mapMessage = JCSMPFactory.onlyInstance().createMessage(MapMessage.class);
             mapMessage.setMap((SDTMap) payload);
             xmlMessage = mapMessage;
-        } else if (payload instanceof Serializable) {
-            BytesMessage bytesMessage = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
-            bytesMessage.setData(SerializationUtils.serialize(payload));
-            metadata.putBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD, true);
-            xmlMessage = bytesMessage;
         } else {
-            String msg = String.format("Invalid payload received. Expected %s. Received: %s", String.join(", ", byte[].class.getSimpleName(), String.class.getSimpleName(), SDTStream.class.getSimpleName(), SDTMap.class.getSimpleName(), Serializable.class.getSimpleName()), payload.getClass().getName());
+            String msg = String.format("Invalid payload received. Expected %s. Received: %s", String.join(", ", byte[].class.getSimpleName(), String.class.getSimpleName(), SDTStream.class.getSimpleName(), SDTMap.class.getSimpleName()), payload.getClass().getName());
             SolaceMessageConversionException exception = new SolaceMessageConversionException(msg);
             log.warn(msg, exception);
             throw exception;
@@ -184,10 +172,8 @@ public class XMLMessageMapper {
         Object payload;
         if (xmlMessage instanceof BytesMessage) {
             payload = ((BytesMessage) xmlMessage).getData();
-            if (metadata != null && metadata.containsKey(SolaceBinderHeaders.SERIALIZED_PAYLOAD)) {
-                if (metadata.getBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD)) {
-                    payload = SerializationUtils.deserialize((byte[]) payload);
-                }
+            if (isJavaSerializedPayload(metadata)) {
+                payload = deserialize((byte[]) payload);
             }
         } else if (xmlMessage instanceof TextMessage) {
             payload = ((TextMessage) xmlMessage).getText();
@@ -259,6 +245,12 @@ public class XMLMessageMapper {
         return builder;
     }
 
+    private static boolean isJavaSerializedPayload(SDTMap metadata) throws SDTException {
+        return metadata != null &&
+                metadata.containsKey(SolaceBinderHeaders.SERIALIZED_PAYLOAD) &&
+                Boolean.TRUE.equals(metadata.getBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD));
+    }
+
     private void validateExclusiveSolaceHeaders(Map<String, Object> headers, UUID messageId) {
         Object expiration = headers.get(SolaceHeaders.EXPIRATION);
         Object timeToLive = headers.get(SolaceHeaders.TIME_TO_LIVE);
@@ -279,7 +271,6 @@ public class XMLMessageMapper {
     @SneakyThrows
     SDTMap map(Map<String, Object> headers, Collection<String> excludedHeaders, boolean convertNonSerializableHeadersToString) {
         SDTMap metadata = JCSMPFactory.onlyInstance().createMap();
-        Set<String> serializedHeaders = new HashSet<>();
 
         Set<String> keys = new HashSet<>(headers.keySet());
 
@@ -296,8 +287,11 @@ public class XMLMessageMapper {
                     IntegrationMessageHeaderAccessor.ACKNOWLEDGMENT_CALLBACK.equals(key)) {
                 continue;
             }
+            if (MessageHeaders.CONTENT_TYPE.equals(key) && value instanceof MimeType mimeType) {
+                value = mimeType.toString();
+            }
 
-            addSDTMapObject(metadata, serializedHeaders, key, value, convertNonSerializableHeadersToString);
+            addSDTMapObject(metadata, key, value, convertNonSerializableHeadersToString);
         }
 
         if (headers.containsKey(SolaceBinderHeaders.PARTITION_KEY)) {
@@ -312,18 +306,14 @@ public class XMLMessageMapper {
             }
         }
 
-        if (!serializedHeaders.isEmpty()) {
-            String var1 = stringSetWriter.writeValueAsString(serializedHeaders);
-            metadata.putString(SolaceBinderHeaders.SERIALIZED_HEADERS, var1);
-            metadata.putString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING, DEFAULT_ENCODING.getName());
-        }
         return metadata;
     }
 
     private static boolean isSpringPollutedHeader(String key, Object value) {
         return key.equals("target-protocol") || // A not true header: https://github.com/spring-cloud/spring-cloud-stream/issues/2222
                 (key.equals("id") && value instanceof UUID) || // Message header pollution from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L137
-                (key.equals("timestamp"));// JCSMP lib supports better supported header via config flags: GENERATE_RCV_TIMESTAMPS and GENERATE_SEND_TIMESTAMPS don't use the polluted version from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L151
+                (key.equals("timestamp")) || // JCSMP lib supports better supported header via config flags: GENERATE_RCV_TIMESTAMPS and GENERATE_SEND_TIMESTAMPS don't use the polluted version from: https://github.com/spring-projects/spring-framework/blob/6.2.x/spring-messaging/src/main/java/org/springframework/messaging/MessageHeaders.java#L151
+                key.equals(IntegrationMessageHeaderAccessor.DELIVERY_ATTEMPT); // Spring Integration counts the deliveries of the inbound message; the receiver of this one counts its own
     }
 
     private static boolean isJcsmpDefaultHeader(String key, Object value) {
@@ -343,38 +333,8 @@ public class XMLMessageMapper {
         final Collection<String> exclusionList = excludedHeaders != null ? excludedHeaders : Collections.emptyList();
 
         Map<String, Object> headers = new HashMap<>();
-
-        // Deserialize headers
-        if (!exclusionList.contains(SolaceBinderHeaders.SERIALIZED_HEADERS) && metadata.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS)) {
-            Encoder encoder = null;
-            if (metadata.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING)) {
-                String encoding = metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING);
-                encoder = Encoder.getByName(encoding);
-                if (encoder == null) {
-                    String msg = String.format("%s encoding is not supported", encoding);
-                    SolaceMessageConversionException exception = new SolaceMessageConversionException(msg);
-                    log.warn(msg, exception);
-                    throw exception;
-                }
-            }
-
-            Set<String> serializedHeaders = stringSetReader.readValue(metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS));
-
-            for (String headerName : serializedHeaders) {
-                if (metadata.containsKey(headerName)) {
-                    byte[] serializedValue;
-                    if (encoder != null) {
-                        serializedValue = encoder.decode(metadata.getString(headerName));
-                    } else {
-                        serializedValue = metadata.getBytes(headerName);
-                    }
-                    Object value = SerializationUtils.deserialize(serializedValue);
-                    if (value instanceof ByteArray) { // Just in case...
-                        value = ((ByteArray) value).asBytes();
-                    }
-                    headers.put(headerName, value);
-                }
-            }
+        if (!exclusionList.contains(SolaceBinderHeaders.SERIALIZED_HEADERS)) {
+            headers.putAll(deserializeLegacyHeaders(metadata));
         }
 
         metadata.keySet().stream().filter(h -> !exclusionList.contains(h)).filter(h -> !headers.containsKey(h)).filter(h -> !SolaceBinderHeaderMeta.META.containsKey(h)).filter(h -> !SolaceHeaderMeta.META.containsKey(h)).forEach(h -> {
@@ -419,19 +379,52 @@ public class XMLMessageMapper {
         return new MessageHeaders(headers);
     }
 
-    /**
-     * Wrapper function which converts Serializable objects to byte[] if they aren't naturally supported by the SDTMap
-     */
+    private static Map<String, Object> deserializeLegacyHeaders(SDTMap metadata) throws SDTException {
+        if (!metadata.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS)) {
+            return Collections.emptyMap();
+        }
+        String encoding = metadata.containsKey(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING) ?
+                metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS_ENCODING) : null;
+        if (encoding != null && !LEGACY_HEADER_ENCODING.equals(encoding)) {
+            String msg = String.format("%s encoding is not supported", encoding);
+            SolaceMessageConversionException exception = new SolaceMessageConversionException(msg);
+            log.warn(msg, exception);
+            throw exception;
+        }
+
+        Set<String> headerNames = HEADER_NAMES_READER.readValue(metadata.getString(SolaceBinderHeaders.SERIALIZED_HEADERS));
+        Map<String, Object> headers = new HashMap<>();
+        for (String headerName : headerNames) {
+            if (!metadata.containsKey(headerName)) {
+                continue;
+            }
+            byte[] serializedValue = encoding != null ?
+                    decodeBase64(metadata.getString(headerName)) :
+                    metadata.getBytes(headerName);
+            Object value = deserialize(serializedValue);
+            if (value instanceof ByteArray byteArray) {
+                value = byteArray.asBytes();
+            }
+            headers.put(headerName, value);
+        }
+        return headers;
+    }
+
+    private static byte[] decodeBase64(String encodedValue) {
+        return encodedValue != null ? Base64.getDecoder().decode(encodedValue) : null;
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Object deserialize(byte[] serialized) {
+        return SerializationUtils.deserialize(serialized);
+    }
+
     @SneakyThrows
-    private void addSDTMapObject(SDTMap sdtMap, Set<String> serializedHeaders, String key, Object object, boolean convertNonSerializableHeadersToString) {
+    private static void addSDTMapObject(SDTMap sdtMap, String key, Object object, boolean convertNonSerializableHeadersToString) {
         try {
             sdtMap.putObject(key, object);
         } catch (IllegalArgumentException | SDTException e) {
-            if (object instanceof Serializable) {
-                String var1 = DEFAULT_ENCODING.encode(SerializationUtils.serialize(object));
-                sdtMap.putString(key, var1);
-                serializedHeaders.add(key);
-            } else if (convertNonSerializableHeadersToString && object != null) {
+            if (convertNonSerializableHeadersToString && object != null) {
                 if (log.isDebugEnabled()) {
                     log.debug(String.format("Irreversibly converting header %s to String", key));
                 }
@@ -439,39 +432,6 @@ public class XMLMessageMapper {
             } else {
                 throw e;
             }
-        }
-    }
-
-    enum Encoder {
-        BASE64("base64", Base64.getEncoder()::encodeToString, Base64.getDecoder()::decode);
-
-        @Getter
-        private final String name;
-        private final Function<byte[], String> encodeFnc;
-        private final Function<String, byte[]> decodeFnc;
-
-        private static final Map<String, Encoder> nameMap = new HashMap<>();
-
-        static {
-            Arrays.stream(Encoder.values()).forEach(e -> nameMap.put(e.getName(), e));
-        }
-
-        Encoder(String name, Function<byte[], String> encodeFnc, Function<String, byte[]> decodeFnc) {
-            this.name = name;
-            this.encodeFnc = encodeFnc;
-            this.decodeFnc = decodeFnc;
-        }
-
-        public String encode(byte[] input) {
-            return input != null ? encodeFnc.apply(input) : null;
-        }
-
-        public byte[] decode(String input) {
-            return input != null ? decodeFnc.apply(input) : null;
-        }
-
-        public static Encoder getByName(String name) {
-            return nameMap.get(name);
         }
     }
 }

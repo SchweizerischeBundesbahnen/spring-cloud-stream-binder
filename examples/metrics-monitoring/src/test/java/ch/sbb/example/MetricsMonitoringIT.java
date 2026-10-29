@@ -3,9 +3,7 @@ package ch.sbb.example;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -13,6 +11,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.solace.Service;
 import org.testcontainers.solace.SolaceContainer;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,41 +40,48 @@ class MetricsMonitoringIT {
     @LocalServerPort
     private int port;
 
-    private RestTemplate restTemplate = new RestTemplate();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
-    void prometheusMetricsAreExposed() throws InterruptedException {
+    void prometheusMetricsAreExposed() throws IOException, InterruptedException {
         for (int i = 0; i < 5; i++) {
             assertThat(MetricsMonitoringApp.RECEIVED.poll(30, TimeUnit.SECONDS)).isNotNull();
         }
 
-        ResponseEntity<String> metricsResponse = null;
-        ResponseEntity<String> payloadMetricResponse = null;
+        HttpResponse<String> metricsResponse = null;
+        HttpResponse<String> payloadMetricResponse = null;
         long end = System.currentTimeMillis() + 15000;
         while (System.currentTimeMillis() < end) {
-            metricsResponse = restTemplate.getForEntity("http://localhost:" + port + "/actuator/metrics", String.class);
-            payloadMetricResponse = restTemplate.getForEntity("http://localhost:" + port + "/actuator/metrics/solace.message.size.payload", String.class);
-            if (payloadMetricResponse.getStatusCode() == HttpStatus.OK && payloadMetricResponse.getBody() != null
-                    && payloadMetricResponse.getBody().contains("solace.message.size.payload")) {
+            metricsResponse = get("/actuator/metrics");
+            payloadMetricResponse = get("/actuator/metrics/solace.message.size.payload");
+            if (payloadMetricResponse.statusCode() == HttpStatus.OK.value() && payloadMetricResponse.body() != null
+                    && payloadMetricResponse.body().contains("solace.message.size.payload")) {
                 break;
             }
             Thread.sleep(250);
         }
 
         assertThat(metricsResponse).isNotNull();
-        assertThat(metricsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(metricsResponse.getBody()).contains("solace.message.size.payload");
+        assertThat(metricsResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
+        assertThat(metricsResponse.body()).contains("solace.message.size.payload");
 
         assertThat(payloadMetricResponse).isNotNull();
-        assertThat(payloadMetricResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(payloadMetricResponse.getBody()).contains("solace.message.size.payload");
+        assertThat(payloadMetricResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
+        assertThat(payloadMetricResponse.body()).contains("solace.message.size.payload");
 
-        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/actuator/prometheus", String.class);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> response = get("/actuator/prometheus");
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value());
 
-        String metricsData = response.getBody();
+        String metricsData = response.body();
         assertThat(metricsData).isNotNull();
         assertThat(metricsData).contains("solace_");
         assertThat(metricsData).contains("solace_message_size_payload"); // Prometheus format of solace.message.size.payload
+    }
+
+    private HttpResponse<String> get(String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .GET()
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }

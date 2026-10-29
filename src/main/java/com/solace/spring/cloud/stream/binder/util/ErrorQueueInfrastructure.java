@@ -5,6 +5,8 @@ import com.solacesystems.jcsmp.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.MessagingException;
 
+import static com.solace.spring.cloud.stream.binder.util.XMLMessageIds.messageIdOf;
+
 @Slf4j
 public class ErrorQueueInfrastructure {
     private final JCSMPSessionProducerManager producerManager;
@@ -30,7 +32,7 @@ public class ErrorQueueInfrastructure {
             producer = producerManager.get(producerKey);
         } catch (Exception e) {
             String msg = String.format("Failed to get producer to send message %s to queue %s",
-                    xmlMessage.getMessageId(), errorQueueName);
+                    messageIdOf(message), errorQueueName);
             log.warn(msg, e);
             throw new MessagingException(msg, e);
         }

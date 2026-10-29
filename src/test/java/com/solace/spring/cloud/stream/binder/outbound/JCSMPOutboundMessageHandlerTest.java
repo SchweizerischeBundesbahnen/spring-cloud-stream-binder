@@ -29,8 +29,10 @@ import org.springframework.integration.IntegrationMessageHeaderAccessor;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
+import org.springframework.messaging.support.ErrorMessage;
 import org.springframework.messaging.support.MessageBuilder;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +60,7 @@ public class JCSMPOutboundMessageHandlerTest {
     private ArgumentCaptor<ProducerFlowProperties> producerFlowPropertiesCaptor;
     private ExtendedProducerProperties<SolaceProducerProperties> producerProperties;
     private JCSMPSessionProducerManager sessionProducerManager;
+    private MessageChannel errorChannel;
     @Mock
     private JCSMPSession session;
     @Mock
@@ -71,6 +74,7 @@ public class JCSMPOutboundMessageHandlerTest {
     public void init(@Mock MessageChannel errChannel,
                      @Mock SolaceMessageHeaderErrorMessageStrategy errorMessageStrategy,
                      @Mock XMLMessageProducer defaultGlobalSessionProducer) throws JCSMPException {
+        errorChannel = errChannel;
         xmlMessageCaptor = ArgumentCaptor.forClass(XMLMessage.class);
         destinationCaptor = ArgumentCaptor.forClass(Destination.class);
 
@@ -118,13 +122,13 @@ public class JCSMPOutboundMessageHandlerTest {
 
     @CartesianTest(name = "[{index}] payloadType={0}")
     public void test_responseReceived_withInTimeout(
-            @Values(classes = {String.class, List.class}) Class<?> payloadType) throws Exception {
+            @Values(classes = {String.class, byte[].class}) Class<?> payloadType) throws Exception {
         messageHandler.start();
         CorrelationData correlationData = new CorrelationData();
         messageHandler.handleMessage(MessageGenerator.generateMessage(
                         i -> {
-                            if (payloadType.equals(List.class)) {
-                                return List.of("test-0", "test-1", "test-2");
+                            if (payloadType.equals(byte[].class)) {
+                                return "test".getBytes(StandardCharsets.UTF_8);
                             } else if (payloadType.equals(String.class)) {
                                 return "test";
                             } else {
@@ -584,6 +588,24 @@ public class JCSMPOutboundMessageHandlerTest {
         XMLMessage sentMsg = xmlMessageCaptor.getValue();
         SDTMap properties = sentMsg.getProperties();
         assertThat(properties.getString("custom-default-header")).isEqualTo("overridden-value");
+    }
+
+    @Test
+    public void unmappableMessageIsSentToTheErrorChannelAndNotPublished() throws Exception {
+        messageHandler.setErrorMessageStrategy(new SolaceMessageHeaderErrorMessageStrategy());
+        messageHandler.start();
+        Message<?> message = MessageBuilder.withPayload(new Object()).build();
+
+        MessagingException exception = assertThrows(MessagingException.class, () -> messageHandler.handleMessage(message));
+
+        ArgumentCaptor<ErrorMessage> errorMessageCaptor = ArgumentCaptor.forClass(ErrorMessage.class);
+        Mockito.verify(errorChannel).send(errorMessageCaptor.capture());
+        assertThat(errorMessageCaptor.getValue().getPayload()).isSameAs(exception);
+        assertThat(exception)
+                .hasMessage("Unable to map message")
+                .hasCauseInstanceOf(SolaceMessageConversionException.class);
+        assertThat(exception.getFailedMessage()).isSameAs(message);
+        Mockito.verify(messageProducer, Mockito.never()).send(any(), any(Destination.class));
     }
 
     private List<Object> getCorrelationKeys() throws JCSMPException {

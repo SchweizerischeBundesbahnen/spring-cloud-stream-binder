@@ -35,6 +35,7 @@ class ErrorQueueRepublishCorrelationKeyTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     void testGetSourceMessageId() {
         when(message.getMessageId()).thenReturn("msg-123");
         assertThat(key.getSourceMessageId()).isEqualTo("msg-123");
