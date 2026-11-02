@@ -186,7 +186,7 @@ public class XMLMessageMapper {
             payload = ((BytesMessage) xmlMessage).getData();
             if (metadata != null && metadata.containsKey(SolaceBinderHeaders.SERIALIZED_PAYLOAD)) {
                 if (metadata.getBoolean(SolaceBinderHeaders.SERIALIZED_PAYLOAD)) {
-                    payload = SerializationUtils.deserialize((byte[]) payload);
+                    payload = deserialize((byte[]) payload);
                 }
             }
         } else if (xmlMessage instanceof TextMessage) {
@@ -368,7 +368,7 @@ public class XMLMessageMapper {
                     } else {
                         serializedValue = metadata.getBytes(headerName);
                     }
-                    Object value = SerializationUtils.deserialize(serializedValue);
+                    Object value = deserialize(serializedValue);
                     if (value instanceof ByteArray) { // Just in case...
                         value = ((ByteArray) value).asBytes();
                     }
@@ -440,6 +440,11 @@ public class XMLMessageMapper {
                 throw e;
             }
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Object deserialize(byte[] serialized) {
+        return SerializationUtils.deserialize(serialized);
     }
 
     enum Encoder {

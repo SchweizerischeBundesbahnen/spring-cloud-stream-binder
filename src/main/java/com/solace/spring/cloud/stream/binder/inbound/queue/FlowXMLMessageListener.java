@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static com.solace.spring.cloud.stream.binder.util.XMLMessageIds.messageIdOf;
+
 @Slf4j
 public class FlowXMLMessageListener implements XMLMessageListener {
     private static final Duration RECEIVER_THREAD_STOP_TIMEOUT = Duration.ofSeconds(5);
@@ -262,7 +264,7 @@ public class FlowXMLMessageListener implements XMLMessageListener {
                         log.warn("Message processing exceeded {} ms (potential deadlock): thread={}, messageId={}, destination={}",
                                 watchdogTimeoutMs,
                                 messageInProgress.getThreadName(),
-                                messageInProgress.getBytesXMLMessage().getMessageId(),
+                                messageIdOf(messageInProgress.getBytesXMLMessage()),
                                 messageInProgress.getBytesXMLMessage().getDestination().getName());
                         messageInProgress.setWarned(true);
                     }

@@ -5,7 +5,6 @@ import com.solacesystems.jcsmp.SessionEventArgs;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
-import org.springframework.lang.Nullable;
 
 @Slf4j
 public class SessionHealthIndicator extends SolaceHealthIndicator {
@@ -23,14 +22,14 @@ public class SessionHealthIndicator extends SolaceHealthIndicator {
         super.healthUp();
     }
 
-    public void reconnecting(@Nullable SessionEventArgs eventArgs) {
+    public void reconnecting(SessionEventArgs eventArgs) {
         if (log.isDebugEnabled()) {
             log.debug("Solace connection is reconnecting, immediately changing state to down");
         }
         super.healthDown(eventArgs);
     }
 
-    public void down(@Nullable SessionEventArgs eventArgs) {
+    public void down(SessionEventArgs eventArgs) {
         super.healthDown(eventArgs);
     }
 

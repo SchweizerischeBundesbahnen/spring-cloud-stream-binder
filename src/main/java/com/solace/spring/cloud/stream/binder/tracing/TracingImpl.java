@@ -6,7 +6,6 @@ import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
-import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 
 import java.util.function.Consumer;
@@ -39,14 +38,14 @@ public class TracingImpl {
     }
 
     @SneakyThrows
-    private void putString(@Nullable SDTMap map, String key, String value) {
+    private void putString(SDTMap map, String key, String value) {
         if (map != null && (TracingProxy.TRACE_PARENT.equals(key) || TracingProxy.TRACE_STATE.equals(key))) {
             map.putString(key, value);
         }
     }
 
     @SneakyThrows
-    private String getString(@Nullable SDTMap map, String key) {
+    private String getString(SDTMap map, String key) {
         if (map != null) {
             return map.getString(key);
         }

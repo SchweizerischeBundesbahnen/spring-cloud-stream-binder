@@ -50,7 +50,6 @@ public class JCSMPInboundTopicMessageMultiplexerTest {
             futures.add(executorService.submit(() -> {
                 // Simulate a message being received
                 BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-                Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
                 Mockito.when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
                 byte[] data = UUID.randomUUID().toString().getBytes();
                 Mockito.when(mockMessage.getBytes()).thenReturn(data);
