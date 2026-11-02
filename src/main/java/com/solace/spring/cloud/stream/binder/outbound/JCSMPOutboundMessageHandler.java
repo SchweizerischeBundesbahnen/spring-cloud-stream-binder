@@ -99,12 +99,7 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
 
         List<XMLMessage> smfMessages;
         Destination dynamicDestination;
-        XMLMessage smfMessageMapped = xmlMessageMapper.map(
-                message,
-                properties.getExtension().getHeaderExclusions(),
-                properties.getExtension().isNonserializableHeaderConvertToString(),
-                properties.getExtension().getDeliveryMode(),
-                properties.getExtension().getDefaultHeader());
+        XMLMessage smfMessageMapped = mapToSmfMessage(message, correlationKey);
         tracing.ifPresent(tracingProxy -> tracingProxy.injectTracingHeader(smfMessageMapped.getProperties()));
 
         smfMessageMapped.setCorrelationKey(correlationKey);
@@ -263,6 +258,19 @@ public class JCSMPOutboundMessageHandler implements MessageHandler, Lifecycle {
     @Override
     public boolean isRunning() {
         return isRunning;
+    }
+
+    private XMLMessage mapToSmfMessage(Message<?> message, ErrorChannelSendingCorrelationKey correlationKey) {
+        try {
+            return xmlMessageMapper.map(
+                    message,
+                    properties.getExtension().getHeaderExclusions(),
+                    properties.getExtension().isNonserializableHeaderConvertToString(),
+                    properties.getExtension().getDeliveryMode(),
+                    properties.getExtension().getDefaultHeader());
+        } catch (Exception e) {
+            throw handleMessagingException(correlationKey, "Unable to map message", e);
+        }
     }
 
     private MessagingException handleMessagingException(ErrorChannelSendingCorrelationKey key, String msg, Exception e)

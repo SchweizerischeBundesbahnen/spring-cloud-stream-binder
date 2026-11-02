@@ -56,7 +56,8 @@ public class SolaceProducerProperties extends SolaceCommonProperties {
 
 
     /**
-     * When set to true, irreversibly convert non-serializable headers to strings. An exception is thrown otherwise.
+     * When set to true, irreversibly convert a header whose value is not a native SMF user property type to the String
+     * its {@code toString()} returns. Such a header makes the publish fail otherwise; it is never Java-serialized.
      */
     private boolean nonserializableHeaderConvertToString = false;
 
