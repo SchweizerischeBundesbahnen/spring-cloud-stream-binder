@@ -6,14 +6,13 @@ import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SolaceSessionOAuth2TokenProvider;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.lang.Nullable;
 
 @Slf4j
 public class SolaceSessionEventHandler extends DefaultSolaceOAuth2SessionEventHandler {
     private final SessionHealthIndicator sessionHealthIndicator;
 
     public SolaceSessionEventHandler(JCSMPProperties jcsmpProperties,
-                                     @Nullable SolaceSessionOAuth2TokenProvider solaceSessionOAuth2TokenProvider,
+                                     SolaceSessionOAuth2TokenProvider solaceSessionOAuth2TokenProvider,
                                      SessionHealthIndicator sessionHealthIndicator) {
         super(jcsmpProperties, solaceSessionOAuth2TokenProvider);
         this.sessionHealthIndicator = sessionHealthIndicator;

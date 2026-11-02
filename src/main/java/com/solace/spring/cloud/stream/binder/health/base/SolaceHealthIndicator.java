@@ -7,7 +7,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.boot.health.contributor.Status;
-import org.springframework.lang.Nullable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Optional;
@@ -38,17 +37,17 @@ public class SolaceHealthIndicator implements HealthIndicator {
         logDebugStatus(String.valueOf(Status.UP));
     }
 
-    public <T> void healthReconnecting(@Nullable T eventArgs) {
+    public <T> void healthReconnecting(T eventArgs) {
         health = addEventDetails(Health.down(), eventArgs).build();
         logDebugStatus(String.valueOf(Status.DOWN));
     }
 
-    public <T> void healthDown(@Nullable T eventArgs) {
+    public <T> void healthDown(T eventArgs) {
         health = addEventDetails(Health.down(), eventArgs).build();
         logDebugStatus(String.valueOf(Status.DOWN));
     }
 
-    public <T> Health.Builder addEventDetails(Health.Builder builder, @Nullable T eventArgs) {
+    public <T> Health.Builder addEventDetails(Health.Builder builder, T eventArgs) {
         if (eventArgs == null) {
             return builder;
         }

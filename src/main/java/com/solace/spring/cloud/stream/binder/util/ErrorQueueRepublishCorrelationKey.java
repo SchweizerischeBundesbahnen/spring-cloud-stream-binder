@@ -6,6 +6,8 @@ import com.solacesystems.jcsmp.XMLMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import static com.solace.spring.cloud.stream.binder.util.XMLMessageIds.messageIdOf;
+
 @Slf4j
 @RequiredArgsConstructor
 public class ErrorQueueRepublishCorrelationKey {
@@ -26,14 +28,14 @@ public class ErrorQueueRepublishCorrelationKey {
             } else {
                 errorQueueDeliveryAttempt++;
                 log.info(String.format("Republishing XMLMessage %s to error queue %s - attempt %s of %s",
-                        message.getMessageId(), errorQueueInfrastructure.getErrorQueueName(),
+                        getSourceMessageId(), errorQueueInfrastructure.getErrorQueueName(),
                         errorQueueDeliveryAttempt, errorQueueInfrastructure.getMaxDeliveryAttempts()));
                 try {
                     errorQueueInfrastructure.send(message, this);
                     break;
                 } catch (Exception e) {
                     log.warn(String.format("Could not send XMLMessage %s to error queue %s",
-                            message.getMessageId(),
+                            getSourceMessageId(),
                             errorQueueInfrastructure.getErrorQueueName()));
                 }
             }
@@ -43,7 +45,7 @@ public class ErrorQueueRepublishCorrelationKey {
     private void fallback() {
         log.info(String.format(
                 "Exceeded max error queue delivery attempts. XMLMessage %s will be re-queued",
-                message.getMessageId()));
+                getSourceMessageId()));
         requeueMessage(message);
     }
 
@@ -56,7 +58,7 @@ public class ErrorQueueRepublishCorrelationKey {
     }
 
     public String getSourceMessageId() {
-        return message.getMessageId();
+        return messageIdOf(message);
     }
 
     public String getErrorQueueName() {

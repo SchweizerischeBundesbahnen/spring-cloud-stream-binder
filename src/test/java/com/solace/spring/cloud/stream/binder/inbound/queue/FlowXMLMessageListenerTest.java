@@ -75,7 +75,6 @@ class FlowXMLMessageListenerTest {
 
             // Simulate a message being received
             BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-            Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
             Mockito.when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
             listener.onReceive(mockMessage);
@@ -116,7 +115,6 @@ class FlowXMLMessageListenerTest {
             long start = System.nanoTime();
             for (int i = 0; i < 20; i++) {
                 BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-                Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
                 Mockito.when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
                 listener.onReceive(mockMessage);
@@ -158,7 +156,6 @@ class FlowXMLMessageListenerTest {
             // Simulate a message being received
             Topic topic = JCSMPFactory.onlyInstance().createTopic("test/topic");
             BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-            Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId-Deadlock");
             Mockito.when(mockMessage.getDestination()).thenReturn(topic);
             listener.onReceive(mockMessage);
 
@@ -186,7 +183,6 @@ class FlowXMLMessageListenerTest {
     @Test
     void testMessageInProgress_EqualsAndHashCode_UsesOnlyImmutableFields() {
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-        when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
         long receivedNanos = System.nanoTime();
@@ -217,7 +213,6 @@ class FlowXMLMessageListenerTest {
     @Test
     void testMessageInProgress_HashCodeIsCached() {
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-        when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
         FlowXMLMessageListener.MessageInProgress mip = new FlowXMLMessageListener.MessageInProgress(System.nanoTime(), mockMessage);
@@ -233,7 +228,6 @@ class FlowXMLMessageListenerTest {
     @Test
     void testMessageInProgress_CanBeAddedAndRemovedFromHashSetAfterMutation() {
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-        when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
         FlowXMLMessageListener.MessageInProgress mip = new FlowXMLMessageListener.MessageInProgress(System.nanoTime(), mockMessage);
@@ -259,11 +253,9 @@ class FlowXMLMessageListenerTest {
     @Test
     void testMessageInProgress_DifferentMessagesAreNotEqual() {
         BytesXMLMessage mockMessage1 = mock(BytesXMLMessage.class);
-        when(mockMessage1.getMessageId()).thenReturn("TestMessageId1");
         when(mockMessage1.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
         BytesXMLMessage mockMessage2 = mock(BytesXMLMessage.class);
-        when(mockMessage2.getMessageId()).thenReturn("TestMessageId2");
         when(mockMessage2.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
         long receivedNanos = System.nanoTime();
@@ -277,7 +269,6 @@ class FlowXMLMessageListenerTest {
     @Test
     void testMessageInProgress_DifferentReceivedNanosAreNotEqual() {
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-        when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
         FlowXMLMessageListener.MessageInProgress mip1 = new FlowXMLMessageListener.MessageInProgress(1000L, mockMessage);
@@ -289,7 +280,6 @@ class FlowXMLMessageListenerTest {
     @Test
     void testMessageInProgress_ToStringIncludesAllFields() {
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-        when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
 
         FlowXMLMessageListener.MessageInProgress mip = new FlowXMLMessageListener.MessageInProgress(12345L, mockMessage);
@@ -338,7 +328,6 @@ class FlowXMLMessageListenerTest {
             long start = System.currentTimeMillis();
             for (int i = 0; i < messageCount; i++) {
                 BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-                when(mockMessage.getMessageId()).thenReturn("TestMessageId-" + i);
                 when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic/" + i));
                 listener.onReceive(mockMessage);
             }
@@ -410,7 +399,6 @@ class FlowXMLMessageListenerTest {
             // Send messages
             for (int i = 0; i < messageCount; i++) {
                 BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-                when(mockMessage.getMessageId()).thenReturn("IntegrityTest-" + i);
                 when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/integrity/" + i));
                 listener.onReceive(mockMessage);
             }
@@ -512,7 +500,7 @@ class FlowXMLMessageListenerTest {
 
             Consumer<BytesXMLMessage> consumer = msg -> {
                 String key = readPartitionKey(msg);
-                int seq = Integer.parseInt(msg.getMessageId().substring(msg.getMessageId().indexOf('#') + 1));
+                int seq = Integer.parseInt(msg.getApplicationMessageId().substring(msg.getApplicationMessageId().indexOf('#') + 1));
                 threadsByKey.computeIfAbsent(key, k -> ConcurrentHashMap.newKeySet())
                         .add(Thread.currentThread().getName());
                 seqByKey.computeIfAbsent(key, k -> Collections.synchronizedList(new ArrayList<>())).add(seq);
@@ -757,9 +745,9 @@ class FlowXMLMessageListenerTest {
         }
     }
 
-    private static BytesXMLMessage mockPartitionedMessage(String partitionKey, String messageId) {
+    private static BytesXMLMessage mockPartitionedMessage(String partitionKey, String applicationMessageId) {
         BytesXMLMessage msg = mock(BytesXMLMessage.class);
-        Mockito.when(msg.getMessageId()).thenReturn(messageId);
+        Mockito.when(msg.getApplicationMessageId()).thenReturn(applicationMessageId);
         Mockito.when(msg.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
         SDTMap properties = JCSMPFactory.onlyInstance().createMap();
         if (partitionKey != null) {
@@ -775,7 +763,6 @@ class FlowXMLMessageListenerTest {
 
     private static BytesXMLMessage mockMessage() {
         BytesXMLMessage mockMessage = mock(BytesXMLMessage.class);
-        Mockito.when(mockMessage.getMessageId()).thenReturn("TestMessageId");
         Mockito.when(mockMessage.getDestination()).thenReturn(JCSMPFactory.onlyInstance().createTopic("test/topic"));
         return mockMessage;
     }

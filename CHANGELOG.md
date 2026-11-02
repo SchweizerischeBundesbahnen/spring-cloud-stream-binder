@@ -8,6 +8,11 @@ All notable changes to this project will be documented in this file.
 - Updated Spring Boot from 4.1.1 to 4.1.2 and Spring Cloud from 2025.1.3 to 2025.1.4.
 - Updated spring-boot-starter-solace-client-config from 3.1.3 to 3.1.4.
 
+## [Unreleased]
+
+### Fixed
+- STTRS-2635: When the error queue producer could not be obtained, the warning named the id of the error message, which has none before it is sent. It now names the id of the message that failed.
+
 ## [9.6.0] - 2026-10-28
 
 ### Added

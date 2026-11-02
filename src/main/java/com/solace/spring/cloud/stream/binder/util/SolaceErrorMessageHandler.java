@@ -17,6 +17,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.solace.spring.cloud.stream.binder.util.XMLMessageIds.messageIdOf;
+
 public class SolaceErrorMessageHandler implements MessageHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SolaceErrorMessageHandler.class);
@@ -50,8 +52,8 @@ public class SolaceErrorMessageHandler implements MessageHandler {
                         StaticMessageHeaderAccessor.getId(messagingExceptionFailedMessage) : null)
                 .addArgument(() -> errorMessage.getOriginalMessage() != null ?
                         StaticMessageHeaderAccessor.getId(errorMessage.getOriginalMessage()) : null)
-                .addArgument(() -> StaticMessageHeaderAccessor.getSourceData(errorMessage) instanceof XMLMessage m ?
-                        m.getMessageId() : null)
+                .addArgument(() -> StaticMessageHeaderAccessor.getSourceData(errorMessage) instanceof XMLMessage message ?
+                        messageIdOf(message) : null)
                 .log();
 
         if (acknowledgmentCallbacks.isEmpty()) {
