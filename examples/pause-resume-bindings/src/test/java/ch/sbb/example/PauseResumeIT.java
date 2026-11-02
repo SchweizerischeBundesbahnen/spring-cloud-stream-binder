@@ -4,12 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -17,8 +12,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.solace.Service;
 import org.testcontainers.solace.SolaceContainer;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.concurrent.TimeUnit;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -43,47 +42,48 @@ class PauseResumeIT {
     @LocalServerPort
     private int port;
 
-    private RestTemplate restTemplate = new RestTemplate();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
     void canPauseAndResumeBindingsViaActuator() throws Exception {
         // 1. Send initial message and verify received
-        ResponseEntity<String> initialPublishResponse = publish("msg1");
-        assertThat(initialPublishResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> initialPublishResponse = publish("msg1");
+        assertThat(initialPublishResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
         String m1 = PauseResumeApp.RECEIVED.poll(30, TimeUnit.SECONDS);
         assertThat(m1).isEqualTo("msg1");
 
         // 2. Pause the consumer
-        ResponseEntity<Object> pauseResponse = restTemplate.postForEntity(
-                "http://localhost:" + port + "/actuator/bindings/pausableConsumer-in-0",
-                Map.of("state", "PAUSED"),
-                Object.class);
-        assertThat(pauseResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        HttpResponse<String> pauseResponse = changeBindingState("PAUSED");
+        assertThat(pauseResponse.statusCode()).isEqualTo(HttpStatus.NO_CONTENT.value());
 
         // 3. Send second message while paused, verify NOT received
-        ResponseEntity<String> pausedPublishResponse = publish("msg2");
-        assertThat(pausedPublishResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> pausedPublishResponse = publish("msg2");
+        assertThat(pausedPublishResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
         String m2 = PauseResumeApp.RECEIVED.poll(2, TimeUnit.SECONDS);
         assertThat(m2).isNull(); // Expected to be null since we're paused
 
         // 4. Resume the consumer
-        ResponseEntity<Object> resumeResponse = restTemplate.postForEntity(
-                "http://localhost:" + port + "/actuator/bindings/pausableConsumer-in-0",
-                Map.of("state", "RESUMED"),
-                Object.class);
-        assertThat(resumeResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        HttpResponse<String> resumeResponse = changeBindingState("RESUMED");
+        assertThat(resumeResponse.statusCode()).isEqualTo(HttpStatus.NO_CONTENT.value());
 
         // 5. Verify queued message is now received
         String resumedMsg = PauseResumeApp.RECEIVED.poll(30, TimeUnit.SECONDS);
         assertThat(resumedMsg).isEqualTo("msg2");
     }
 
-    private ResponseEntity<String> publish(String payload) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.TEXT_PLAIN);
-        return restTemplate.postForEntity(
-                "http://localhost:" + port + "/send",
-                new HttpEntity<>(payload, headers),
-                String.class);
+    private HttpResponse<String> publish(String payload) throws IOException, InterruptedException {
+        return post("/send", "text/plain", payload);
+    }
+
+    private HttpResponse<String> changeBindingState(String state) throws IOException, InterruptedException {
+        return post("/actuator/bindings/pausableConsumer-in-0", "application/json", "{\"state\":\"" + state + "\"}");
+    }
+
+    private HttpResponse<String> post(String path, String contentType, String body) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .header("Content-Type", contentType)
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }

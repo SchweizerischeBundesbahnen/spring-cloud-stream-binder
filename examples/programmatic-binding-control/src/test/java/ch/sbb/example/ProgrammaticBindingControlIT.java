@@ -3,19 +3,19 @@ package ch.sbb.example;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.web.client.RestTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.solace.Service;
 import org.testcontainers.solace.SolaceContainer;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,49 +40,40 @@ class ProgrammaticBindingControlIT {
     @LocalServerPort
     private int port;
 
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+
     @Test
     void bindingCanBeStartedStoppedAndStartedAgain() throws Exception {
         ProgrammaticBindingControlApp.RECEIVED.clear();
-        RestTemplate restTemplate = new RestTemplate();
 
-        ResponseEntity<String> startResponse = restTemplate.postForEntity(
-                url("/bindings/start"),
-                HttpEntity.EMPTY,
-                String.class);
-        assertThat(startResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> startResponse = post("/bindings/start", HttpRequest.BodyPublishers.noBody());
+        assertThat(startResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
 
-        ResponseEntity<String> initialPublish = publish(restTemplate, "msg-1");
-        assertThat(initialPublish.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> initialPublish = publish("msg-1");
+        assertThat(initialPublish.statusCode()).isEqualTo(HttpStatus.OK.value());
         assertThat(ProgrammaticBindingControlApp.RECEIVED.poll(30, TimeUnit.SECONDS)).isEqualTo("msg-1");
 
-        ResponseEntity<String> stopResponse = restTemplate.postForEntity(
-                url("/bindings/stop"),
-                HttpEntity.EMPTY,
-                String.class);
-        assertThat(stopResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> stopResponse = post("/bindings/stop", HttpRequest.BodyPublishers.noBody());
+        assertThat(stopResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
 
-        ResponseEntity<String> stoppedPublish = publish(restTemplate, "msg-2");
-        assertThat(stoppedPublish.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> stoppedPublish = publish("msg-2");
+        assertThat(stoppedPublish.statusCode()).isEqualTo(HttpStatus.OK.value());
         assertThat(ProgrammaticBindingControlApp.RECEIVED.poll(2, TimeUnit.SECONDS)).isNull();
 
-        ResponseEntity<String> restartResponse = restTemplate.postForEntity(
-                url("/bindings/start"),
-                HttpEntity.EMPTY,
-                String.class);
-        assertThat(restartResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        HttpResponse<String> restartResponse = post("/bindings/start", HttpRequest.BodyPublishers.noBody());
+        assertThat(restartResponse.statusCode()).isEqualTo(HttpStatus.OK.value());
         assertThat(ProgrammaticBindingControlApp.RECEIVED.poll(30, TimeUnit.SECONDS)).isEqualTo("msg-2");
     }
 
-    private ResponseEntity<String> publish(RestTemplate restTemplate, String payload) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.TEXT_PLAIN);
-        return restTemplate.postForEntity(
-                url("/send"),
-                new HttpEntity<>(payload, headers),
-                String.class);
+    private HttpResponse<String> publish(String payload) throws IOException, InterruptedException {
+        return post("/send", HttpRequest.BodyPublishers.ofString(payload));
     }
 
-    private String url(String path) {
-        return "http://localhost:" + port + path;
+    private HttpResponse<String> post(String path, HttpRequest.BodyPublisher body) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .header("Content-Type", "text/plain")
+                .POST(body)
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }
