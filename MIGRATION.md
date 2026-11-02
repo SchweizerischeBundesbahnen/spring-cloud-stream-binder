@@ -4,6 +4,42 @@ This document contains migration guides for version upgrades of the Spring Cloud
 
 ---
 
+## 9.6.0 to 10.0.0
+
+### Payloads and headers are no longer Java-serialized
+
+The binder used to Java-serialize a `Serializable` payload or header that SMF cannot carry natively. Deserializing
+bytes from the wire runs code from any class on the consumer's classpath, so the binder no longer writes such
+content. It still reads it, so that a consumer can be upgraded before the producers that publish to it.
+
+When publishing:
+
+- a payload other than `byte[]`, `String`, `SDTStream` or `SDTMap` makes the publish fail with a `MessagingException`.
+  Let Spring Cloud Stream convert the object, for example to JSON, which it does by default unless
+  `useNativeEncoding=true`, or convert it yourself before sending.
+- a header whose value is not a native SMF user property type, such as a `UUID`, a `List` or an application object,
+  makes the publish fail with a `MessagingException` that names the header. Convert it to a `String` or `byte[]`
+  yourself, drop it with `headerExclusions`, or set `nonserializableHeaderConvertToString: true` to have the binder
+  write its `toString()`.
+- a `contentType` header held as a `MimeType` is written as its String form. The `deliveryAttempt` counter that
+  Spring Integration keeps for the inbound message is not forwarded, so the receiver of a message this binder
+  publishes starts its own count at zero.
+
+When consuming, a payload or header an older binder Java-serialized is deserialized as before. Two things change:
+
+- once a producer is upgraded, its `contentType` arrives as a `String` instead of a `MimeType`, and
+  `getHeaders().get(MessageHeaders.CONTENT_TYPE, MimeType.class)` throws an `IllegalArgumentException`. Read it with
+  `StaticMessageHeaderAccessor.getContentType(message)`, which accepts both.
+- a processor passes on what it receives. A header an older producer Java-serialized, a `UUID` for instance, arrives
+  as that object, and forwarding it makes the processor's publish fail, although the processor never set the header.
+  As long as any of its producers is older, give such a processor `headerExclusions` for those headers or
+  `nonserializableHeaderConvertToString: true`.
+
+Upgrade the producers of a `Serializable` payload or header only after converting it to a native type, and make
+sure every consumer of a payload converted this way, for example to JSON, can read the new format.
+
+---
+
 ## 9.5.2 to 9.6.0
 
 ### `SolaceMessageChannelBinder#destroy` leaves the session and its `Context` open

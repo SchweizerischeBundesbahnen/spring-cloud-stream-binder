@@ -2,16 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [10.0.0] - 2026-11-02
+
+### Breaking Changes
+- STTRS-3496: The binder no longer Java-serializes a payload or header that is not a native SMF type. A consumer that deserializes such bytes runs code from any class on its classpath, and Spring deprecated the `SerializationUtils.deserialize` that consumer relies on for exactly that reason. Such a payload, or such a header without `nonserializableHeaderConvertToString`, now makes the publish fail with a `MessagingException` that names the header, which goes to the producer's error channel. Java-serialized content from an older binder is still deserialized on receipt, so consumers can be upgraded before their producers. See [MIGRATION.md](MIGRATION.md).
+
+### Changed
+- STTRS-3496: A `contentType` header held as a `MimeType` is written as its String form, and the `deliveryAttempt` header of the inbound message is no longer forwarded, so the receiver of a message this binder publishes starts its own count.
+
+### Fixed
+- STTRS-2635: When the error queue producer could not be obtained, the warning named the id of the error message, which has none before it is sent. It now names the id of the message that failed.
+
 ## [9.6.1] - 2026-11-05
 
 ### Changed
 - Updated Spring Boot from 4.1.1 to 4.1.2 and Spring Cloud from 2025.1.3 to 2025.1.4.
 - Updated spring-boot-starter-solace-client-config from 3.1.3 to 3.1.4.
-
-## [Unreleased]
-
-### Fixed
-- STTRS-2635: When the error queue producer could not be obtained, the warning named the id of the error message, which has none before it is sent. It now names the id of the message that failed.
 
 ## [9.6.0] - 2026-10-28
 
