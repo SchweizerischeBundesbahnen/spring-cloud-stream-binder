@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [9.6.1] - 2026-11-05
+
+### Changed
+- Updated Spring Boot from 4.1.1 to 4.1.2 and Spring Cloud from 2025.1.3 to 2025.1.4.
+- Updated spring-boot-starter-solace-client-config from 3.1.3 to 3.1.4.
+
 ## [9.6.0] - 2026-10-28
 
 ### Added
