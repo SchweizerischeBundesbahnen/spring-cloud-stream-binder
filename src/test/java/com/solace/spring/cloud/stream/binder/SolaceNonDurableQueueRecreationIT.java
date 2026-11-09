@@ -88,7 +88,7 @@ class SolaceNonDurableQueueRecreationIT {
         await().atMost(FLOW_BACK_WITHIN).until(() -> !events.isEmpty());
         assertThat(events).singleElement().satisfies(recorded -> {
             assertThat(recorded.event()).isEqualTo(new SolaceNonDurableQueueRecreatedEvent("recreated-in-0", queueName));
-            assertThat(recorded.thread()).doesNotContain("Dispatcher");
+            assertThat(recorded.thread()).startsWith("solace-queue-recreated-");
         });
     }
 
