@@ -1023,6 +1023,23 @@ public Function<Message<SDTMap>, Message<SDTMap>> transform() {
 
 If this behavior is undesirable, then you should configure your consumers `maxAttempts` to `1` and rely on [Message Redelivery](#message-redelivery) to handle reprocessing.
 
+## Recreated Anonymous Consumer Queues
+
+An anonymous consumer binding, one without a `group`, consumes from a temporary queue. When the binder loses its connection, the broker keeps that queue for a while and then deletes it. On reconnect, the binder creates the queue anew, empty and under the same name. Every message published to the binding's subscriptions while the queue was gone is lost.
+
+The binder announces this with a `SolaceNonDurableQueueRecreatedEvent`, an application event that carries the binding name and the queue name:
+
+```java
+@EventListener
+public void onQueueRecreated(SolaceNonDurableQueueRecreatedEvent event) {
+    log.warn("Binding {} lost the messages published while queue {} was gone", event.bindingName(), event.queueName());
+}
+```
+
+The event is published on a thread of its own, never on the thread that dispatches Solace messages, so a listener may take its time.
+
+The binder tells a recreated queue from one that survived the disconnect by subscribing it again: only a recreated queue lacks its subscriptions. A binding with `addDestinationAsSubscriptionToQueue=false` and no `queueAdditionalSubscriptions` has no subscription to check, so the recreation of its queue goes unannounced.
+
 ## Consumer Bindings Pause/Resume
 
 The Solace binder supports pausing and resuming consumer bindings through the Spring Cloud Stream actuator `bindings` endpoint. See [Spring Cloud Stream documentation](https://docs.spring.io/spring-cloud-stream/docs/current/reference/html/spring-cloud-stream.html#binding_visualization_control) to learn how to pause and resume consumer bindings.

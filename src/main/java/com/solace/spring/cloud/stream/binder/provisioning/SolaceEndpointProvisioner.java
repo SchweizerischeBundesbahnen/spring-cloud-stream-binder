@@ -173,11 +173,16 @@ public class SolaceEndpointProvisioner
                 properties.getExtension().isProvisionErrorQueue());
     }
 
-    public void addSubscriptionToQueue(Queue queue, String topicName, SolaceCommonProperties properties, boolean isDestinationSubscription) {
+    /**
+     * Subscribes the queue to the topic, unless it is subscribed already.
+     *
+     * @return whether the queue lacked the subscription and got it now
+     */
+    public boolean addSubscriptionToQueue(Queue queue, String topicName, SolaceCommonProperties properties, boolean isDestinationSubscription) {
         if (isDestinationSubscription && !properties.isAddDestinationAsSubscriptionToQueue()) {
             log.debug("Adding destination as subscription was disabled, queue {} will not be subscribed to topic {}",
                     queue.getName(), topicName);
-            return;
+            return false;
         }
 
         log.info("Subscribing queue {} to topic {}", queue.getName(), topicName);
@@ -185,13 +190,14 @@ public class SolaceEndpointProvisioner
             Topic topic = JCSMPFactory.onlyInstance().createTopic(topicName);
             try {
                 jcsmpSession.addSubscription(queue, topic, JCSMPSession.WAIT_FOR_CONFIRM);
+                return true;
             } catch (JCSMPErrorResponseException e) {
                 if (e.getSubcodeEx() == JCSMPErrorResponseSubcodeEx.SUBSCRIPTION_ALREADY_PRESENT) {
                     log.info("Queue {} is already subscribed to topic {}, SUBSCRIPTION_ALREADY_PRESENT error will be ignored...",
                             queue.getName(), topicName);
-                } else {
-                    throw e;
+                    return false;
                 }
+                throw e;
             }
         } catch (JCSMPException e) {
             String msg = String.format("Failed to add subscription of %s to queue %s", topicName, queue.getName());
