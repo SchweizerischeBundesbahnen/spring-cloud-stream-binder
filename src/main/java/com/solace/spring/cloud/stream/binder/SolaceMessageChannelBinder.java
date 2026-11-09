@@ -1,6 +1,7 @@
 package com.solace.spring.cloud.stream.binder;
 
 import com.solace.spring.cloud.stream.binder.health.SolaceBinderHealthAccessor;
+import com.solace.spring.cloud.stream.binder.inbound.queue.ConsumerQueueSubscriber;
 import com.solace.spring.cloud.stream.binder.inbound.queue.JCSMPInboundQueueMessageProducer;
 import com.solace.spring.cloud.stream.binder.inbound.topic.JCSMPInboundTopicMessageMultiplexer;
 import com.solace.spring.cloud.stream.binder.inbound.topic.JCSMPInboundTopicMessageProducer;
@@ -279,15 +280,6 @@ public class SolaceMessageChannelBinder
      */
     private Consumer<Endpoint> getConsumerPostStart(SolaceConsumerDestination destination,
                                                     ExtendedConsumerProperties<SolaceConsumerProperties> properties) {
-        return (endpoint) -> {
-            if (endpoint instanceof Queue queue) {
-                provisioningProvider.addSubscriptionToQueue(queue, destination.getBindingDestinationName(), properties.getExtension(), true);
-
-                //Process additional subscriptions
-                for (String subscription : destination.getAdditionalSubscriptions()) {
-                    provisioningProvider.addSubscriptionToQueue(queue, subscription, properties.getExtension(), false);
-                }
-            }
-        };
+        return new ConsumerQueueSubscriber(provisioningProvider, destination, properties, getApplicationContext());
     }
 }
