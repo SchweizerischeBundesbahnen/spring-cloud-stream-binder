@@ -10,8 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.TaskExecutor;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -27,6 +28,8 @@ import java.util.function.Consumer;
 @Slf4j
 @RequiredArgsConstructor
 public class ConsumerQueueSubscriber implements Consumer<Endpoint> {
+    private static final TaskExecutor EVENT_EXECUTOR = new SimpleAsyncTaskExecutor("solace-queue-recreated-");
+
     private final SolaceEndpointProvisioner provisioningProvider;
     private final SolaceConsumerDestination destination;
     private final ExtendedConsumerProperties<SolaceConsumerProperties> properties;
@@ -54,10 +57,12 @@ public class ConsumerQueueSubscriber implements Consumer<Endpoint> {
     private void publishRecreation(SolaceNonDurableQueueRecreatedEvent event) {
         log.warn("Non-durable queue {} of binding {} was recreated, messages published while it was gone are lost",
                 event.queueName(), event.bindingName());
-        CompletableFuture.runAsync(() -> eventPublisher.publishEvent(event))
-                .exceptionally(e -> {
-                    log.error("Failed to publish {}", event, e);
-                    return null;
-                });
+        EVENT_EXECUTOR.execute(() -> {
+            try {
+                eventPublisher.publishEvent(event);
+            } catch (RuntimeException e) {
+                log.error("Failed to publish {}", event, e);
+            }
+        });
     }
 }

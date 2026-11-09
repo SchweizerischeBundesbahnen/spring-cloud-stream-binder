@@ -1025,7 +1025,7 @@ If this behavior is undesirable, then you should configure your consumers `maxAt
 
 ## Recreated Anonymous Consumer Queues
 
-An anonymous consumer binding, one without a `group`, consumes from a temporary queue. When the binder loses its connection, the broker keeps that queue for a while and then deletes it. On reconnect, the binder creates the queue anew, empty and under the same name. Every message published to the binding's subscriptions while the queue was gone is lost.
+An anonymous consumer binding, one without a `group` or with `group: non-durable`, consumes from a temporary queue. When the binder loses its connection, the broker keeps that queue for a while and then deletes it, together with every message still in it, delivered but unacknowledged ones included. On reconnect, the binder creates the queue anew, empty and under the same name, and subscribes it again. Every message published to the binding's subscriptions until then is lost as well.
 
 The binder announces this with a `SolaceNonDurableQueueRecreatedEvent`, an application event that carries the binding name and the queue name:
 

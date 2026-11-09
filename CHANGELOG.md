@@ -6,7 +6,6 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - #183: A `SolaceNonDurableQueueRecreatedEvent` application event tells an application that the broker dropped the temporary queue of an anonymous consumer binding while the binder was disconnected, and that the messages published in between are lost. See [Recreated Anonymous Consumer Queues](API.md#recreated-anonymous-consumer-queues).
-- `SolaceEndpointProvisioner#addSubscriptionToQueue` returns whether the queue lacked the subscription.
 
 ## [10.0.0] - 2026-11-02
 
